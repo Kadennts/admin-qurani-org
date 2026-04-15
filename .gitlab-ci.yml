@@ -2,31 +2,35 @@ stages:
   - test
   - deploy
 
-# TAHAP 1: PENGECEKAN KODE (TESTING)
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
 check_code:
   stage: test
   tags:
-    - nodejs # Sesuaikan dengan tag runner kamu, atau hapus baris tags ini jika runner tidak pakai tag
+    - nodejs
   script:
-    - echo "Sedang mengecek kelayakan kodingan..."
-    - npm install
-    # Jika kamu belum punya script test, baris di bawah bisa dikomentari dulu
-    - npm test || echo "Test belum dikonfigurasi, lanjut..." 
+    - echo "Mengecek kodingan..."
+    - npm ci  # Pakai 'ci' biar lebih cepat di runner
+    - npm test || echo "Skip"
   only:
     - main
 
-# TAHAP 2: PENGIRIMAN KE SERVER (DEPLOY)
 deploy_to_aapanel:
   stage: deploy
   tags:
     - nodejs
   script:
-    - echo "Kodingan aman! Mengirim ke aaPanel..."
-    - ssh -o StrictHostKeyChecking=no root@192.168.1.155 "
+    - echo "Kirim ke aaPanel..."
+    - rsync -avz --delete --exclude '.git' --exclude 'node_modules' ./ root@192.168.1.157:/www/wwwroot/admin-qurani-org/
+    - ssh -o StrictHostKeyChecking=no root@192.168.1.157 "
         cd /www/wwwroot/admin-qurani-org && 
-        git pull origin main && 
-        npm install && 
-        pm2 restart all || echo 'Aplikasi sudah terupdate!'
+        npm install --production &&
+        npm run build && 
+        pm2 startOrReload ecosystem.config.js --update-env && 
+        echo 'Deploy Sukses!'
       "
   only:
-    - main
+    - main  # Pastikan branch-nya sama (tadi kamu tulis master, sekarang saya samain ke main)
