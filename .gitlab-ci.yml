@@ -11,10 +11,10 @@ deploy_proyek:
     - npm run build
     
     # 1. Kirim file
-    - rsync -az --delete --exclude '.git' --exclude 'node_modules' ./ root@192.168.1.157:/www/wwwroot/admin-qurani-org/
+    - rsync -az --delete --exclude '.git' --exclude 'node_modules' ./ root@192.168.1.155:/www/wwwroot/admin-qurani-org/
     
     # 2. Perbaiki Permission & Restart via sudo -u www
-    - ssh -o StrictHostKeyChecking=no root@192.168.1.157 "
+    - ssh -o StrictHostKeyChecking=no root@192.168.1.155 "
         chown -R www:www /www/wwwroot/admin-qurani-org && 
         cd /www/wwwroot/admin-qurani-org && 
         sudo -u www npm install --production --no-audit && 
