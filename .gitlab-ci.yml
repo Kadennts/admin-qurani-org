@@ -1,36 +1,25 @@
 stages:
-  - test
-  - deploy
+  - build_and_deploy
 
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - node_modules/
-
-check_code:
-  stage: test
+deploy_proyek:
+  stage: build_and_deploy
   tags:
     - nodejs
   script:
-    - echo "Mengecek kodingan..."
-    - npm ci  # Pakai 'ci' biar lebih cepat di runner
-    - npm test || echo "Skip"
-  only:
-    - main
-
-deploy_to_aapanel:
-  stage: deploy
-  tags:
-    - nodejs
-  script:
-    - echo "Kirim ke aaPanel..."
-    - rsync -avz --delete --exclude '.git' --exclude 'node_modules' ./ root@192.168.1.157:/www/wwwroot/admin-qurani-org/
+    - echo "🚀 Deploy bersih sebagai user www..."
+    - npm ci --prefer-offline
+    - npm run build
+    
+    # 1. Kirim file
+    - rsync -az --delete --exclude '.git' --exclude 'node_modules' ./ root@192.168.1.157:/www/wwwroot/admin-qurani-org/
+    
+    # 2. Perbaiki Permission & Restart via sudo -u www
     - ssh -o StrictHostKeyChecking=no root@192.168.1.157 "
+        chown -R www:www /www/wwwroot/admin-qurani-org && 
         cd /www/wwwroot/admin-qurani-org && 
-        npm install --production &&
-        npm run build && 
-        pm2 startOrReload ecosystem.config.js --update-env && 
-        echo 'Deploy Sukses!'
+        sudo -u www npm install --production --no-audit && 
+        sudo -u www pm2 startOrReload ecosystem.config.js --update-env &&
+        echo '✅ Deploy Berhasil via User www!'
       "
   only:
-    - main  # Pastikan branch-nya sama (tadi kamu tulis master, sekarang saya samain ke main)
+    - main
