@@ -1,7 +1,7 @@
 "use server";
 
 import { MonthRecap, MonthUser } from "@/types/recap";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient, createClient } from "@/utils/supabase/server";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com";
 
@@ -23,28 +23,43 @@ export interface CityData {
   total?: number;
 }
 
-export async function fetchCities(stateId: number) {
+type FetchCityItem = {
+  id: number;
+  name: string;
+  timezone: string;
+  state_id: number;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export async function fetchCities(stateId: number): Promise<{
+  success: boolean;
+  message: string;
+  data: FetchCityItem[];
+  error?: unknown;
+}> {
   try {
-    const url = `${API_BASE_URL}/api/v1/Cities/state/${stateId}`;
+    const supabase = await createAdminClient();
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-      next: { revalidate: 3600 }
-    });
+    const { data, error } = await supabase
+      .from("cities")
+      .select("id, name, timezone, state_id, latitude, longitude")
+      .eq("state_id", stateId)
+      .order("name");
 
-    if (!response.ok) {
-      console.error("[fetchCities] API Error:", response.status, url);
-      return { success: false, message: "Error fetching cities" };
+    if (error) {
+      console.error("[fetchCities] Error:", error.message, "stateId:", stateId);
+      return { success: false, message: error.message, data: [] };
     }
 
-    const data = await response.json();
-    return { success: true, message: "Cities fetched successfully", data };
+    return { 
+      success: true, 
+      message: "Cities fetched successfully", 
+      data: (data || []) as FetchCityItem[] 
+    };
   } catch (error) {
-    console.error("[fetchCities] Error:", error);
-    return { success: false, message: "Error fetching cities", error };
+    console.error("[fetchCities] Catch Error:", error);
+    return { success: false, message: "Server error", data: [], error };
   }
 }
 

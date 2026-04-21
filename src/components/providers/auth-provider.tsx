@@ -13,6 +13,7 @@ interface UserProfile {
     email: string
     avatar: string
     role?: string
+    timezone?: string
 }
 
 interface AuthContextType {
@@ -146,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: parsed.email,
                             avatar: normalizeAvatarUrl(parsed.avatar || parsed.image),
                             role: parsed.role || "member",
+                            timezone: parsed.timezone || "",
                         } as UserProfile;
                     }
                 }
@@ -169,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: userData.email,
                             avatar: normalizeAvatarUrl(userData.avatar || userData.image),
                             role: userData.role || "member",
+                            timezone: userData.timezone || "",
                         } as UserProfile;
 
                         // Cache the profile for future page loads
@@ -357,6 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: customUser.email,
                 avatar: normalizeAvatarUrl(customUser.image),
                 role: "member",
+                timezone: (customUser as any).timezone || "",
             } as UserProfile;
         }
         return null;

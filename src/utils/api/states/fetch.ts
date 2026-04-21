@@ -1,59 +1,70 @@
 "use server";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com";
+import { createAdminClient, createClient } from "@/utils/supabase/server";
 
-export async function fetchStates(country_id?: number) {
+type StateItem = {
+  id: number;
+  name: string;
+  country_id: number;
+  country_code?: string;
+  country_name?: string;
+};
+
+export async function fetchStates(country_id?: number): Promise<{
+  success: boolean;
+  message: string;
+  data: StateItem[];
+}> {
   try {
-    let url = `${API_BASE_URL}/api/v1/States`;
+    const { createAdminClient } = await import("@/utils/supabase/server");
+    const supabase = await createAdminClient();
 
-    // Use specific endpoint if country_id is provided
+    let query = supabase
+      .from("states")
+      .select("id, name, country_id, country_code, country_name")
+      .order("name");
+
     if (country_id) {
-      url = `${API_BASE_URL}/api/v1/States/country/${country_id}`;
+      query = query.eq("country_id", country_id);
     }
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-      next: { revalidate: 3600 } // Cache for 1 hour
-    });
+    const { data, error } = await query;
 
-    if (!response.ok) {
-      console.error("[fetchStates] API Error:", response.status, url);
-      return { success: false, message: `Failed to fetch provinces: ${response.status}` };
+    if (error) {
+      console.error("[fetchStates] Supabase Error:", error);
+      return { success: false, message: "Failed to fetch states", data: [] };
     }
 
-    const data = await response.json();
-    return { success: true, message: "Provinces fetched successfully", data };
+    return { success: true, message: "States fetched successfully", data: (data || []) as StateItem[] };
   } catch (error) {
     console.error("[fetchStates] Error:", error);
-    return { success: false, message: error instanceof Error ? error.message : "Unknown error" };
+    return { success: false, message: "Unknown error", data: [] };
   }
 }
 
-export async function fetchStatesById(id: number) {
+export async function fetchStatesById(id: number): Promise<{
+  success: boolean;
+  message: string;
+  data?: StateItem;
+}> {
   try {
-    const url = `${API_BASE_URL}/api/v1/States/${id}`;
+    const { createAdminClient } = await import("@/utils/supabase/server");
+    const supabase = await createAdminClient();
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-      next: { revalidate: 3600 }
-    });
+    const { data, error } = await supabase
+      .from("states")
+      .select("id, name, country_id, country_code, country_name")
+      .eq("id", id)
+      .single();
 
-    if (!response.ok) {
-      // Try fallback or just return error
-      console.error("[fetchStatesById] API Error:", response.status);
-      return { success: false, message: `Failed to fetch province: ${response.status}` };
+    if (error || !data) {
+      console.error("[fetchStatesById] Supabase Error:", error);
+      return { success: false, message: "Failed to fetch state" };
     }
 
-    const data = await response.json();
-    return { success: true, message: "Provinces fetched successfully", data };
+    return { success: true, message: "State fetched successfully", data: data as StateItem };
   } catch (error) {
     console.error("[fetchStatesById] Error:", error);
-    return { success: false, message: error instanceof Error ? error.message : "Unknown error" };
+    return { success: false, message: "Unknown error" };
   }
 }

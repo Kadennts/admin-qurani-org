@@ -389,6 +389,7 @@ function ProfilePageContent() {
         profileData.phoneNumber,
         profileData.bio,
         profilePhotoUrl || undefined,
+        profileData.email, // Tambahkan email di sini
       )
 
       if (!result.success) {

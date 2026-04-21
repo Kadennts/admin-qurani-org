@@ -41,6 +41,7 @@ import Link from "next/link"
 import { fetchTickets, fetchTicketStats, type TicketListItem } from "@/utils/api/tickets/fetch"
 import { bulkUpdateTickets } from "@/utils/api/tickets/update"
 import { bulkDeleteTickets } from "@/utils/api/tickets/delete"
+import { useAuth } from "@/hooks/use-auth"
 // DISABLED: Supabase realtime subscriptions
 // import { createClient } from "@/utils/supabase/client"
 import { cn } from "@/lib/utils"
@@ -54,8 +55,10 @@ const DEPARTMENTS = ["Marketing", "Teknis", "Produk", "Engineering", "Data", "Au
 
 export default function SupportTicketsPage() {
   const router = useRouter()
-  // const { profile } = useAuth() // Unused
+  const { profile } = useAuth()
   const { t, locale } = useTranslation(['support'])
+
+  const userTimezone = profile?.timezone || "Asia/Jakarta"
 
   // -- State --
   const [searchQuery, setSearchQuery] = useState("")
@@ -612,14 +615,21 @@ export default function SupportTicketsPage() {
         return formatDistanceToNowStrict(date, { addSuffix: true, locale: localeObj })
       }
 
-      const hour = date.getHours().toString().padStart(2, "0")
-      const minute = date.getMinutes().toString().padStart(2, "0")
-      const timeLabel = `${hour}:${minute}`
-      const shortDate = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short" }).format(date)
-      const longDate = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" }).format(date)
+      // Timezone-aware formatting using Intl.DateTimeFormat
+      const options: Intl.DateTimeFormatOptions = {
+        day: "2-digit",
+        month: "short",
+        timeZone: userTimezone
+      };
 
-      if (variant === 'short') return shortDate
-      return `${longDate} - ${timeLabel}`
+      if (variant === 'long') {
+        options.year = "numeric";
+        options.hour = "2-digit";
+        options.minute = "2-digit";
+        options.hour12 = false;
+      }
+
+      return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', options).format(date).replace(',', ' -')
     } catch {
       return dateString
     }

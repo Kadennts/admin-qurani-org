@@ -1,30 +1,42 @@
 "use server";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com";
+import { createAdminClient } from "@/utils/supabase/server";
 
-export async function fetchCountries() {
+export type CountryItem = {
+  id: number;
+  name: string;
+  iso2?: string;
+  iso3?: string;
+  phone_code?: string;
+};
+
+export async function fetchCountries(): Promise<{
+  success: boolean;
+  message: string;
+  data: CountryItem[];
+}> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/Countries`, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-      next: { revalidate: 86400 } // Cache for 24 hours (Master data rarely changes)
-    });
+    const supabase = await createAdminClient();
 
-    if (!response.ok) {
-      console.error("[fetchCountries] API Error:", response.status);
-      return { success: false, message: `Failed to fetch countries: ${response.status}` };
+    console.log("[fetchCountries] Fetching countries from Supabase...");
+    const { data, error } = await supabase
+      .from("countries")
+      .select("id, name") // Disederhanakan untuk tes
+      .order("name");
+
+    if (error) {
+      console.error("[fetchCountries] Error:", error.message);
+      return { success: false, message: error.message, data: [] };
     }
 
-    const result = await response.json();
-
-    // Handle both array response and wrapped data response
-    const data = Array.isArray(result) ? result : (Array.isArray(result.data) ? result.data : []);
-
-    return { success: true, message: "Countries fetched successfully", data };
+    console.log(`[fetchCountries] Success! Found ${data?.length || 0} countries.`);
+    return { 
+      success: true, 
+      message: "Countries fetched successfully", 
+      data: (data || []) as CountryItem[] 
+    };
   } catch (error) {
-    console.error("[fetchCountries] Error:", error);
-    return { success: false, message: error instanceof Error ? error.message : "Unknown error" };
+    console.error("[fetchCountries] Catch Error:", error);
+    return { success: false, message: "Server error", data: [] };
   }
 }

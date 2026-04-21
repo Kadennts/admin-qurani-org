@@ -56,7 +56,39 @@ export async function GET() {
         const result = JSON.parse(responseText);
         const profileData = result.data || result;
 
-        return NextResponse.json({ profile: convertToProfile(profileData) });
+        // --- AMBIL DATA TAMBAHAN DARI SUPABASE (AGAR TIDAK KOSONG) ---
+        let profile = convertToProfile(profileData);
+        try {
+            const { createClient } = await import("@/utils/supabase/server");
+            const supabase = await createClient();
+            
+            // Cari data berdasarkan email
+            if (profile.email) {
+                const { data: sbData } = await supabase
+                    .from("user_profiles")
+                    .select("countryId, stateId, cityId, countryName, stateName, cityName, timezone")
+                    .eq("email", profile.email)
+                    .maybeSingle();
+
+                if (sbData) {
+                    profile = {
+                        ...profile,
+                        countryId: sbData.countryId || profile.countryId,
+                        stateId: sbData.stateId || profile.stateId,
+                        cityId: sbData.cityId || profile.cityId,
+                        countryName: sbData.countryName || profile.countryName,
+                        stateName: sbData.stateName || profile.stateName,
+                        cityName: sbData.cityName || profile.cityName,
+                        timezone: sbData.timezone || profile.timezone,
+                    };
+                }
+            }
+        } catch (err) {
+            console.error("[/api/me] Supabase merge skipped:", err);
+        }
+        // -------------------------------------------------------------
+
+        return NextResponse.json({ profile });
     } catch (err) {
         console.error("[/api/me] Error:", err);
         return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });

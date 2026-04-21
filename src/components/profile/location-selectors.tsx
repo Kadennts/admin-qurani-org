@@ -106,7 +106,7 @@ export function LocationSelectors({
               <CommandInput placeholder={t('common.search', 'Search')} />
               <CommandList>
                 <CommandGroup>
-                  {countries.map((country: CountryData) => (
+                  {(countries ?? []).map((country: CountryData) => (
                     <CommandItem
                       key={country.id}
                       className="w-full flex justify-between cursor-pointer"
@@ -164,7 +164,7 @@ export function LocationSelectors({
               <CommandInput placeholder={t('common.search', 'Search')} />
               <CommandList>
                 <CommandGroup>
-                  {states.map((state) => (
+                  {(states ?? []).map((state) => (
                     <CommandItem
                       key={state.id}
                       className="w-full flex justify-between cursor-pointer"
@@ -174,7 +174,7 @@ export function LocationSelectors({
                           name: state.name
                         })
                         if (selectedCity.id !== 0) {
-                          const selectedCityData = cities.find(city => city.id === selectedCity.id)
+                          const selectedCityData = (cities ?? []).find(city => city.id === selectedCity.id)
                           if (selectedCityData && selectedCityData.state_id !== state.id) {
                             setSelectedCity({ id: 0, name: "", timezone: "" })
                           }
@@ -227,7 +227,7 @@ export function LocationSelectors({
               <CommandInput placeholder={t('common.search', 'Search')} />
               <CommandList>
                 <CommandGroup>
-                  {cities.map((city) => (
+                  {cities?.map((city) => (
                     <CommandItem
                       key={city.id}
                       className="w-full flex justify-between cursor-pointer"

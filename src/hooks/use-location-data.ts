@@ -62,19 +62,24 @@ export function useLocationData(enabled: boolean = true) {
           setCountries(parsed);
           countriesLoadedRef.current = true;
           return;
+        } else {
+          localStorage.removeItem("countries_cache");
         }
       } catch (e) {
-        console.error("Failed to parse countries cache", e);
+        localStorage.removeItem("countries_cache");
       }
     }
 
     const load = async () => {
       countriesLoadedRef.current = true;
       const result = await fetchCountries();
-      if (result.success) {
-        const data = result.data || [];
-        setCountries(data);
-        localStorage.setItem("countries_cache", JSON.stringify(data));
+      if (result.success && result.data && result.data.length > 0) {
+        setCountries(result.data);
+        localStorage.setItem("countries_cache", JSON.stringify(result.data));
+      } else {
+        console.warn("[useLocationData] Failed to load countries or empty list", result);
+        // Allow reload next time if empty
+        countriesLoadedRef.current = false;
       }
     };
 
@@ -100,17 +105,21 @@ export function useLocationData(enabled: boolean = true) {
             setStates(parsed);
             return;
           }
+          localStorage.removeItem(cacheKey);
         } catch (e) {
-          console.error("Failed to parse states cache", e);
+          localStorage.removeItem(cacheKey);
         }
       }
 
       const load = async () => {
+        console.log(`[useLocationData] Fetching states for country ${countryId}...`);
         const result = await fetchStates(countryId);
-        if (result.success) {
-          const data = result.data || [];
-          setStates(data);
-          localStorage.setItem(cacheKey, JSON.stringify(data));
+        if (result.success && result.data && result.data.length > 0) {
+          setStates(result.data);
+          localStorage.setItem(cacheKey, JSON.stringify(result.data));
+        } else {
+          console.warn("[useLocationData] No states found for country:", countryId, result);
+          setStates([]);
         }
       };
       load();
@@ -128,7 +137,6 @@ export function useLocationData(enabled: boolean = true) {
     const stateId = selectedState.id !== 0 ? selectedState.id : currentState.id;
     if (stateId && stateId !== 0) {
       const cacheKey = `cities_cache_${stateId}`;
-
       // Check cache first
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
@@ -138,17 +146,22 @@ export function useLocationData(enabled: boolean = true) {
             setCities(parsed);
             return;
           }
+          // If empty, clear it
+          localStorage.removeItem(cacheKey);
         } catch (e) {
-          console.error("Failed to parse cities cache", e);
+          localStorage.removeItem(cacheKey);
         }
       }
 
       const load = async () => {
+        console.log(`[useLocationData] Fetching cities for state ${stateId}...`);
         const result = await fetchCities(stateId);
-        if (result.success) {
-          const data = result.data || [];
-          setCities(data);
-          localStorage.setItem(cacheKey, JSON.stringify(data));
+        if (result.success && result.data && result.data.length > 0) {
+          setCities(result.data);
+          localStorage.setItem(cacheKey, JSON.stringify(result.data));
+        } else {
+          console.warn("[useLocationData] No cities found for state:", stateId, result);
+          setCities([]);
         }
       };
       load();

@@ -25,6 +25,7 @@ import { CityData } from "@/types/cities"
 import Image from "next/image"
 import { fetchCountries } from "@/utils/api/countries/fetch"
 import { CountryData } from "@/types/countries"
+import { useLocationData } from "@/hooks/use-location-data"
 
 export function RegisterForm({
     className,
@@ -45,13 +46,23 @@ export function RegisterForm({
     const [isClient, setIsClient] = useState(false);
     const redirectPath = searchParams.get("redirect");
 
-    const [countries, setCountries] = useState<CountryData[]>([]);
-    const [provinces, setProvinces] = useState<ProvinceData[]>([]);
-    const [cities, setCities] = useState<CityData[]>([]);
-
-    const [openCountry, setOpenCountry] = useState(false);
-    const [openProvince, setOpenProvince] = useState(false);
-    const [openCity, setOpenCity] = useState(false);
+    const {
+        countries,
+        states: provinces,
+        cities,
+        openCountry,
+        setOpenCountry,
+        openState: openProvince,
+        setOpenState: setOpenProvince,
+        openCity,
+        setOpenCity,
+        selectedCountry,
+        setSelectedCountry,
+        selectedState: selectedProvince,
+        setSelectedState: setSelectedProvince,
+        selectedCity: selectedCityObj,
+        setSelectedCity: setSelectedCityObj,
+    } = useLocationData(true);
 
     const { data, handleChange } = useForm({
         email: "",
@@ -67,93 +78,56 @@ export function RegisterForm({
         timezone: "",
     });
 
-    // Debounce username untuk menghindari terlalu banyak request
+    // Sinkronkan data form dengan data dari Hook
+    useEffect(() => {
+        handleChange({ target: { name: "country_id", value: selectedCountry.id.toString() } });
+        handleChange({ target: { name: "country_name", value: selectedCountry.name } });
+    }, [selectedCountry]);
+
+    useEffect(() => {
+        handleChange({ target: { name: "province_id", value: selectedProvince.id.toString() } });
+        handleChange({ target: { name: "province_name", value: selectedProvince.name } });
+    }, [selectedProvince]);
+
+    useEffect(() => {
+        handleChange({ target: { name: "city_id", value: selectedCityObj.id.toString() } });
+        handleChange({ target: { name: "city_name", value: selectedCityObj.name } });
+        handleChange({ target: { name: "timezone", value: selectedCityObj.timezone } });
+    }, [selectedCityObj]);
+
+    // --- RESTORED LOGIC ---
     const debouncedUsername = useDebounce(data.username, 500);
 
     useEffect(() => {
         const urlError = searchParams.get("error");
-        if (urlError) {
-            setError(urlError);
-        }
+        if (urlError) setError(urlError);
     }, [searchParams]);
 
-    // Prevent hydration mismatch
     useEffect(() => {
         setIsClient(true);
     }, []);
 
-    // Effect untuk mengecek ketersediaan username secara real-time
     useEffect(() => {
         const checkUsername = async () => {
             if (!debouncedUsername) {
                 setUsernameStatus({ isChecking: false, isAvailable: null, message: "" });
                 return;
             }
-
             if (debouncedUsername.length < 3) {
-                setUsernameStatus({
-                    isChecking: false,
-                    isAvailable: false,
-                    message: t("register.username_min_length")
-                });
+                setUsernameStatus({ isChecking: false, isAvailable: false, message: t("register.username_min_length") });
                 return;
             }
-
             setUsernameStatus(prev => ({ ...prev, isChecking: true }));
-
             try {
                 const result = await checkUsernameAvailability(debouncedUsername);
-                setUsernameStatus({
-                    isChecking: false,
-                    isAvailable: result.isAvailable,
-                    message: result.message || ""
-                });
+                setUsernameStatus({ isChecking: false, isAvailable: result.isAvailable, message: result.message || "" });
             } catch {
-                setUsernameStatus({
-                    isChecking: false,
-                    isAvailable: false,
-                    message: t("register.username_checking_error")
-                });
+                setUsernameStatus({ isChecking: false, isAvailable: false, message: t("register.username_checking_error") });
             }
         };
-
         checkUsername();
     }, [debouncedUsername, t]);
-
-    // Effect untuk load countries
-    useEffect(() => {
-        const loadCountries = async () => {
-            try {
-                const result = await fetchCountries()
-                if (result.success) {
-                    setCountries(result.data || [])
-                }
-            } catch {
-                // Silent error handling for country loading
-            }
-        }
-        loadCountries()
-    }, [])
-
-    useEffect(() => {
-        const fetchStatesLoad = async () => {
-            const result = await fetchStates(parseInt(data.country_id));
-            if (result.success) {
-                setProvinces(result.data || []);
-            } else {
-                toast.error(result.message || "Error fetching provinces");
-            }
-        };
-        fetchStatesLoad();
-    }, [data.country_id]);
-
-    useEffect(() => {
-        const fetchCitiesLoad = async () => {
-            const result = await fetchCities(Number(data.province_id));
-            setCities(result.data || []);
-        };
-        fetchCitiesLoad();
-    }, [data.province_id]);
+    // -----------------------
 
 
     const handleEmailRegister = async (e: React.FormEvent) => {
@@ -209,56 +183,63 @@ export function RegisterForm({
 
         try {
             await withLoading(async () => {
-                // 1. Try MyQurani API register first
-                try {
-                    const { authApi } = await import('@/lib/api');
-                    const result = await authApi.register({
-                        email: data.email.trim(),
-                        password: data.password,
-                        username: data.username.trim().toLowerCase(),
-                        name: data.full_name.trim(),
-                        countryId: parseInt(data.country_id) || 0,
-                        stateId: parseInt(data.province_id) || 0,
-                        cityId: parseInt(data.city_id) || 0,
-                        timezone: data.timezone,
-                    });
+                const { authApi } = await import('@/lib/api');
+                
+                // 1. Daftar ke MyQurani API TERLEBIH DAHULU untuk mendapat userId
+                console.log("[Register] Registering to MyQurani API...");
+                const registerResult = await authApi.register({
+                    email: data.email.trim(),
+                    password: data.password,
+                    username: data.username.trim().toLowerCase(),
+                    name: data.full_name.trim(),
+                    countryId: parseInt(data.country_id) || 0,
+                    stateId: parseInt(data.province_id) || 0,
+                    cityId: parseInt(data.city_id) || 0,
+                    timezone: data.timezone || "Asia/Jakarta",
+                });
 
-                    if (result) {
-                        toast.success(t("register.success", "Registration successful!"));
-                        // If got token, redirect to dashboard
-                        if (result.accessToken) {
-                            router.replace('/dashboard');
-                        } else {
-                            // Otherwise redirect to login
-                            router.replace('/login');
-                        }
-                        return;
+                // 2. Setelah dapat userId dari API, simpan profil ke Supabase
+                const realUserId = String(registerResult?.userId || "");
+                if (realUserId) {
+                    const { updateUserProfile } = await import('@/utils/api/user/update-profile');
+                    console.log("[Register] Saving profile to Supabase with userId:", realUserId);
+                    
+                    const supabaseResult = await updateUserProfile(
+                        realUserId,
+                        parseInt(data.country_id) || 0,
+                        parseInt(data.province_id) || 0,
+                        parseInt(data.city_id) || 0,
+                        data.country_name,
+                        data.province_name,
+                        data.city_name,
+                        data.timezone,
+                        data.full_name.trim(),
+                        "", // nickname
+                        data.username.trim().toLowerCase(),
+                        null, // gender
+                        "", // dob
+                        "", // job
+                        "", // phone
+                        "", // bio
+                        undefined, // avatar
+                        data.email.trim()
+                    );
+
+                    if (!supabaseResult.success) {
+                        console.warn("[Register] Supabase save warning:", supabaseResult.message);
+                    } else {
+                        console.log("[Register] Profile saved to Supabase successfully!");
                     }
-                } catch (apiError: any) {
-                    console.log("MyQurani API register failed:", apiError.message);
-                    // Rethrow if it's a specific error (like "email already exists")
-                    if (apiError.message && !apiError.message.includes('fetch')) {
-                        throw apiError;
-                    }
-                    // Otherwise try fallback
+                } else {
+                    console.warn("[Register] No userId returned from API, skipping Supabase save");
                 }
 
-                // 2. Fallback to Supabase (old flow)
-                const formData = new FormData();
-                formData.append('email', data.email.trim());
-                formData.append('password', data.password);
-                formData.append('full_name', data.full_name.trim());
-                formData.append('username', data.username.trim().toLowerCase());
-                formData.append('country_id', data.country_id);
-                formData.append('states_id', data.province_id);
-                formData.append('city_id', data.city_id);
-                formData.append('country_name', data.country_name);
-                formData.append('states_name', data.province_name);
-                formData.append('city_name', data.city_name);
-                formData.append('timezone', data.timezone);
-
-                await registerWithToast(formData);
-                router.replace('/login');
+                toast.success(t("register.success", "Registration successful!"));
+                if (registerResult?.accessToken) {
+                    router.replace('/dashboard');
+                } else {
+                    router.replace('/login');
+                }
             });
         } catch (err: any) {
             toast.error(err.message || t("register.failed", "Registration failed"));
@@ -414,34 +395,30 @@ export function RegisterForm({
                         )}
                     </div>
                     <div className="grid gap-1">
-                        <Label htmlFor="country_id">{isClient ? t("register.country", "Countries") : "Province"}</Label>
+                        <Label htmlFor="country_id">{isClient ? t("register.country", "Country") : "Country"}</Label>
                         <Popover open={openCountry} onOpenChange={setOpenCountry}>
                             <PopoverTrigger asChild className="w-full text-left">
                                 <Button variant="outline">
-                                    {data.country_name ? data.country_name : (isClient ? t("register.select_country", "Select Province") : "Select Province")}
+                                    {data.country_name ? data.country_name : (isClient ? t("register.select_country", "Select Country") : "Select Country")}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent align="start" className="p-0">
                                 <Command>
-                                    <CommandInput placeholder={isClient ? t("register.search_country", "Search Province") : "Search Province"} />
+                                    <CommandInput placeholder={isClient ? t("register.search_country", "Search Country") : "Search Country"} />
                                     <CommandList>
                                         <CommandGroup>
-                                            {countries.map((country) => (
-                                                <CommandItem className="w-full flex justify-between" onSelect={() => {
-                                                    if (Number(data.province_id) === country.id) {
-                                                        handleChange({ target: { name: "country_id", value: "0" }, });
-                                                        handleChange({ target: { name: "country_name", value: "" }, });
-                                                        handleChange({ target: { name: "province_id", value: "0" }, });
-                                                        handleChange({ target: { name: "province_name", value: "" }, });
-                                                    } else {
-                                                        handleChange({ target: { name: "country_id", value: country.id.toString() } });
-                                                        handleChange({ target: { name: "country_name", value: country.name } });
-                                                        handleChange({ target: { name: "province_id", value: "0" }, });
-                                                        handleChange({ target: { name: "province_name", value: "" }, });
+                                            {countries.map((country: CountryData) => (
+                                                <CommandItem 
+                                                    className="w-full flex justify-between cursor-pointer" 
+                                                    onSelect={() => {
+                                                        setSelectedCountry({ id: country.id, name: country.name });
                                                         setOpenCountry(false);
-                                                    }
-                                                }} value={country.name} key={country.id}>{country.name}
-                                                    <Check className={`text-red-200 w-4 h-4 ${data.country_name === country.name ? "opacity-100" : "opacity-0"}`} />
+                                                    }} 
+                                                    value={country.name} 
+                                                    key={country.id}
+                                                >
+                                                    {country.name}
+                                                    <Check className={`text-emerald-500 w-4 h-4 ${data.country_id === country.id.toString() ? "opacity-100" : "opacity-0"}`} />
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
@@ -463,22 +440,18 @@ export function RegisterForm({
                                     <CommandInput placeholder={isClient ? t("register.search_province", "Search Province") : "Search Province"} />
                                     <CommandList>
                                         <CommandGroup>
-                                            {provinces.map((province) => (
-                                                <CommandItem className="w-full flex justify-between" onSelect={() => {
-                                                    if (Number(data.province_id) === province.id) {
-                                                        handleChange({ target: { name: "province_id", value: "0" }, });
-                                                        handleChange({ target: { name: "province_name", value: "" }, });
-                                                        handleChange({ target: { name: "city_id", value: "0" }, });
-                                                        handleChange({ target: { name: "city_name", value: "" }, });
-                                                    } else {
-                                                        handleChange({ target: { name: "province_id", value: province.id.toString() } });
-                                                        handleChange({ target: { name: "province_name", value: province.name } });
-                                                        handleChange({ target: { name: "city_id", value: "0" }, });
-                                                        handleChange({ target: { name: "city_name", value: "" }, });
+                                            {provinces.map((province: ProvinceData) => (
+                                                <CommandItem 
+                                                    className="w-full flex justify-between cursor-pointer" 
+                                                    onSelect={() => {
+                                                        setSelectedProvince({ id: province.id, name: province.name });
                                                         setOpenProvince(false);
-                                                    }
-                                                }} value={province.name} key={province.id}>{province.name}
-                                                    <Check className={`text-red-200 w-4 h-4 ${data.province_name === province.name ? "opacity-100" : "opacity-0"}`} />
+                                                    }} 
+                                                    value={province.name} 
+                                                    key={province.id}
+                                                >
+                                                    {province.name}
+                                                    <Check className={`text-emerald-500 w-4 h-4 ${data.province_id === province.id.toString() ? "opacity-100" : "opacity-0"}`} />
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
@@ -500,21 +473,18 @@ export function RegisterForm({
                                     <CommandInput placeholder={isClient ? t("register.search_city", "Search City") : "Search City"} />
                                     <CommandList>
                                         <CommandGroup>
-                                            {cities.map((city) => (
-                                                <CommandItem className="w-full flex justify-between" onSelect={() => {
-                                                    if (Number(data.city_id) === city.id) {
-                                                        handleChange({ target: { name: "city_name", value: "" }, });
-                                                        handleChange({ target: { name: "city_id", value: "0" }, });
-                                                        handleChange({ target: { name: "timezone", value: "" }, });
-                                                    } else {
-                                                        handleChange({ target: { name: "city_name", value: city.name }, });
-                                                        handleChange({ target: { name: "city_id", value: city.id.toString() }, });
-                                                        handleChange({ target: { name: "timezone", value: city.timezone }, });
+                                            {cities.map((city: CityData) => (
+                                                <CommandItem 
+                                                    className="w-full flex justify-between cursor-pointer" 
+                                                    onSelect={() => {
+                                                        setSelectedCityObj({ id: city.id, name: city.name, timezone: city.timezone });
                                                         setOpenCity(false);
-                                                    }
-                                                }} value={city.name} key={Number(city.id)}>
+                                                    }} 
+                                                    value={city.name} 
+                                                    key={city.id}
+                                                >
                                                     {city.name}
-                                                    <Check className={`text-red-200 w-4 h-4 ${Number(data.city_id) === city.id ? "opacity-100" : "opacity-0"}`} />
+                                                    <Check className={`text-emerald-500 w-4 h-4 ${data.city_id === city.id.toString() ? "opacity-100" : "opacity-0"}`} />
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>

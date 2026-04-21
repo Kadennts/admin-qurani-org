@@ -376,24 +376,32 @@ export default function TicketDetailClient({
 
 
 
+    const userTimezone = profile?.timezone || "Asia/Jakarta"
+
     const formatDateTime = (dateString: string | null) => {
         if (!dateString) return "-"
         try {
             let dateStr = dateString
             if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-                // If it looks like "2024-04-20 08:30:00" replace space with T
                 if (dateStr.includes(' ')) {
                     dateStr = dateStr.replace(' ', 'T') + 'Z'
                 } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                    // datetime-local format
                     dateStr = dateStr + ':00Z'
                 }
             }
-            const date = parseISO(dateStr)
+            const date = new Date(dateStr)
             if (Number.isNaN(date.getTime())) return dateString
 
-            // Used for tooltips
-            return format(date, "MMM dd, yyyy - HH:mm")
+            // Timezone-aware formatting
+            return new Intl.DateTimeFormat('en-US', {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+                timeZone: userTimezone
+            }).format(date).replace(',', '')
         } catch {
             return dateString
         }
@@ -892,7 +900,7 @@ export default function TicketDetailClient({
                                     <span className="font-bold text-gray-900 dark:text-white text-sm">{ticket.contact}</span>
                                     <span className="text-xs text-gray-500">opened this ticket</span>
                                 </div>
-                                <span className="text-xs text-gray-400 cursor-help" title={formatDateTime(ticket.submitted_date)}>{formatRelativeTime(ticket.submitted_date)}</span>
+                                <span className="text-xs text-gray-400">{formatDateTime(ticket.submitted_date)}</span>
                             </div>
                             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
                                 {ticket.body}
@@ -931,7 +939,7 @@ export default function TicketDetailClient({
                                         <div className="font-semibold text-gray-700 dark:text-gray-300">
                                             {reply.author === 'Staff' ? 'Support Team' : reply.author} <span className="font-normal text-gray-500 ml-1">{isUser ? "(Client)" : "(Staff)"}</span>
                                         </div>
-                                        <div className="text-gray-400 cursor-help" title={formatDateTime(reply.date)}>{formatRelativeTime(reply.date)}</div>
+                                        <div className="text-gray-400">{formatDateTime(reply.date)}</div>
                                     </div>
                                     <div className="p-4 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
                                         {/* Only show message if it's not just "📎 Attachment" placeholder */}
