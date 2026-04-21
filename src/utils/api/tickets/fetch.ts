@@ -223,6 +223,70 @@ function convertTicketWithReplies(apiTicket: ApiTicketDetailDto): TicketWithRepl
 // ============================================
 // API Functions
 // ============================================
+// Helper: Ambil tiket dari Supabase (selalu dijalankan, tidak tergantung API)
+// ============================================
+async function fetchSupabaseTicketList(filters?: {
+  status?: string
+  priority?: string
+  search?: string
+  limit?: number
+}): Promise<TicketListItem[]> {
+  try {
+    const { createAdminClient } = await import('@/utils/supabase/server');
+    const supabase = await createAdminClient();
+
+    let query = supabase
+      .from('tickets')
+      .select('id, ticket_number, subject, contact, department, project, service, priority, status, last_reply, submitted_date, body')
+      .order('submitted_date', { ascending: false })
+      .limit(filters?.limit || 100);
+
+    if (filters?.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.priority && filters.priority !== 'all') {
+      query = query.eq('priority', filters.priority);
+    }
+    if (filters?.search) {
+      query = query.ilike('subject', `%${filters.search}%`);
+    }
+
+    const { data: sbData, error: sbError } = await query;
+
+    if (sbError || !sbData || sbData.length === 0) {
+      if (sbError) console.warn('[fetchSupabaseTicketList] Error:', sbError.message);
+      return [];
+    }
+
+    console.log('[fetchSupabaseTicketList] Found', sbData.length, 'tickets from Supabase');
+    return sbData.map(t => ({
+      id: t.id,
+      ticket_number: t.ticket_number || `#${t.id}`,
+      subject: t.subject,
+      contact: t.contact,
+      department: t.department || 'Support',
+      project: t.project || null,
+      service: t.service || null,
+      priority: t.priority || 'Medium',
+      status: t.status || 'Open',
+      last_reply: t.last_reply || null,
+      submitted_date: t.submitted_date || new Date().toISOString(),
+      body: t.body || null,
+    }));
+  } catch (err) {
+    console.warn('[fetchSupabaseTicketList] Skipped:', err);
+    return [];
+  }
+}
+
+// Helper: merge API + Supabase, hilangkan duplikat berdasarkan ID
+function mergeTickets(apiTickets: TicketListItem[], sbTickets: TicketListItem[]): TicketListItem[] {
+  const apiIds = new Set(apiTickets.map(t => String(t.id)));
+  const uniqueSb = sbTickets.filter(t => !apiIds.has(String(t.id)));
+  return [...apiTickets, ...uniqueSb];
+}
+
+// ============================================
 
 export async function fetchTickets(filters?: {
   status?: string
@@ -236,9 +300,13 @@ export async function fetchTickets(filters?: {
 }): Promise<{ success: boolean; data?: TicketListItem[]; totalCount?: number; error?: string }> {
   const token = await getAuthToken();
 
+  // Mulai fetch Supabase DI AWAL secara paralel — tidak menunggu API
+  const supabasePromise = fetchSupabaseTicketList(filters);
+
   if (!token) {
     console.error('[fetchTickets] No auth token found');
-    return { success: false, error: 'Not authenticated' };
+    const sbTickets = await supabasePromise;
+    return { success: true, data: sbTickets, totalCount: sbTickets.length };
   }
 
   try {
@@ -271,7 +339,8 @@ export async function fetchTickets(filters?: {
       response = await fetchWithAutoRefresh(url, { method: 'GET' });
     } catch (authError) {
       console.error('[fetchTickets] Auth error:', authError);
-      return { success: true, data: [], totalCount: 0, error: 'Authentication required' };
+      const sbTickets = await supabasePromise;
+      return { success: true, data: sbTickets, totalCount: sbTickets.length, error: 'Authentication required' };
     }
 
     // Handle empty response
@@ -280,8 +349,9 @@ export async function fetchTickets(filters?: {
     console.log('[fetchTickets] Response text:', responseText.substring(0, 300));
 
     if (!responseText || responseText.trim() === '') {
-      console.log('[fetchTickets] Empty response, returning empty array');
-      return { success: true, data: [], totalCount: 0 };
+      console.log('[fetchTickets] Empty response, using Supabase only');
+      const sbTickets = await supabasePromise;
+      return { success: true, data: sbTickets, totalCount: sbTickets.length };
     }
 
     let rawResult: any;
@@ -289,13 +359,14 @@ export async function fetchTickets(filters?: {
       rawResult = JSON.parse(responseText);
     } catch (parseError) {
       console.error('[fetchTickets] JSON parse error:', parseError);
-      return { success: true, data: [], totalCount: 0 };
+      const sbTickets = await supabasePromise;
+      return { success: true, data: sbTickets, totalCount: sbTickets.length };
     }
 
     if (!response.ok) {
       console.error('[fetchTickets] API error:', rawResult);
-      // Return empty data with success true to avoid crashing the UI
-      return { success: true, data: [], totalCount: 0, error: rawResult.message || 'Failed to fetch tickets' };
+      const sbTickets = await supabasePromise;
+      return { success: true, data: sbTickets, totalCount: sbTickets.length, error: rawResult.message || 'Failed to fetch tickets' };
     }
 
     // Handle different response structures
@@ -322,15 +393,25 @@ export async function fetchTickets(filters?: {
 
     console.log('[fetchTickets] Parsed:', ticketData.length, 'tickets, total:', totalCount);
 
+    // Convert API tickets to local format
+    const apiTickets = ticketData.map(convertTicketListItem);
+
+    // Await Supabase (sudah berjalan paralel sejak awal)
+    const sbTickets = await supabasePromise;
+    const allTickets = mergeTickets(apiTickets, sbTickets);
+
+    console.log('[fetchTickets] Final:', apiTickets.length, 'API +', (allTickets.length - apiTickets.length), 'Supabase =', allTickets.length, 'total');
+
     return {
       success: true,
-      data: ticketData.map(convertTicketListItem),
-      totalCount: totalCount,
+      data: allTickets,
+      totalCount: totalCount + (allTickets.length - apiTickets.length),
     };
   } catch (error) {
     console.error('[fetchTickets] Error:', error);
-    // Return empty data to avoid crashing the UI
-    return { success: true, data: [], totalCount: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+    // Fallback ke Supabase saja jika terjadi error
+    const sbTickets = await supabasePromise.catch(() => [] as TicketListItem[]);
+    return { success: true, data: sbTickets, totalCount: sbTickets.length, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 

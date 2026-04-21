@@ -334,21 +334,50 @@ export const authApi = {
             }),
         });
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: 'Registration failed' }));
-            throw new Error(error.message || error.error || 'Registration failed');
+        const responseText = await response.text().catch(() => '');
+        let responseData: any = {};
+
+        if (responseText) {
+            try {
+                const parsed = JSON.parse(responseText);
+                responseData = parsed.data || parsed;
+            } catch {
+                // Server returned non-JSON (e.g. plain text "true" or HTML error)
+                console.warn('[authApi.register] Non-JSON response:', responseText.substring(0, 200));
+                // If not OK, throw a readable error
+                if (!response.ok) {
+                    throw new Error(responseText.substring(0, 200) || `Registration failed (${response.status})`);
+                }
+                // If OK but non-JSON, treat as success with no token (user needs to login)
+                return {
+                    userId: '',
+                    email: data.email,
+                    username: data.username,
+                    name: data.name,
+                    accessToken: '',
+                    refreshToken: '',
+                    expiresAt: '',
+                    roles: [],
+                };
+            }
         }
 
-        const result = await response.json();
-        const responseData = result.data || result;
+        if (!response.ok) {
+            // Extract error message from parsed JSON
+            const errorMsg = responseData.message
+                || responseData.error
+                || responseData.title
+                || `Registration failed (${response.status})`;
+            throw new Error(errorMsg);
+        }
 
         // If API returns tokens, auto-login
         if (responseData.accessToken) {
             const auth: AuthData = {
                 userId: responseData.userId,
-                email: responseData.email,
-                username: responseData.username,
-                name: responseData.name,
+                email: responseData.email || data.email,
+                username: responseData.username || data.username,
+                name: responseData.name || data.name,
                 image: responseData.image,
                 accessToken: responseData.accessToken,
                 refreshToken: responseData.refreshToken,
@@ -359,9 +388,9 @@ export const authApi = {
             return auth;
         }
 
-        // Otherwise, return empty auth (user needs to login manually)
+        // Registration succeeded but no token returned (manual login required)
         return {
-            userId: responseData.userId || '',
+            userId: responseData.userId || responseData.id || '',
             email: data.email,
             username: data.username,
             name: data.name,

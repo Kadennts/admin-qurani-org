@@ -376,7 +376,8 @@ export default function TicketDetailClient({
 
 
 
-    const userTimezone = profile?.timezone || "Asia/Jakarta"
+    // Timezone dari profile user — auth-provider sudah supplement dari Supabase jika API kosong
+    const userTimezone = profile?.timezone || 'UTC'
 
     const formatDateTime = (dateString: string | null) => {
         if (!dateString) return "-"
@@ -392,16 +393,17 @@ export default function TicketDetailClient({
             const date = new Date(dateStr)
             if (Number.isNaN(date.getTime())) return dateString
 
-            // Timezone-aware formatting
-            return new Intl.DateTimeFormat('en-US', {
-                month: "short",
+            // Timezone-aware formatting — shows time in viewer's own timezone + abbreviation
+            return new Intl.DateTimeFormat('en-GB', {
                 day: "2-digit",
+                month: "short",
                 year: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: false,
-                timeZone: userTimezone
-            }).format(date).replace(',', '')
+                timeZone: userTimezone,
+                timeZoneName: "short",  // WIB / BST / GMT / EST dll
+            }).format(date)
         } catch {
             return dateString
         }
@@ -519,7 +521,10 @@ export default function TicketDetailClient({
             let replySuccess = false
             let apiError: string | null = null
 
-            if (auth?.accessToken) {
+            // Deteksi tiket Supabase (ID kecil) vs MyQurani (18 digit snowflake ID)
+            const isSupabaseTicket = ticket.id < 1_000_000;
+
+            if (auth?.accessToken && !isSupabaseTicket) {
                 console.log('[Reply] Sending reply to ticket:', ticket.id)
                 console.log('[Reply] User roles:', auth.roles)
                 console.log('[Reply] User name:', auth.name)
@@ -533,14 +538,14 @@ export default function TicketDetailClient({
 
                     if (replyResult?.success === false || replyResult?.error) {
                         apiError = replyResult?.message || replyResult?.error || 'Unknown error'
-                        console.error('[Reply] API returned error:', apiError)
+                        console.warn('[Reply] API returned error (expected for Supabase tickets):', apiError)
                     } else {
                         replySuccess = true
                     }
                 } catch (apiErr: any) {
-                    // API threw an error (400, 403, etc.) - but don't fail completely
+                    // API threw an error (400, 403, etc.) — expected for Supabase-only tickets
                     apiError = apiErr?.message || 'API request failed'
-                    console.error('[Reply] API threw error:', apiError)
+                    console.warn('[Reply] API failed (non-critical for Supabase tickets):', apiError)
 
                     // If it's "Access denied", the API might have still saved the reply
                     // This happens when API returns 403 but data is saved (backend bug)
@@ -550,17 +555,24 @@ export default function TicketDetailClient({
                 }
             }
 
-            // If client-side failed or no token, try server action as fallback
-            if (!replySuccess && !auth?.accessToken) {
+            // Jika API gagal (termasuk tiket Supabase yg tidak ada di MyQurani),
+            // simpan reply ke Supabase sebagai fallback
+            if (!replySuccess) {
                 try {
-                    await createTicketReply({
+                    const sbResult = await createTicketReply({
                         ticket_id: ticket.id,
                         author: authorName,
                         message: messageContent || (attachmentUrls.length > 0 ? "📎 Attachment" : ""),
                         attachments: attachmentsJson || undefined,
                         isFromAdmin: true
                     })
-                    replySuccess = true
+                    if (sbResult.success) {
+                        replySuccess = true
+                        console.log('[Reply] Saved to Supabase successfully')
+                    } else {
+                        apiError = sbResult.error || 'Supabase save failed'
+                        console.error('[Reply] Supabase save failed:', apiError)
+                    }
                 } catch (serverErr: any) {
                     apiError = serverErr?.message || 'Server action failed'
                     console.error('[Reply] Server action failed:', apiError)

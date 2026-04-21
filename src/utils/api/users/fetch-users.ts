@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
+import { createAdminClient } from "@/utils/supabase/server"
 
 export interface RegularUser {
   id: string
@@ -11,7 +11,7 @@ export interface RegularUser {
 
 export async function fetchRegularUsers(): Promise<{ users: RegularUser[]; error?: string }> {
   try {
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const { data, error } = await supabase
       .from("user_profiles")

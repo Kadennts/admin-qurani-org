@@ -134,12 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Priority 0: Check cached profile in localStorage (from previous login)
             // This prevents 'me' request on every page load
             try {
-                const cachedProfile = localStorage.getItem('myqurani_user_profile');
+                const cachedProfile = localStorage.getItem('myqurani_user_profile_v2');
                 if (cachedProfile) {
                     const parsed = JSON.parse(cachedProfile);
-                    // Verify cached profile matches current user
-                    if (parsed.id?.toString() === authId || parsed.userId?.toString() === authId) {
-                        console.log('[AuthProvider] Using cached user profile, no API call needed');
+                    // Verify cached profile matches current user AND timezone sudah ada
+                    if ((parsed.id?.toString() === authId || parsed.userId?.toString() === authId) && parsed.timezone) {
+                        console.log('[AuthProvider] Using cached user profile, timezone:', parsed.timezone);
                         return {
                             id: parsed.id?.toString() || authId,
                             name: parsed.name || parsed.username,
@@ -147,8 +147,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: parsed.email,
                             avatar: normalizeAvatarUrl(parsed.avatar || parsed.image),
                             role: parsed.role || "member",
-                            timezone: parsed.timezone || "",
+                            timezone: parsed.timezone,
                         } as UserProfile;
+                    } else if (parsed.id?.toString() === authId || parsed.userId?.toString() === authId) {
+                        // Profile match tapi timezone kosong → hapus cache, fetch ulang dengan timezone
+                        console.log('[AuthProvider] Cached profile has no timezone, re-fetching...');
+                        localStorage.removeItem('myqurani_user_profile_v2');
                     }
                 }
             } catch (e) {
@@ -174,13 +178,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             timezone: userData.timezone || "",
                         } as UserProfile;
 
-                        // Cache the profile for future page loads
-                        localStorage.setItem('myqurani_user_profile', JSON.stringify({
+                        // Jika API tidak mengembalikan timezone, ambil dari Supabase user_profiles
+                        if (!profile.timezone && (userData.id || authId)) {
+                            try {
+                                const { data: tzData } = await supabase
+                                    .from("user_profiles")
+                                    .select("timezone, cityId")
+                                    .eq("id", userData.id?.toString() || authId)
+                                    .maybeSingle();
+
+                                if (tzData?.timezone) {
+                                    // Timezone tersimpan langsung di user_profiles
+                                    profile.timezone = tzData.timezone;
+                                    console.log('[AuthProvider] Timezone from Supabase profile:', profile.timezone);
+                                } else if (tzData?.cityId) {
+                                    // Fallback: timezone tidak tersimpan, derivasi dari kota user
+                                    const { data: cityData } = await supabase
+                                        .from("cities")
+                                        .select("timezone")
+                                        .eq("id", tzData.cityId)
+                                        .maybeSingle();
+                                    if (cityData?.timezone) {
+                                        profile.timezone = cityData.timezone;
+                                        console.log('[AuthProvider] Timezone derived from city:', profile.timezone);
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('[AuthProvider] Failed to get timezone from Supabase:', e);
+                            }
+                        }
+
+                        // Cache the profile for future page loads (v2 key = busts old cache without timezone)
+                        localStorage.setItem('myqurani_user_profile_v2', JSON.stringify({
                             ...profile,
                             userId: authId,
                             cachedAt: new Date().toISOString(),
                         }));
-                        console.log('[AuthProvider] Profile cached for future use');
+                        console.log('[AuthProvider] Profile cached for future use, timezone:', profile.timezone);
 
                         return profile;
                     }

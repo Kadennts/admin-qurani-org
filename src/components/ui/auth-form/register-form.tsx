@@ -199,7 +199,20 @@ export function RegisterForm({
                 });
 
                 // 2. Setelah dapat userId dari API, simpan profil ke Supabase
-                const realUserId = String(registerResult?.userId || "");
+                let realUserId = String(registerResult?.userId || "");
+                
+                // Jika userId tidak ada di respons register, lakukan login untuk mendapatkannya
+                if (!realUserId) {
+                    console.log("[Register] No userId in register response, attempting login to get it...");
+                    try {
+                        const loginResult = await authApi.login(data.email.trim(), data.password);
+                        realUserId = String(loginResult?.userId || "");
+                        console.log("[Register] Got userId from login:", realUserId);
+                    } catch (loginErr) {
+                        console.warn("[Register] Auto-login to get userId failed:", loginErr);
+                    }
+                }
+
                 if (realUserId) {
                     const { updateUserProfile } = await import('@/utils/api/user/update-profile');
                     console.log("[Register] Saving profile to Supabase with userId:", realUserId);
@@ -214,7 +227,7 @@ export function RegisterForm({
                         data.city_name,
                         data.timezone,
                         data.full_name.trim(),
-                        "", // nickname
+                        data.username.trim().toLowerCase(), // nickname = username
                         data.username.trim().toLowerCase(),
                         null, // gender
                         "", // dob
@@ -226,12 +239,15 @@ export function RegisterForm({
                     );
 
                     if (!supabaseResult.success) {
-                        console.warn("[Register] Supabase save warning:", supabaseResult.message);
+                        // Tampilkan error ke user agar kita bisa identifikasi masalahnya
+                        console.error("[Register] Supabase save FAILED:", supabaseResult.message);
+                        toast.warning(`Profile note: ${supabaseResult.message}`);
                     } else {
-                        console.log("[Register] Profile saved to Supabase successfully!");
+                        console.log("[Register] ✅ Profile saved to Supabase successfully!");
                     }
                 } else {
-                    console.warn("[Register] No userId returned from API, skipping Supabase save");
+                    console.warn("[Register] No userId obtained — skipping Supabase save");
+                    toast.warning("Account created but profile not linked to database. Please update your profile after login.");
                 }
 
                 toast.success(t("register.success", "Registration successful!"));

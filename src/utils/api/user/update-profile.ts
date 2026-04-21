@@ -68,6 +68,12 @@ export const updateUserProfile = async (
   email?: string // Argument ke-18
 ) => {
   // Prepare update data with all fields
+  // Helper: pastikan username selalu punya prefix '@' untuk konsistensi di Supabase
+  const formatUsername = (uname: string) => {
+    if (!uname) return uname;
+    return uname.startsWith('@') ? uname : `@${uname}`;
+  };
+
   const updateData: any = {
     countryId: countryId,
     stateId: stateId,
@@ -80,7 +86,7 @@ export const updateUserProfile = async (
 
   if (fullName !== undefined) updateData.name = fullName;
   if (nickname !== undefined) updateData.nickname = nickname;
-  if (username !== undefined) updateData.username = username;
+  if (username !== undefined) updateData.username = formatUsername(username);
   if (gender !== undefined) updateData.gender = gender;
   if (date_of_birth !== undefined) updateData.dob = date_of_birth || null;
   if (job !== undefined) updateData.job = job;
@@ -133,14 +139,17 @@ export const updateUserProfile = async (
       // 2b. JIKA TIDAK ADA: Gunakan INSERT (Buat Baru)
       console.log(`[updateUserProfile] Profile not found for ${userId}, performing INSERT`);
 
-      const newData = {
+      const newData: any = {
         ...updateData,
-        id: userId, // Gunakan userId dari Auth sebagai primary key
-        auth: userId, // Hubungkan ke Auth
+        id: userId,       // Primary key = userId dari MyQurani
         role: "member",
         created: new Date().toISOString(),
         email: email
+        // NOTE: 'auth' field dihapus karena menyebabkan FK constraint error
+        // (auth merujuk ke Supabase auth.users, bukan MyQurani user)
       };
+
+      console.log("[updateUserProfile] INSERT payload:", JSON.stringify(newData, null, 2));
 
       const { data, error: insertErr } = await adminSupabase
         .from("user_profiles")
@@ -151,9 +160,16 @@ export const updateUserProfile = async (
     }
 
     if (error) {
-      console.error("Supabase Save Error:", error);
-      // Kirim error detail ke UI agar kita tahu masalahnya (misal: kolom kurang, error tipe data, dll)
-      return { success: false, message: `Database Save Error: ${error.message} (${error.code})` };
+      console.error("Supabase Save Error - Full details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      return { 
+        success: false, 
+        message: `Database Save Error: ${error.message} | Code: ${error.code} | Hint: ${error.hint || 'none'}`
+      };
     }
 
     // Optionally sync to external API (non-blocking)

@@ -58,7 +58,9 @@ export default function SupportTicketsPage() {
   const { profile } = useAuth()
   const { t, locale } = useTranslation(['support'])
 
-  const userTimezone = profile?.timezone || "Asia/Jakarta"
+  // Timezone dari profile user (disimpan di Supabase user_profiles.timezone saat user set lokasi)
+  // Fallback ke 'UTC' jika belum di-set — auth-provider sudah meng-supplement dari Supabase
+  const userTimezone = profile?.timezone || 'UTC'
 
   // -- State --
   const [searchQuery, setSearchQuery] = useState("")
@@ -231,20 +233,67 @@ export default function SupportTicketsPage() {
           // Always save to cache (even if empty) to prevent refetching
           const convertedTickets = tickets.length > 0 ? convertTickets(tickets) : [];
 
+          // ============================================
+          // TAMBAHAN: Ambil tiket dari Supabase dan gabungkan
+          // ============================================
+          let finalTickets = convertedTickets;
+          let finalTotal = total;
+          try {
+            const sbParams = new URLSearchParams();
+            if (singleStatus) sbParams.set('status', singleStatus);
+            if (singlePriority) sbParams.set('priority', singlePriority);
+            if (searchQuery) sbParams.set('search', searchQuery);
+            sbParams.set('limit', '100');
+
+            const sbRes = await fetch(`/api/tickets/supabase/list?${sbParams.toString()}`, { signal });
+            if (sbRes.ok) {
+              const sbResult = await sbRes.json();
+              if (sbResult.success && Array.isArray(sbResult.data) && sbResult.data.length > 0) {
+                const apiIds = new Set(convertedTickets.map((t: any) => String(t.id)));
+                const sbTickets = sbResult.data
+                  .filter((t: any) => !apiIds.has(String(t.id)))
+                  .map((t: any) => ({
+                    id: t.id,
+                    ticket_number: t.ticket_number || `#${t.id}`,
+                    subject: t.subject,
+                    contact: t.contact,
+                    department: t.department || 'GENERAL',
+                    project: null,
+                    service: null,
+                    priority: t.priority || 'Medium',
+                    status: t.status || 'Open',
+                    last_reply: t.last_reply || null,
+                    submitted_date: t.submitted_date,
+                    body: t.body || null,
+                  }));
+
+                if (sbTickets.length > 0) {
+                  finalTickets = [...convertedTickets, ...sbTickets];
+                  finalTotal = total + sbTickets.length;
+                  console.log('[Tickets] +', sbTickets.length, 'from Supabase, total:', finalTotal);
+                }
+              }
+            }
+          } catch (sbErr) {
+            // Non-critical, jangan crash
+            console.warn('[Tickets] Supabase fetch skipped:', sbErr);
+          }
+          // ============================================
+
           try {
             sessionStorage.setItem(cacheKey, JSON.stringify({
-              tickets: convertedTickets,
-              totalCount: total,
+              tickets: finalTickets,
+              totalCount: finalTotal,
               timestamp: Date.now()
             }));
-            console.log('[Tickets] Saved to cache:', cacheKey, '| count:', convertedTickets.length);
+            console.log('[Tickets] Saved to cache:', cacheKey, '| count:', finalTickets.length);
           } catch (e) {
             console.error('[Tickets] Cache write error:', e);
           }
 
-          if (tickets.length > 0) {
-            setTickets(convertedTickets);
-            setTotalCount(total);
+          if (finalTickets.length > 0) {
+            setTickets(finalTickets);
+            setTotalCount(finalTotal);
             setIsLoading(false);
             return;
           }
@@ -255,7 +304,37 @@ export default function SupportTicketsPage() {
 
       if (signal?.aborted) return;
 
-      // Only set empty if client API didn't find tickets
+      // Jika API sama sekali tidak ada tiket, coba Supabase saja
+      try {
+        const sbRes = await fetch(`/api/tickets/supabase/list?limit=100`, { signal });
+        if (sbRes.ok) {
+          const sbResult = await sbRes.json();
+          if (sbResult.success && Array.isArray(sbResult.data) && sbResult.data.length > 0) {
+            const sbTickets = sbResult.data.map((t: any) => ({
+              id: t.id,
+              ticket_number: t.ticket_number || `#${t.id}`,
+              subject: t.subject,
+              contact: t.contact,
+              department: t.department || 'GENERAL',
+              project: null,
+              service: null,
+              priority: t.priority || 'Medium',
+              status: t.status || 'Open',
+              last_reply: t.last_reply || null,
+              submitted_date: t.submitted_date,
+              body: t.body || null,
+            }));
+            setTickets(sbTickets);
+            setTotalCount(sbTickets.length);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (sbFallbackErr) {
+        console.warn('[Tickets] Supabase fallback failed:', sbFallbackErr);
+      }
+
+      // Only set empty if both API and Supabase didn't find tickets
       setTickets([]);
       setTotalCount(0);
 
@@ -616,10 +695,12 @@ export default function SupportTicketsPage() {
       }
 
       // Timezone-aware formatting using Intl.DateTimeFormat
+      // userTimezone comes from profile.timezone (e.g. "Asia/Jakarta", "Europe/London")
+      const tz = userTimezone || 'UTC'
       const options: Intl.DateTimeFormatOptions = {
         day: "2-digit",
         month: "short",
-        timeZone: userTimezone
+        timeZone: tz,
       };
 
       if (variant === 'long') {
@@ -627,9 +708,13 @@ export default function SupportTicketsPage() {
         options.hour = "2-digit";
         options.minute = "2-digit";
         options.hour12 = false;
+        options.timeZoneName = "short"; // Tambahkan WIB / BST / EST / dll
       }
 
-      return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', options).format(date).replace(',', ' -')
+      return new Intl.DateTimeFormat(
+        locale === 'id' ? 'id-ID' : 'en-GB',
+        options
+      ).format(date)
     } catch {
       return dateString
     }
@@ -1097,14 +1182,17 @@ export default function SupportTicketsPage() {
                           </td>
                           <td
                             className="px-4 py-3 hidden xl:table-cell text-xs text-gray-500 whitespace-nowrap cursor-help"
-                            title={formatDate(ticket.submitted_date, 'long')}
+                            title={`${formatDate(ticket.submitted_date, 'long')} (${userTimezone})`}
                           >
                             {formatDate(ticket.submitted_date, 'relative')}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             <span
                               className="text-sm text-gray-700 dark:text-gray-300 font-medium cursor-help"
-                              title={formatDate(ticket.last_reply, 'long')}
+                              title={ticket.last_reply
+                                ? `${formatDate(ticket.last_reply, 'long')} (${userTimezone})`
+                                : undefined
+                              }
                             >
                               {formatDate(ticket.last_reply, 'relative')}
                             </span>

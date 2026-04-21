@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
+import { createAdminClient } from "@/utils/supabase/server"
 
 export interface AdminUser {
   id: string
@@ -11,7 +11,7 @@ export interface AdminUser {
 
 export async function fetchAdmins(): Promise<{ admins: AdminUser[]; error?: string }> {
   try {
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const { data, error } = await supabase
       .from("user_profiles")
