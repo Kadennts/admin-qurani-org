@@ -112,7 +112,7 @@ export default function TicketDetailClient({
     // Auto-resize textarea
     const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setTextareaHeight("auto") // Reset height
-        const newHeight = `${Math.max(100, e.target.scrollHeight)}px`
+        const newHeight = `${Math.max(80, e.target.scrollHeight)}px`
         setTextareaHeight(newHeight)
         setReplyContent(e.target.value)
     }
@@ -791,7 +791,7 @@ export default function TicketDetailClient({
                         value={replyContent}
                         onChange={handleTextareaInput}
                         placeholder="Enter your reply here..."
-                        className="w-full min-h-[150px] p-4 text-sm bg-white dark:bg-gray-950 border-0 focus:ring-0 placeholder-gray-400 resize-none font-sans"
+                        className="w-full min-h-[80px] p-4 text-sm bg-white dark:bg-gray-950 border-0 focus:ring-0 placeholder-gray-400 resize-none font-sans"
                         style={{ height: textareaHeight }}
                     />
                     {/* File Previews */}
