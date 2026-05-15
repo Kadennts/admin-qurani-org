@@ -41,6 +41,7 @@
     "i18n": "^0.15.1",
     "i18next": "^25.5.2",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.540.0",
     "motion": "^12.23.12",
     "next": "^15.5.7",

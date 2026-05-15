@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -30,15 +30,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 // Import from centralized API lib
 import {
     usersApi,
-    rolesApi,
     masterdataApi,
-    getStoredAuth,
     API_BASE,
     UserData,
     CountryData,
     StateData,
-    CityData as ApiCityData,
-    RoleData
+    CityData as ApiCityData
 } from "@/lib/api"
 
 // Extended User interface for component use
@@ -100,6 +97,57 @@ const getAvatarSrc = (user: UserItem): string | null => {
     return null;
 }
 
+const ITEMS_PER_PAGE = 10
+
+const parseUserItems = (result: any): UserItem[] => {
+    if (Array.isArray(result?.data?.items)) return result.data.items
+    if (Array.isArray(result?.items)) return result.items
+    if (Array.isArray(result?.data?.data)) return result.data.data
+    if (Array.isArray(result?.data)) return result.data
+    if (Array.isArray(result)) return result
+    return []
+}
+
+const parseTotalCount = (result: any): number | null => {
+    const candidates = [
+        result?.data?.pagination?.totalCount,
+        result?.data?.totalCount,
+        result?.data?.TotalCount,
+        result?.pagination?.totalCount,
+        result?.totalCount,
+        result?.TotalCount,
+    ]
+
+    for (const value of candidates) {
+        if (typeof value === "number" && Number.isFinite(value)) return value
+        if (typeof value === "string" && value.trim()) {
+            const parsed = Number(value)
+            if (Number.isFinite(parsed)) return parsed
+        }
+    }
+
+    return null
+}
+
+const parseNumberish = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value
+    if (typeof value === "string" && value.trim()) {
+        const parsed = Number(value)
+        if (Number.isFinite(parsed)) return parsed
+    }
+    return null
+}
+
+const parseBooleanish = (value: unknown): boolean | null => {
+    if (typeof value === "boolean") return value
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase()
+        if (normalized === "true") return true
+        if (normalized === "false") return false
+    }
+    return null
+}
+
 export default function Users() {
     const { t } = useI18n()
     const [searchQuery, setSearchQuery] = useState("")
@@ -150,11 +198,9 @@ export default function Users() {
     // User data states (from API)
     const [users, setUsers] = useState<UserItem[]>([])
     const [totalCount, setTotalCount] = useState(0)
+    const [hasNextPage, setHasNextPage] = useState(false)
+    const [hasPrevPage, setHasPrevPage] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
-    const lastFetchTime = useRef(0)
-
-    // Available roles from API
-    const [availableRoles, setAvailableRoles] = useState<RoleData[]>([])
 
     const debouncedUsername = useDebounce(editForm.username, 500)
     const debouncedSearch = useDebounce(searchQuery, 500)
@@ -194,9 +240,9 @@ export default function Users() {
             const result = await usersApi.search({ keyword: `@${normalizedUsername}`, pageSize: 1 })
 
             // Check if username exists and belongs to different user
-            const existingUsers = result?.data || result?.items || []
+            const existingUsers = parseUserItems(result)
             const existingUser = existingUsers.find((u: UserItem) =>
-                u.username === `@${normalizedUsername}` && String(u.id) !== String(currentUserId)
+                u.username === `@${normalizedUsername}` && getUserId(u) !== String(currentUserId)
             )
 
             if (existingUser) {
@@ -216,22 +262,23 @@ export default function Users() {
 
     // Load users from API
     const loadUsers = useCallback(async (keyword?: string, signal?: AbortSignal) => {
-        // Simple throttle to prevent double-fetch in Strict Mode
-        const now = Date.now()
-        if (now - lastFetchTime.current < 1000) {
-            return
-        }
-        lastFetchTime.current = now
-
         setIsLoading(true)
         try {
             const params: any = {
                 page: currentPage,
-                pageSize: 10,
+                pageSize: ITEMS_PER_PAGE,
             }
 
             if (keyword) {
                 params.keyword = keyword
+            }
+
+            if (roleFilter !== "all") {
+                params.role = roleFilter
+            }
+
+            if (statusFilter !== "all") {
+                params.isBlocked = statusFilter === "blocked"
             }
 
             console.log('[Users] Fetching users with params:', params)
@@ -240,40 +287,84 @@ export default function Users() {
             // Debug: Log raw API response to understand structure
             console.log('[Users] Raw API response:', JSON.stringify(result, null, 2).substring(0, 500))
 
-            // API response format varies, try multiple patterns
-            let summaryList: UserItem[] = []
-            let total = 0
+            const summaryList = parseUserItems(result)
+            const parsedTotal = parseTotalCount(result)
+            const paginationInfo = result?.data?.pagination || result?.pagination || {}
+            const parsedPageSize = parseNumberish(paginationInfo?.pageSize) || ITEMS_PER_PAGE
+            const parsedTotalPages = parseNumberish(paginationInfo?.totalPages)
+            const derivedTotalFromPages = parsedTotalPages !== null ? parsedTotalPages * parsedPageSize : null
+            const totalFromResponse = parsedTotal ?? derivedTotalFromPages
+            const fallbackTotal = summaryList.length
+            const parsedHasNext = parseBooleanish(paginationInfo?.hasNext)
 
-            // Extract items from various possible structures
-            if (result?.data?.items && Array.isArray(result.data.items)) {
-                summaryList = result.data.items
-            } else if (result?.items && Array.isArray(result.items)) {
-                summaryList = result.items
-            } else if (Array.isArray(result?.data)) {
-                summaryList = result.data
-            } else if (Array.isArray(result)) {
-                summaryList = result
-            }
-
-            // Extract totalCount from various possible structures
-            total = result?.data?.pagination?.totalCount
-                || result?.data?.totalCount
-                || result?.pagination?.totalCount
-                || result?.totalCount
-                || result?.total
-                || result?.data?.total
-                || summaryList.length
-
-            console.log('[Users] Parsed totalCount:', total, 'from result structure')
+            console.log('[Users] Parsed totalCount:', parsedTotal, 'from result structure')
 
             // NOTE: Search API only returns UserSummaryDto (userId, username, name, image)
             // User requested to minimize requests to 1 per page, so we use summary data.
             // Fields like email, role, createdAt will be empty/undefined.
 
-            console.log('[Users] Loaded', summaryList.length, 'users (Summary only). Total:', total)
-            setUsers(summaryList)
+            let mergedUsers = summaryList
 
-            setTotalCount(total)
+            try {
+                const overrideResponse = await fetch("/api/admin/users/overrides", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    body: JSON.stringify({
+                        userIds: summaryList.map((u) => getUserId(u)).filter(Boolean),
+                        usernames: summaryList.map((u) => u.username).filter(Boolean),
+                    }),
+                })
+
+                if (overrideResponse.ok) {
+                    const overridePayload = await overrideResponse.json().catch(() => null)
+                    const overrideRows = Array.isArray(overridePayload?.data) ? overridePayload.data : []
+                    if (overrideRows.length > 0) {
+                        const byId = new Map(overrideRows.map((row: any) => [String(row.id), row]))
+                        const byUsername = new Map(
+                            overrideRows
+                                .filter((row: any) => typeof row?.username === "string")
+                                .map((row: any) => [String(row.username), row])
+                        )
+
+                        mergedUsers = summaryList.map((user) => {
+                            const fromId = byId.get(getUserId(user))
+                            const fromUsername = !fromId ? byUsername.get(String(user.username || "")) : null
+                            const patch = fromId || fromUsername
+                            return patch ? { ...user, ...patch, userId: user.userId ?? user.id } : user
+                        })
+                    }
+                }
+            } catch (overrideError) {
+                console.warn("[Users] Failed to load local overrides:", overrideError)
+            }
+
+            console.log('[Users] Loaded', mergedUsers.length, 'users (Summary + Overrides). Total:', totalFromResponse ?? fallbackTotal)
+            setUsers(mergedUsers)
+            setTotalCount((prev) => {
+                if (typeof totalFromResponse === "number" && totalFromResponse >= mergedUsers.length) {
+                    return totalFromResponse
+                }
+
+                if (currentPage === 1) {
+                    return Math.max(fallbackTotal, prev)
+                }
+
+                const minimumKnownTotal = ((currentPage - 1) * ITEMS_PER_PAGE) +
+                    (mergedUsers.length === ITEMS_PER_PAGE ? ITEMS_PER_PAGE + 1 : mergedUsers.length)
+                return Math.max(prev, minimumKnownTotal)
+            })
+            setHasNextPage(
+                parsedHasNext ?? (
+                    mergedUsers.length === ITEMS_PER_PAGE &&
+                    (typeof totalFromResponse === "number"
+                        ? currentPage * ITEMS_PER_PAGE < totalFromResponse
+                        : true)
+                )
+            )
+            setHasPrevPage(currentPage > 1)
         } catch (error: any) {
             // Ignore abort errors
             if (error.name === 'AbortError') {
@@ -283,34 +374,20 @@ export default function Users() {
             console.error('[Users] Error loading users:', error)
             toast.error(t('users.error_loading', 'Gagal memuat data pengguna'))
             setUsers([])
+            setHasNextPage(false)
+            setHasPrevPage(currentPage > 1)
         } finally {
             if (!signal?.aborted) {
                 setIsLoading(false)
             }
         }
-    }, [currentPage, t])
+    }, [currentPage, roleFilter, statusFilter, t])
 
     // Load users on mount and when filters change
     useEffect(() => {
         // No AbortController to avoid "canceled" status logging in dev console
-        // Throttling in loadUsers prevents duplicate requests
         loadUsers(debouncedSearch || undefined)
     }, [loadUsers, debouncedSearch])
-
-    // Load available roles on mount
-    /*
-    useEffect(() => {
-        const loadRoles = async () => {
-            try {
-                const result = await rolesApi.getAll()
-                const rolesData = result?.data || result || []
-                setAvailableRoles(rolesData)
-            } catch (error) {
-                console.error('[Users] Error loading roles:', error)
-            }
-        }
-        loadRoles()
-    }, [])
 
     // Load countries on mount
     useEffect(() => {
@@ -326,7 +403,6 @@ export default function Users() {
         }
         loadCountries()
     }, [])
-    */
 
     // Load states when country changes
     useEffect(() => {
@@ -368,7 +444,7 @@ export default function Users() {
     // Validate username when it changes (with 0.5 second delay)
     useEffect(() => {
         if (editingUser) {
-            checkUsernameAvailability(debouncedUsername, editingUser.id)
+            checkUsernameAvailability(debouncedUsername, getUserId(editingUser))
         }
     }, [debouncedUsername, editingUser, checkUsernameAvailability])
 
@@ -430,9 +506,16 @@ export default function Users() {
         })
 
     // Pagination - API handles this, but we keep display logic
-    const itemsPerPage = 10
+    const itemsPerPage = ITEMS_PER_PAGE
     const actualTotalUsers = totalCount || filteredUsers.length
     const totalPages = Math.ceil(actualTotalUsers / itemsPerPage)
+    const inferredTotalPages = Math.max(
+        currentPage,
+        totalPages > 0 ? totalPages : 1,
+        hasNextPage ? currentPage + 1 : currentPage
+    )
+    const shouldShowPagination = inferredTotalPages > 1 || currentPage > 1 || hasNextPage
+    const canGoNext = hasNextPage || currentPage < inferredTotalPages
     const paginatedUsers = filteredUsers // Already paginated by API
 
     // Pagination display
@@ -544,16 +627,17 @@ export default function Users() {
             }
 
             // Validate username first
-            const isUsernameValid = await checkUsernameAvailability(editForm.username, editingUser.id)
+            const editingUserId = getUserId(editingUser)
+            const isUsernameValid = await checkUsernameAvailability(editForm.username, editingUserId)
             if (!isUsernameValid) {
                 return // Don't save if username is invalid
             }
 
             setIsSaving(true)
             try {
+                const normalizedUsername = normalizeUsername(editForm.username)
                 const updateData = {
-                    ...editingUser,
-                    username: editForm.username,
+                    username: `@${normalizedUsername}`,
                     name: editForm.name,
                     email: editForm.email,
                     isBlocked: editForm.isBlocked,
@@ -563,16 +647,44 @@ export default function Users() {
                     cityId: editForm.cityId,
                     countryName: editForm.countryName,
                     stateName: editForm.stateName,
-                    cityName: editForm.cityName
+                    cityName: editForm.cityName,
+                    previousUsername: editingUser.username || ""
                 }
-                // Note: usersApi.updateMe only updates current user
-                // For admin updates, we may need a different endpoint
-                // For now, we'll use updateMe if it's the current user
-                const response = await usersApi.updateMe(updateData)
-                console.log('[Users] Update response:', response)
+                const response = await fetch(`/api/admin/users/${encodeURIComponent(editingUserId)}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    body: JSON.stringify(updateData),
+                })
 
-                // Reload users to reflect changes
-                await loadUsers(debouncedSearch || undefined)
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => null)
+                    throw new Error(errorPayload?.message || `API Error: ${response.status}`)
+                }
+
+                const result = await response.json().catch(() => null)
+                console.log('[Users] Update response:', result)
+
+                // Update table immediately without refetching API page
+                setUsers((prev) => prev.map((u) => {
+                    if (getUserId(u) !== editingUserId) return u
+                    return {
+                        ...u,
+                        username: updateData.username,
+                        name: updateData.name,
+                        email: updateData.email,
+                        isBlocked: updateData.isBlocked,
+                        role: updateData.role,
+                        countryId: updateData.countryId || undefined,
+                        stateId: updateData.stateId || undefined,
+                        cityId: updateData.cityId || undefined,
+                        countryName: updateData.countryName || undefined,
+                        stateName: updateData.stateName || undefined,
+                        cityName: updateData.cityName || undefined,
+                    }
+                }))
 
                 setIsEditModalOpen(false)
                 setEditingUser(null)
@@ -826,7 +938,7 @@ export default function Users() {
                     </div>
 
                     {/* Pagination */}
-                    {totalPages > 1 && (
+                    {shouldShowPagination && (
                         <div className="flex flex-col-reverse gap-3 items-center pt-4">
                             <div className="text-sm text-gray-600 dark:text-gray-400">
                                 {t('pagination.showing', 'Menampilkan {start} - {end} dari {total} pengguna')
@@ -835,76 +947,42 @@ export default function Users() {
                                     .replace('{total}', actualTotalUsers.toString())}
                                 {searchTerm && ` (hasil pencarian "${searchTerm}")`}
                             </div>
-                            <div className="flex items-center flex-wrap space-x-1">
+                            <div className="flex items-center flex-wrap gap-1">
                                 {/* Previous Button */}
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="p-2"
+                                    disabled={!hasPrevPage && currentPage === 1}
+                                    className="h-9 px-2 text-gray-500 hover:text-gray-700 disabled:text-gray-400"
                                 >
-                                    <ChevronLeft className="w-4 h-4" />
+                                    <ChevronLeft className="w-4 h-4 mr-1" />
+                                    <span>Previous</span>
                                 </Button>
                                 {/* Page Numbers */}
                                 {(() => {
                                     const pages = [];
-                                    const showPages = 3; // Show 3 page numbers max
+                                    const showPages = 5;
                                     let startPage = Math.max(1, currentPage - Math.floor(showPages / 2));
-                                    const endPage = Math.min(totalPages, startPage + showPages - 1);
-                                    // Adjust start page if we're near the end
+                                    let endPage = Math.min(inferredTotalPages, startPage + showPages - 1);
                                     if (endPage - startPage + 1 < showPages) {
                                         startPage = Math.max(1, endPage - showPages + 1);
+                                        endPage = Math.min(inferredTotalPages, startPage + showPages - 1);
                                     }
-                                    // First page + ellipsis
-                                    if (startPage > 1) {
-                                        pages.push(
-                                            <Button
-                                                key={1}
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setCurrentPage(1)}
-                                                className="px-3 py-2"
-                                            >
-                                                1
-                                            </Button>
-                                        );
-                                        if (startPage > 2) {
-                                            pages.push(
-                                                <span key="ellipsis1" className="px-0.5 text-gray-500">...</span>
-                                            );
-                                        }
-                                    }
-                                    // Page numbers
+
                                     for (let i = startPage; i <= endPage; i++) {
                                         pages.push(
                                             <Button
                                                 key={i}
-                                                variant={currentPage === i ? "default" : "outline"}
+                                                variant="ghost"
                                                 size="sm"
                                                 onClick={() => setCurrentPage(i)}
-                                                className={`px-3 py-2 ${currentPage === i ? "bg-gradient-to-r from-emerald-600 to-teal-600 dark:text-white" : ""}`}
+                                                className={`h-9 w-9 p-0 text-sm ${currentPage === i
+                                                    ? "bg-emerald-600 text-white hover:bg-emerald-600 rounded-lg"
+                                                    : "text-gray-700 hover:bg-gray-100 rounded-lg"
+                                                    }`}
                                             >
                                                 {i}
-                                            </Button>
-                                        );
-                                    }
-                                    // Last page + ellipsis
-                                    if (endPage < totalPages) {
-                                        if (endPage < totalPages - 1) {
-                                            pages.push(
-                                                <span key="ellipsis2" className="px-0.5 text-gray-500">...</span>
-                                            );
-                                        }
-                                        pages.push(
-                                            <Button
-                                                key={totalPages}
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setCurrentPage(totalPages)}
-                                                className="px-3 py-2"
-                                            >
-                                                {totalPages}
                                             </Button>
                                         );
                                     }
@@ -912,13 +990,14 @@ export default function Users() {
                                 })()}
                                 {/* Next Button */}
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                    className="p-2"
+                                    onClick={() => setCurrentPage(prev => prev + 1)}
+                                    disabled={!canGoNext}
+                                    className="h-9 px-2 text-gray-700 hover:text-gray-900 disabled:text-gray-400"
                                 >
-                                    <ChevronRight className="w-4 h-4" />
+                                    <span>Next</span>
+                                    <ChevronRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </div>
                         </div>
@@ -1207,7 +1286,7 @@ export default function Users() {
                             <Label htmlFor="status" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {t('edit_user.status_label', 'Aktif')}
                             </Label>
-                            {editingUser && editingUser.id === users[users.length - 1]?.id ? (
+                            {editingUser && users.length > 0 && getUserId(editingUser) === getUserId(users[users.length - 1]) ? (
                                 // Read-only display for the last user
                                 <div className="flex items-center space-x-2 p-2 border border-gray-300 rounded-lg bg-gray-50 dark:bg-gray-800">
                                     <div className={`w-3 h-3 rounded-full ${editForm.isBlocked ? 'bg-red-500' : 'bg-green-500'}`}></div>

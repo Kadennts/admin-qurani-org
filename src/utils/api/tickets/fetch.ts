@@ -460,17 +460,44 @@ export async function fetchTicketById(ticketId: number): Promise<{ success: bool
 }
 
 export async function fetchRelatedTickets(excludeId: number): Promise<{ success: boolean; data?: TicketListItem[]; error?: string }> {
-  // Fetch recent tickets excluding the current one
-  const result = await fetchTickets({ limit: 5 });
+  const result = await fetchTickets({ limit: 200 });
+  if (!result.success || !result.data) return result;
 
-  if (!result.success) {
-    return result;
+  const current = result.data.find(t => t.id === excludeId);
+  const pool = result.data.filter(t => t.id !== excludeId);
+
+  // Fallback when current ticket isn't in this page of data.
+  if (!current) {
+    return { success: true, data: pool.slice(0, 8) };
   }
 
-  return {
-    success: true,
-    data: result.data?.filter(t => t.id !== excludeId).slice(0, 4),
-  };
+  const normalize = (val: string | null | undefined) => (val || "").trim().toLowerCase();
+  const keywords = normalize(current.subject).split(/\s+/).filter(w => w.length >= 4);
+
+  const scored = pool.map((t) => {
+    let score = 0;
+    if (normalize(t.department) && normalize(t.department) === normalize(current.department)) score += 5;
+    if (normalize(t.contact) && normalize(t.contact) === normalize(current.contact)) score += 3;
+    if (normalize(t.service) && normalize(t.service) === normalize(current.service)) score += 3;
+    if (normalize(t.priority) && normalize(t.priority) === normalize(current.priority)) score += 1;
+
+    const subject = normalize(t.subject);
+    const keywordHit = keywords.some((k) => subject.includes(k));
+    if (keywordHit) score += 1;
+
+    return { ticket: t, score };
+  });
+
+  const related = scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.ticket.submitted_date).getTime() - new Date(a.ticket.submitted_date).getTime();
+    })
+    .map((item) => item.ticket)
+    .slice(0, 8);
+
+  return { success: true, data: related };
 }
 
 export async function fetchTicketStats(): Promise<{

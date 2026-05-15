@@ -128,6 +128,42 @@ export async function updateTicketPriority(
   }
 }
 
+export async function updateTicketDetails(
+  ticketId: number,
+  updates: {
+    project?: string | null
+    service?: string | null
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { createAdminClient } = await import('@/utils/supabase/server')
+    const supabase = await createAdminClient()
+
+    const payload: Record<string, string | null> = {}
+    if (updates.project !== undefined) payload.project = updates.project
+    if (updates.service !== undefined) payload.service = updates.service
+
+    if (Object.keys(payload).length === 0) {
+      return { success: true }
+    }
+
+    const { error } = await supabase
+      .from('tickets')
+      .update(payload)
+      .eq('id', ticketId)
+
+    if (error) {
+      console.error('[updateTicketDetails] Supabase error:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('[updateTicketDetails] Error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
 export async function updateTicket(
   ticketId: number,
   updates: {

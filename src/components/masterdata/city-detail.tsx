@@ -19,6 +19,7 @@ import {
     Users,
 } from "lucide-react"
 import { toast } from "sonner"
+import { CityLocationMap } from "@/components/masterdata/city-location-map"
 
 interface CityDetailProps {
     id: string
@@ -296,6 +297,31 @@ export function CityDetail({ id }: CityDetailProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Map Section — shown only when coordinates are available */}
+            {city.latitude && city.longitude && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                    {/* Map Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                            <MapPin className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Location Map</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {city.latitude.toFixed(4)}, {city.longitude.toFixed(4)}
+                            </p>
+                        </div>
+                    </div>
+                    {/* Leaflet Map */}
+                    <CityLocationMap
+                        latitude={city.latitude}
+                        longitude={city.longitude}
+                        cityName={city.name}
+                        countryEmoji={country?.emoji ?? undefined}
+                    />
+                </div>
+            )}
 
             {/* Native Name & Additional Details */}
             {(city.native || city.type) && (

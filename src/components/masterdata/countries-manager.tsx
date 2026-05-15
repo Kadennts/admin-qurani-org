@@ -651,11 +651,6 @@ export function CountriesManager() {
                                                 <p className="font-medium text-gray-900 dark:text-white truncate">
                                                     {country.name}
                                                 </p>
-                                                {country.capital && (
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        Capital: {country.capital}
-                                                    </p>
-                                                )}
                                             </div>
                                         </div>
                                     </TableCell>

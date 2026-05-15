@@ -21,7 +21,7 @@ export async function fetchCountries(): Promise<{
     console.log("[fetchCountries] Fetching countries from Supabase...");
     const { data, error } = await supabase
       .from("countries")
-      .select("id, name") // Disederhanakan untuk tes
+      .select("id, name, iso2")
       .order("name");
 
     if (error) {

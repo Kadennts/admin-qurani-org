@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Check } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { CountryData } from "@/types/countries"
 import { ProvinceData } from "@/types/provinces"
@@ -13,14 +13,12 @@ import { Input } from "../ui/input"
 
 interface LocationSelectorsProps {
   isEditing: boolean
-  // Country
   countries: CountryData[]
-  selectedCountry: { id: number; name: string }
-  currentCountry: { id: number; name: string }
+  selectedCountry: { id: number; name: string; iso2?: string }
+  currentCountry: { id: number; name: string; iso2?: string }
   openCountry: boolean
   setOpenCountry: (open: boolean) => void
-  setSelectedCountry: (country: { id: number; name: string }) => void
-  // State
+  setSelectedCountry: (country: { id: number; name: string; iso2?: string }) => void
   states: ProvinceData[]
   selectedState: { id: number; name: string }
   currentState: { id: number; name: string }
@@ -28,10 +26,9 @@ interface LocationSelectorsProps {
   setOpenState: (open: boolean) => void
   setSelectedState: (state: { id: number; name: string }) => void
   setSelectedCity: (city: { id: number; name: string, timezone: string }) => void
-  // City
   cities: CityData[]
   selectedCity: { id: number; name: string, timezone: string }
-  currentCity: { id: number; name: string }
+  currentCity: { id: number; name: string, timezone?: string }
   openCity: boolean
   setOpenCity: (open: boolean) => void
   timezone: string
@@ -60,45 +57,38 @@ export function LocationSelectors({
   timezone
 }: LocationSelectorsProps) {
   const { t } = useI18n()
+  const isCountryTouched = selectedCountry.id !== 0
+  const isStateTouched = selectedState.id !== 0
+  const stateLabel = selectedState.name || (!isCountryTouched ? currentState.name : "")
+  const cityLabel = selectedCity.name || (!isCountryTouched && !isStateTouched ? currentCity.name : "")
+  const cityDisabled = !isEditing || (selectedState.id === 0 && (isCountryTouched || currentState.id === 0))
 
   return (
     <>
-      {/* timezone */}
       <div className="space-y-2">
         <Label htmlFor="timezone">{t('profile.timezone')}</Label>
         <Input
           id="timezone"
-          type="tel"
+          type="text"
           value={timezone}
           placeholder="-"
           disabled
         />
       </div>
 
-      {/* Country Selectionn */}
       <div className="space-y-2">
         <Label htmlFor="country">{t('profile.country', 'Country')}</Label>
         <Popover open={openCountry} onOpenChange={setOpenCountry}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="w-full justify-start text-left"
+              className="w-full justify-between text-left"
               disabled={!isEditing}
             >
-              {selectedCountry.name || currentCountry.name || t('profile.select_country', 'Select Country')}
-              {selectedCountry.id !== 0 && (
-                <span
-                  className="ml-2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedCountry({ id: 0, name: "" })
-                    setSelectedState({ id: 0, name: "" })
-                    setSelectedCity({ id: 0, name: "", timezone: "" })
-                  }}
-                >
-                  ×
-                </span>
-              )}
+              <span className="truncate">
+                {selectedCountry.name || currentCountry.name || t('profile.select_country', 'Select Country')}
+              </span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-full">
@@ -113,7 +103,8 @@ export function LocationSelectors({
                       onSelect={() => {
                         setSelectedCountry({
                           id: country.id,
-                          name: country.name
+                          name: country.name,
+                          iso2: country.iso2 || ""
                         })
                         setOpenCountry(false)
                       }}
@@ -134,29 +125,17 @@ export function LocationSelectors({
         </Popover>
       </div>
 
-      {/* State Selection */}
       <div className="space-y-2">
         <Label htmlFor="state">{t('profile.province')}</Label>
         <Popover open={openState} onOpenChange={setOpenState}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="w-full justify-start text-left"
+              className="w-full justify-between text-left"
               disabled={!isEditing}
             >
-              {selectedState.name || currentState.name || t('profile.select_state', 'Select State')}
-              {selectedState.id !== 0 && (
-                <span
-                  className="ml-2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedState({ id: 0, name: "" })
-                    setSelectedCity({ id: 0, name: "", timezone: "" })
-                  }}
-                >
-                  ×
-                </span>
-              )}
+              <span className="truncate">{stateLabel || t('profile.select_state', 'Select State')}</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-full">
@@ -173,12 +152,6 @@ export function LocationSelectors({
                           id: state.id,
                           name: state.name
                         })
-                        if (selectedCity.id !== 0) {
-                          const selectedCityData = (cities ?? []).find(city => city.id === selectedCity.id)
-                          if (selectedCityData && selectedCityData.state_id !== state.id) {
-                            setSelectedCity({ id: 0, name: "", timezone: "" })
-                          }
-                        }
                         setOpenState(false)
                       }}
                     >
@@ -198,28 +171,17 @@ export function LocationSelectors({
         </Popover>
       </div>
 
-      {/* City Selection */}
-      <div className="space-y-2 relative">
+      <div className="space-y-2">
         <Label htmlFor="city">{t('profile.city', 'City')}</Label>
         <Popover open={openCity} onOpenChange={setOpenCity}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="w-full justify-start text-left"
-              disabled={!isEditing || (selectedState.id === 0 && currentState.id === 0)}
+              className="w-full justify-between text-left"
+              disabled={cityDisabled}
             >
-              {selectedCity.name || currentCity.name || t('profile.select_city', 'Select City')}
-              {selectedCity.id !== 0 && (
-                <span
-                  className="ml-2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedCity({ id: 0, name: "", timezone: "" })
-                  }}
-                >
-                  ×
-                </span>
-              )}
+              <span className="truncate">{cityLabel || t('profile.select_city', 'Select City')}</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-full">
@@ -258,4 +220,3 @@ export function LocationSelectors({
     </>
   )
 }
-

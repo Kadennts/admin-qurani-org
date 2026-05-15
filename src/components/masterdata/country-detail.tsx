@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { masterdataApi, CountryData, StateData, CityData } from "@/lib/api"
 import { fetchAllCitiesByCountry } from "@/lib/fetch-helpers"
@@ -35,6 +35,7 @@ import {
     ArrowLeft,
     MapPin,
     Globe,
+    Clock3,
     DollarSign,
     Search,
     MoreVertical,
@@ -57,7 +58,9 @@ export function CountryDetail({ id }: CountryDetailProps) {
     const [isLoading, setIsLoading] = useState(true)
     const [isLoadingStates, setIsLoadingStates] = useState(false)
     const [isLoadingCities, setIsLoadingCities] = useState(false)
+    const [isLoadingTimezones, setIsLoadingTimezones] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [countryTimezoneCodes, setCountryTimezoneCodes] = useState<string[]>([])
 
     // Search and pagination states
     const [activeTab, setActiveTab] = useState<"states" | "cities">("states")
@@ -122,16 +125,14 @@ export function CountryDetail({ id }: CountryDetailProps) {
 
             setIsLoadingStates(true)
             try {
-                const response = await masterdataApi.states.getByCountryId(
-                    country.id,
-                    undefined,
-                    statesAbortRef.current.signal
-                )
-
-                if (response && response.data) {
-                    const statesData = Array.isArray(response.data) ? response.data : []
-                    setStates(statesData)
-                }
+                // Use local API so citiesCount is included and consistent with states page
+                const res = await fetch(`/api/masterdata/states?countryId=${country.id}`, {
+                    signal: statesAbortRef.current.signal
+                })
+                if (!res.ok) throw new Error(`Failed to fetch states: ${res.status}`)
+                const json = await res.json()
+                const statesData = json?.success && Array.isArray(json.data) ? json.data : []
+                setStates(statesData)
             } catch (err) {
                 if (err instanceof Error && err.name === 'AbortError') return
                 console.error("Error fetching states:", err)
@@ -147,7 +148,7 @@ export function CountryDetail({ id }: CountryDetailProps) {
                 statesAbortRef.current.abort()
             }
         }
-    }, [country?.id])
+    }, [country?.id, country?.name])
 
     // Fetch cities when country is loaded
     useEffect(() => {
@@ -190,7 +191,7 @@ export function CountryDetail({ id }: CountryDetailProps) {
                 citiesAbortRef.current.abort()
             }
         }
-    }, [country?.id])
+    }, [country?.id, country?.name])
 
     // Fetch currency ID when country is loaded
     useEffect(() => {
@@ -225,14 +226,81 @@ export function CountryDetail({ id }: CountryDetailProps) {
         fetchCurrencyId()
     }, [country?.currency])
 
+    const parseCountryTimezoneField = useCallback((raw: string | null | undefined): string[] => {
+        if (!raw) return []
+        return Array.from(
+            new Set(
+                raw
+                    .replace(/\[|\]|\"/g, "")
+                    .split(",")
+                    .map((tz) => tz.trim())
+                    .filter(Boolean)
+            )
+        )
+    }, [])
+
+    // Fetch timezone list per country from API Qurani (fallback: country.timezones)
+    useEffect(() => {
+        const loadTimezones = async () => {
+            if (!country?.iso2) {
+                setCountryTimezoneCodes(parseCountryTimezoneField(country?.timezones))
+                return
+            }
+
+            setIsLoadingTimezones(true)
+            try {
+                const res = await fetch(`/api/masterdata/timezones?countryCode=${encodeURIComponent(country.iso2)}`, {
+                    method: "GET",
+                    cache: "no-store",
+                })
+
+                if (!res.ok) {
+                    setCountryTimezoneCodes(parseCountryTimezoneField(country.timezones))
+                    return
+                }
+
+                const json = await res.json()
+                if (!json?.success || !Array.isArray(json.data)) {
+                    setCountryTimezoneCodes(parseCountryTimezoneField(country.timezones))
+                    return
+                }
+
+                const rows = json.data as Array<{ code?: string; name?: string; offset?: string }>
+                const labels = Array.from(new Set(
+                    rows
+                        .map((row) => {
+                            const base = (row.name || row.code || "").trim()
+                            const offset = (row.offset || "").trim()
+                            if (!base) return ""
+                            return offset ? `${base} (UTC${offset})` : base
+                        })
+                        .filter((tz): tz is string => Boolean(tz))
+                ))
+
+                if (labels.length > 0) {
+                    setCountryTimezoneCodes(labels)
+                } else {
+                    setCountryTimezoneCodes(parseCountryTimezoneField(country.timezones))
+                }
+            } catch (err) {
+                console.error("Error fetching country timezones:", err)
+                setCountryTimezoneCodes(parseCountryTimezoneField(country.timezones))
+            } finally {
+                setIsLoadingTimezones(false)
+            }
+        }
+
+        loadTimezones()
+    }, [country?.iso2, country?.timezones, parseCountryTimezoneField])
+
     // Filter and paginate states
     const filteredStates = useMemo(() => {
-        if (!statesSearchQuery.trim()) return states
+        if (!statesSearchQuery.trim()) return [...states].sort((a, b) => a.name.localeCompare(b.name))
         const q = statesSearchQuery.toLowerCase()
         return states.filter(state =>
             state.name.toLowerCase().includes(q) ||
             state.iso2?.toLowerCase().includes(q)
-        )
+        ).sort((a, b) => a.name.localeCompare(b.name))
     }, [states, statesSearchQuery])
 
     const statesTotalPages = Math.ceil(filteredStates.length / itemsPerPage)
@@ -241,16 +309,43 @@ export function CountryDetail({ id }: CountryDetailProps) {
         return filteredStates.slice(start, start + itemsPerPage)
     }, [filteredStates, statesPage])
 
+    const stateNameById = useMemo(() => {
+        const map = new Map<number, string>()
+        states.forEach((s) => {
+            if (typeof s.id === "number" && s.name) map.set(s.id, s.name)
+        })
+        return map
+    }, [states])
+
+    const stateNameByCode = useMemo(() => {
+        const map = new Map<string, string>()
+        states.forEach((s) => {
+            if (s.iso2 && s.name) map.set(s.iso2.toUpperCase(), s.name)
+        })
+        return map
+    }, [states])
+
+    const getCityStateLabel = useCallback((city: CityData) => {
+        if (city.state && city.state.trim()) return city.state
+        if (typeof city.stateId === "number" && stateNameById.has(city.stateId)) return stateNameById.get(city.stateId) as string
+        if (city.stateCode && stateNameByCode.has(city.stateCode.toUpperCase())) return stateNameByCode.get(city.stateCode.toUpperCase()) as string
+        if (city.stateCode && city.stateCode.trim()) return city.stateCode
+        return "—"
+    }, [stateNameByCode, stateNameById])
+
     // Filter and paginate cities
     const filteredCities = useMemo(() => {
-        if (!citiesSearchQuery.trim()) return cities
-        const q = citiesSearchQuery.toLowerCase()
-        return cities.filter(city =>
-            city.name.toLowerCase().includes(q) ||
-            city.state?.toLowerCase().includes(q) ||
-            city.stateCode?.toLowerCase().includes(q)
-        )
-    }, [cities, citiesSearchQuery])
+        let result = cities
+        if (citiesSearchQuery.trim()) {
+            const q = citiesSearchQuery.toLowerCase()
+            result = cities.filter(city =>
+                city.name.toLowerCase().includes(q) ||
+                getCityStateLabel(city).toLowerCase().includes(q) ||
+                city.stateCode?.toLowerCase().includes(q)
+            )
+        }
+        return [...result].sort((a, b) => a.name.localeCompare(b.name))
+    }, [cities, citiesSearchQuery, getCityStateLabel])
 
     const citiesTotalPages = Math.ceil(filteredCities.length / itemsPerPage)
     const displayedCities = useMemo(() => {
@@ -373,7 +468,7 @@ export function CountryDetail({ id }: CountryDetailProps) {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <MapPin className="w-6 h-6" />
@@ -405,6 +500,23 @@ export function CountryDetail({ id }: CountryDetailProps) {
                         <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Currency</p>
                         <p className="text-lg font-bold text-gray-900 dark:text-white">
                             {country.currency || "N/A"}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                        <Clock3 className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Timezones</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                            {isLoadingTimezones ? "..." : countryTimezoneCodes.length || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {countryTimezoneCodes.length > 0
+                                ? countryTimezoneCodes.join(", ")
+                                : "N/A"}
                         </p>
                     </div>
                 </div>
@@ -611,7 +723,7 @@ export function CountryDetail({ id }: CountryDetailProps) {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-gray-600 dark:text-gray-400">
-                                                    {city.state || city.stateCode || "—"}
+                                                    {getCityStateLabel(city)}
                                                 </TableCell>
                                                 <TableCell>
                                                     {city.latitude && city.longitude ? (
@@ -702,3 +814,4 @@ export function CountryDetail({ id }: CountryDetailProps) {
         </div>
     )
 }
+

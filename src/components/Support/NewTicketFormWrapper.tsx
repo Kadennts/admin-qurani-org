@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Paperclip, Plus, X, Check, Loader2 } from "lucide-react"
 import { createTicket } from "@/utils/api/tickets/insert"
 
-const departments = ["Marketing", "Technical", "Product", "Engineering", "Billing", "Data", "Sales", "Support"]
+const departments = ["Marketing", "Billing", "Support"]
 const priorities = ["Low", "Medium", "High"]
 
 interface Attachment {

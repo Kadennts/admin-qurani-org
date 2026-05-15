@@ -24,6 +24,10 @@ import {
     ListChecks,
     PanelRight,
     Edit,
+    Save,
+    UserCheck,
+    Tag,
+    RefreshCw,
 } from "lucide-react"
 
 import { useState, useEffect, useRef } from "react"
@@ -37,7 +41,7 @@ import {
     fetchTicketRepliesPage
 } from "@/utils/api/tickets/fetch"
 import { createTicketReply } from "@/utils/api/tickets/insert"
-import { updateTicketStatus, updateTicketPriority } from "@/utils/api/tickets/update"
+import { updateTicketStatus, updateTicketPriority, updateTicketDetails } from "@/utils/api/tickets/update"
 import { uploadMultipleAttachments } from "@/utils/api/tickets/upload"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/utils/supabase/client"
@@ -83,6 +87,8 @@ interface TicketDetailClientProps {
 // We can reconstruct that structure or adapt the state.
 // Let's reconstruct it to minimize churn in render logic.
 type TicketState = TicketListItem & { replies: TicketReply[] }
+type RelatedMatchSource = "Department" | "Contact"
+type RelatedTicketItem = TicketListItem & { relatedBy: RelatedMatchSource[] }
 
 
 export default function TicketDetailClient({
@@ -162,7 +168,7 @@ export default function TicketDetailClient({
                         }
                     });
                     // Sort by date
-                    merged.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    merged.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
                     return { ...initialTicket, replies: merged };
                 } catch (e) {
                     console.error('Failed to parse cached replies:', e);
@@ -180,11 +186,65 @@ export default function TicketDetailClient({
     const [isTicketLoading] = useState(false)
     const [isSending, setIsSending] = useState(false)
 
-    const [relatedTickets] = useState<TicketListItem[]>(initialRelatedTickets)
-    const [users] = useState<RegularUser[]>(initialUsers)
-    const [selectedAssignee, setSelectedAssignee] = useState<RegularUser | null>(null)
+    const [relatedTickets, setRelatedTickets] = useState<RelatedTicketItem[]>(() =>
+        initialRelatedTickets.map((item) => ({ ...item, relatedBy: [] }))
+    )
+    const [isLoadingRelated, setIsLoadingRelated] = useState(false)
+
+    // Admin list for assignee
+    const [adminUsers, setAdminUsers] = useState<{ id: string; name: string; email: string; role?: string }[]>([])
+    const [selectedAssignee, setSelectedAssignee] = useState<{ id: string; name: string; email: string } | null>(null)
     const [assigneeSearch, setAssigneeSearch] = useState("")
     const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
+    const [isSavingAssignee, setIsSavingAssignee] = useState(false)
+    const assigneeDropdownRef = useRef<HTMLDivElement>(null)
+
+    // Project / Service editing
+    const [editingProject, setEditingProject] = useState(false)
+    const [projectValue, setProjectValue] = useState(initialTicket?.project || "")
+    const [isSavingProject, setIsSavingProject] = useState(false)
+
+    const [editingService, setEditingService] = useState(false)
+    const [serviceValue, setServiceValue] = useState(initialTicket?.service || "")
+    const [isSavingService, setIsSavingService] = useState(false)
+    const [savedServices, setSavedServices] = useState<string[]>([])
+    const [showServiceDropdown, setShowServiceDropdown] = useState(false)
+    const serviceDropdownRef = useRef<HTMLDivElement>(null)
+
+    // Tags
+    const [tags, setTags] = useState<string[]>([])
+    const [tagInput, setTagInput] = useState("")
+
+    // Hydrate local storage fields
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try { 
+                const savedTags = JSON.parse(localStorage.getItem(`ticket_${ticketId}_tags`) || '[]')
+                if (Array.isArray(savedTags) && savedTags.length > 0) setTags(savedTags)
+                
+                const savedServices = JSON.parse(localStorage.getItem('ticket_saved_services') || '[]')
+                if (Array.isArray(savedServices)) setSavedServices(savedServices)
+
+                const savedAssignee = JSON.parse(localStorage.getItem(`ticket_${ticketId}_assignee`) || 'null')
+                if (savedAssignee) setSelectedAssignee(savedAssignee)
+                
+                // If project/service were updated locally but API doesn't have them, load them from cache
+                const ticketCache = JSON.parse(localStorage.getItem(`ticket_cache_${ticketId}`) || 'null')
+                if (ticketCache) {
+                    if (ticketCache.project && !initialTicket?.project) {
+                        setProjectValue(ticketCache.project)
+                        setTicket(prev => prev ? { ...prev, project: ticketCache.project } : prev)
+                    }
+                    if (ticketCache.service && !initialTicket?.service) {
+                        setServiceValue(ticketCache.service)
+                        setTicket(prev => prev ? { ...prev, service: ticketCache.service } : prev)
+                    }
+                }
+            } catch (e) {
+                console.warn('Hydration error:', e)
+            }
+        }
+    }, [ticketId, initialTicket])
 
 
     // Pagination State
@@ -258,13 +318,9 @@ export default function TicketDetailClient({
                             return { ...prev, replies: updatedReplies }
                         }
 
-                        // No match found, append as new
-                        return { ...prev, replies: [...prev.replies, newReply] }
+                        // No match found, prepend as new (latest first)
+                        return { ...prev, replies: [newReply, ...prev.replies] }
                     })
-
-                    setTimeout(() => {
-                        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-                    }, 100)
                 }
             )
             .subscribe()
@@ -272,16 +328,10 @@ export default function TicketDetailClient({
         return () => {
             supabase?.removeChannel(channel)
         }
-    }, [ticketId]) // Removed loadTicket dep
+    }, [ticketId]) // Removed loadTicketon mount
 
     // Scroll to bottom on mount ONLY
     useEffect(() => {
-        if (activeTab === 'reply' && initialReplies.length > 0) {
-            // Small timeout to ensure rendering is complete
-            setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-            }, 100)
-        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []) // Empty deps ensures this runs once on mount
 
@@ -310,7 +360,7 @@ export default function TicketDetailClient({
                     const combined = [...prev.replies, ...result.data!]
                     const unique = Array.from(new Map(combined.map(item => [item.id, item])).values())
                     // Sort just in case
-                    unique.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     return { ...prev, replies: unique }
                 })
                 setRepliesOffset(prev => prev + repliesLimit)
@@ -325,17 +375,32 @@ export default function TicketDetailClient({
     }
 
 
-    const filteredUsers = users.filter(user =>
+    const filteredUsers = adminUsers.filter(user =>
         user.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
         user.email.toLowerCase().includes(assigneeSearch.toLowerCase())
     )
 
-    const handleSelectAssignee = (user: RegularUser) => {
+    const handleSelectAssignee = async (user: any) => {
         setSelectedAssignee(user)
-        setAssigneeSearch(user.name)
+        setAssigneeSearch("")
         setShowAssigneeDropdown(false)
-        showSuccessToast()
+        setIsSavingAssignee(true)
+        try {
+            // Save locally since API doesn't have assignee endpoint yet
+            localStorage.setItem(`ticket_${ticketId}_assignee`, JSON.stringify(user))
+            showSuccessToast()
+        } finally {
+            setIsSavingAssignee(false)
+        }
     }
+
+    // Load saved assignee
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(`ticket_${ticketId}_assignee`)
+            if (saved) setSelectedAssignee(JSON.parse(saved))
+        } catch {}
+    }, [ticketId])
 
     const getStatusConfig = (status: string) => {
         // Perfex Style: Often simple badges or text colors
@@ -376,8 +441,35 @@ export default function TicketDetailClient({
 
 
 
-    // Timezone dari profile user — auth-provider sudah supplement dari Supabase jika API kosong
-    const userTimezone = profile?.timezone || 'UTC'
+    const resolveTimezone = () => {
+        const isValidTimezone = (tz: string) => {
+            try {
+                new Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date())
+                return true
+            } catch {
+                return false
+            }
+        }
+
+        let cachedTimezone = ""
+        try {
+            const raw = localStorage.getItem('myqurani_user_profile_v2')
+            if (raw) {
+                const parsed = JSON.parse(raw)
+                cachedTimezone = (parsed?.timezone || "").trim()
+            }
+        } catch {
+            // no-op
+        }
+
+        const fromProfile = (profile?.timezone || "").trim()
+        const preferred = cachedTimezone || fromProfile
+        if (preferred && isValidTimezone(preferred)) return preferred
+        if (fromProfile && isValidTimezone(fromProfile)) return fromProfile
+        return "UTC"
+    }
+
+    const userTimezone = resolveTimezone()
 
     const formatDateTime = (dateString: string | null) => {
         if (!dateString) return "-"
@@ -508,11 +600,11 @@ export default function TicketDetailClient({
                 attachments: attachmentsJson
             }
 
-            setTicket(prev => prev ? { ...prev, replies: [...prev.replies, optimisticReply] } : prev)
+            setTicket(prev => prev ? { ...prev, replies: [optimisticReply, ...prev.replies] } : prev)
             setReplyContent("")
             setSelectedFiles([])
             setFilePreviews([])
-            setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }) }, 50)
+
 
             // Use client-side API to send reply
             const { ticketsApi, getStoredAuth } = await import('@/lib/api')
@@ -621,7 +713,7 @@ export default function TicketDetailClient({
             // Revert optimistic update by removing the last reply
             setTicket(prev => prev ? {
                 ...prev,
-                replies: prev.replies.slice(0, -1)
+                replies: prev.replies.slice(1)
             } : prev)
             setReplyContent(messageContent)
             alert('Failed to send reply. Please try again.')
@@ -709,6 +801,216 @@ export default function TicketDetailClient({
         setShowSaveSuccess(true)
         setTimeout(() => setShowSaveSuccess(false), 2000)
     }
+
+    // ---- Helper to update cache ----
+    const updateTicketCache = (updates: Partial<TicketState>) => {
+        if (!ticket) return;
+        try {
+            const cacheKey = `ticket_cache_${ticket.id}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, ...updates }));
+            } else {
+                localStorage.setItem(cacheKey, JSON.stringify({ ...ticket, ...updates }));
+            }
+        } catch (e) {
+            console.warn('Failed to update ticket cache', e);
+        }
+    };
+
+    // ---- Project save ----
+    const handleSaveProject = async () => {
+        if (!ticket) return
+        setIsSavingProject(true)
+        try {
+            const res = await updateTicketDetails(ticket.id, { project: projectValue || null })
+            if (res.success) {
+                setTicket(prev => prev ? { ...prev, project: projectValue || null } : prev)
+                updateTicketCache({ project: projectValue || null })
+                setEditingProject(false)
+                showSuccessToast()
+            }
+        } finally {
+            setIsSavingProject(false)
+        }
+    }
+
+    // ---- Service save + add to global list ----
+    const handleSaveService = async (val?: string) => {
+        if (!ticket) return
+        const finalVal = val !== undefined ? val : serviceValue
+        setIsSavingService(true)
+        try {
+            const res = await updateTicketDetails(ticket.id, { service: finalVal || null })
+            if (res.success) {
+                setTicket(prev => prev ? { ...prev, service: finalVal || null } : prev)
+                updateTicketCache({ service: finalVal || null })
+                setServiceValue(finalVal)
+                setEditingService(false)
+                showSuccessToast()
+            }
+        } finally {
+            setIsSavingService(false)
+        }
+    }
+
+    const handleAddServiceToList = () => {
+        const val = serviceValue.trim()
+        if (!val || savedServices.includes(val)) return
+        const next = [...savedServices, val]
+        setSavedServices(next)
+        localStorage.setItem('ticket_saved_services', JSON.stringify(next))
+        showSuccessToast()
+    }
+
+    // ---- Tags ----
+    const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && tagInput.trim()) {
+            e.preventDefault()
+            const raw = tagInput.trim()
+            const tag = raw.startsWith('#') ? raw : `#${raw}`
+            if (!tags.includes(tag)) {
+                const next = [...tags, tag]
+                setTags(next)
+                localStorage.setItem(`ticket_${ticketId}_tags`, JSON.stringify(next))
+            }
+            setTagInput('')
+        }
+        if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
+            const next = tags.slice(0, -1)
+            setTags(next)
+            localStorage.setItem(`ticket_${ticketId}_tags`, JSON.stringify(next))
+        }
+    }
+
+    const removeTag = (tag: string) => {
+        const next = tags.filter(t => t !== tag)
+        setTags(next)
+        localStorage.setItem(`ticket_${ticketId}_tags`, JSON.stringify(next))
+    }
+
+    // ---- Assignee: load admin users from API ----
+    useEffect(() => {
+        const loadAdmins = async () => {
+            try {
+                const { ticketsApi, getStoredAuth } = await import('@/lib/api')
+                const auth = getStoredAuth()
+                if (!auth?.accessToken) return
+                // Fetch via Qurani users endpoint filtered by admin role
+                const res = await fetch(`${process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com'}/api/v1/Users?role=admin&pageSize=100`, {
+                    headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' }
+                })
+                if (!res.ok) return
+                const json = await res.json()
+                const list: any[] = json?.data?.items || json?.data || json?.items || []
+                if (Array.isArray(list)) {
+                    setAdminUsers(list.map((u: any) => ({
+                        id: String(u.id || u.userId),
+                        name: u.name || u.username || u.email || 'Admin',
+                        email: u.email || '',
+                        role: u.role || 'admin',
+                    })))
+                }
+            } catch (e) {
+                console.warn('[Assignee] Failed to load admins:', e)
+            }
+        }
+        loadAdmins()
+    }, [])
+
+    // Close assignee dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (assigneeDropdownRef.current && !assigneeDropdownRef.current.contains(e.target as Node)) {
+                setShowAssigneeDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    // Close service dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
+                setShowServiceDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    // ---- Load Related Tickets via Qurani API ----
+    const loadRelatedTickets = async () => {
+        if (!ticket) return
+        setIsLoadingRelated(true)
+        try {
+            const { ticketsApi, getStoredAuth } = await import('@/lib/api')
+            const auth = getStoredAuth()
+            if (!auth?.accessToken) return
+
+            const API = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com'
+            // Fetch tickets from Qurani API, filter by same department or contact
+            const params = new URLSearchParams({ PageSize: '50', Page: '1' })
+            const res = await fetch(`${API}/api/v1/tickets?${params}`, {
+                headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' }
+            })
+            if (!res.ok) return
+            const json = await res.json()
+            const raw: any[] = json?.data?.items || json?.data || json?.items || []
+            if (!Array.isArray(raw)) return
+
+            const normalize = (v: any) => String(v || '').trim().toLowerCase()
+            const related = raw
+                .filter((t: any) => String(t.id) !== String(ticket.id))
+                .map((t: any) => {
+                    let score = 0
+                    const relatedBy: RelatedMatchSource[] = []
+                    if (t.department && normalize(t.department) === normalize(ticket.department)) {
+                        score += 5
+                        relatedBy.push("Department")
+                    }
+                    if ((t.name || t.email) && normalize(t.name || t.email) === normalize(ticket.contact)) {
+                        score += 4
+                        relatedBy.push("Contact")
+                    }
+                    return { t, score, relatedBy }
+                })
+                .filter(x => x.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 8)
+                .map(x => ({
+                    id: x.t.id,
+                    ticket_number: x.t.ticketKey || `#${x.t.id}`,
+                    subject: x.t.subject || 'No Subject',
+                    contact: x.t.name || x.t.email || 'Unknown',
+                    department: String(x.t.department || ''),
+                    project: null,
+                    service: x.t.service || null,
+                    priority: x.t.priorityName || 'Medium',
+                    status: x.t.statusName || 'Open',
+                    last_reply: x.t.lastReply || null,
+                    submitted_date: x.t.date || new Date().toISOString(),
+                    body: null,
+                    relatedBy: x.relatedBy,
+                } as RelatedTicketItem))
+
+            setRelatedTickets(related)
+        } catch (e) {
+            console.warn('[Related] Failed:', e)
+        } finally {
+            setIsLoadingRelated(false)
+        }
+    }
+
+    // Auto-load related tickets when tab is switched to "others"
+    useEffect(() => {
+        if (activeTab === 'others' && relatedTickets.length === 0) {
+            loadRelatedTickets()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab])
 
     // If ticket is not loaded or not found, show loading/error state
     // This guard ensures that `ticket` is not null for the rest of the component
@@ -1133,18 +1435,56 @@ export default function TicketDetailClient({
                                 )}
 
                                 {activeTab === 'others' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {relatedTickets.map(t => (
-                                            <div key={t.id} onClick={() => router.push(`/support/tickets/${t.id}`)} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:ring-2 hover:ring-emerald-500/20 cursor-pointer transition-all">
-                                                <div className="flex justify-between text-xs mb-2">
-                                                    <span className="font-mono text-gray-500">#{t.id}</span>
-                                                    <span className={cn("px-2 py-0.5 rounded-full", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700")}>{t.status}</span>
-                                                </div>
-                                                <h4 className="font-semibold text-sm mb-1 line-clamp-1">{t.subject}</h4>
-                                                <p className="text-xs text-gray-500">{formatDateTime(t.submitted_date)}</p>
+                                    <div className="space-y-4">
+                                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 text-emerald-800 px-3 py-2.5 text-sm flex items-start gap-2">
+                                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                            <p>
+                                                Menampilkan tiket lain dengan Department ({ticket.department || "-"}) atau Contact ({ticket.contact || "-"}) yang sama.
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {isLoadingRelated ? (
+                                            <div className="col-span-2 py-8 text-center text-gray-500 flex flex-col items-center">
+                                                <Loader2 className="w-6 h-6 animate-spin mb-2" />
+                                                <p className="text-sm">Finding related tickets...</p>
                                             </div>
-                                        ))}
-                                        {relatedTickets.length === 0 && <p className="text-gray-500 text-sm">No related tickets found.</p>}
+                                        ) : relatedTickets.length > 0 ? (
+                                            relatedTickets.map(t => (
+                                                <div key={t.id} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg cursor-default">
+                                                    <div className="flex justify-between text-xs mb-2">
+                                                        <span className="font-mono text-gray-500">{t.ticket_number || `#${t.id}`}</span>
+                                                        <span className={cn("px-2 py-0.5 rounded-full", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700")}>{t.status}</span>
+                                                    </div>
+                                                    <h4 className="font-semibold text-sm mb-1 line-clamp-1">{t.subject}</h4>
+                                                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                                        <span className="text-[11px] text-gray-500">Related via:</span>
+                                                        {t.relatedBy.length > 0 ? (
+                                                            t.relatedBy.map((source) => (
+                                                                <span
+                                                                    key={source}
+                                                                    className={cn(
+                                                                        "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                                                        source === "Department" && "bg-blue-50 text-blue-700 border border-blue-200",
+                                                                        source === "Contact" && "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                                    )}
+                                                                >
+                                                                    {source}
+                                                                </span>
+                                                            ))
+                                                        ) : (
+                                                            <span className="text-[11px] text-gray-400">-</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[11px] text-gray-500 mb-1">
+                                                        {t.contact || "Unknown"} · {t.department || "-"}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">{formatDateTime(t.submitted_date)}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="col-span-2 text-center text-gray-500 text-sm py-8">No related tickets found.</p>
+                                        )}
+                                        </div>
                                     </div>
                                 )}
 
@@ -1202,18 +1542,62 @@ export default function TicketDetailClient({
                             {/* DETAILS */}
                             <div className="border-t border-gray-200 dark:border-gray-800 pt-4 pb-3 space-y-3">
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</h4>
-                                <dl className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between">
+                                <dl className="text-xs">
+                                    <div className="grid grid-cols-[74px_minmax(0,1fr)] items-center gap-x-3 py-1.5">
                                         <dt className="text-gray-500">Department</dt>
-                                        <dd className="font-medium text-gray-900 dark:text-gray-100">{ticket.department || "-"}</dd>
+                                        <dd className="font-medium text-gray-900 dark:text-gray-100 text-right justify-self-end min-w-0 truncate">{ticket.department || "-"}</dd>
                                     </div>
-                                    <div className="flex items-center justify-between">
+                                    <div className="grid grid-cols-[74px_minmax(0,1fr)] items-center gap-x-3 py-1.5 group min-h-[1.5rem]">
                                         <dt className="text-gray-500">Project</dt>
-                                        <dd className="font-medium text-gray-900 dark:text-gray-100 text-right">{ticket.project || "-"}</dd>
+                                        <dd className="font-medium text-gray-900 dark:text-gray-100 flex items-center justify-end min-w-0">
+                                            {editingProject ? (
+                                                <div className="flex gap-1 items-center justify-end w-full">
+                                                    <Input value={projectValue} onChange={e => setProjectValue(e.target.value)} className="h-7 text-xs w-28" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()} />
+                                                    <button onClick={handleSaveProject} disabled={isSavingProject} className="p-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200">{isSavingProject ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}</button>
+                                                    <button onClick={() => {setEditingProject(false); setProjectValue(ticket.project || '')}} className="p-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"><X className="w-3 h-3"/></button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingProject(true)}
+                                                    className="w-full text-right hover:text-emerald-700 hover:underline underline-offset-2 transition-colors truncate"
+                                                    title="Click to edit project"
+                                                >
+                                                    {ticket.project || "-"}
+                                                </button>
+                                            )}
+                                        </dd>
                                     </div>
-                                    <div className="flex items-center justify-between">
+                                    <div className="grid grid-cols-[74px_minmax(0,1fr)] items-center gap-x-3 py-1.5 group min-h-[1.5rem] relative" ref={serviceDropdownRef}>
                                         <dt className="text-gray-500">Service</dt>
-                                        <dd className="font-medium text-gray-900 dark:text-gray-100 text-right">{ticket.service || "-"}</dd>
+                                        <dd className="font-medium text-gray-900 dark:text-gray-100 flex items-center justify-end min-w-0">
+                                            {editingService ? (
+                                                <div className="flex flex-col items-end">
+                                                    <div className="flex gap-1 items-center justify-end w-full">
+                                                        <Input value={serviceValue} onChange={e => {setServiceValue(e.target.value); setShowServiceDropdown(true)}} onFocus={() => setShowServiceDropdown(true)} className="h-7 text-xs w-28" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveService()} />
+                                                        <button onClick={handleAddServiceToList} title="Add to global list" className="p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"><Plus className="w-3 h-3"/></button>
+                                                        <button onClick={() => handleSaveService()} disabled={isSavingService} title="Save to ticket" className="p-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200">{isSavingService ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}</button>
+                                                        <button onClick={() => {setEditingService(false); setServiceValue(ticket.service || '')}} className="p-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"><X className="w-3 h-3"/></button>
+                                                    </div>
+                                                    {showServiceDropdown && savedServices.length > 0 && (
+                                                        <div className="absolute top-full right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 max-h-32 overflow-y-auto w-40 text-left">
+                                                            {savedServices.filter(s => s.toLowerCase().includes(serviceValue.toLowerCase())).map(s => (
+                                                                <div key={s} onClick={() => {setServiceValue(s); setShowServiceDropdown(false)}} className="px-2 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">{s}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {setEditingService(true); setShowServiceDropdown(true)}}
+                                                    className="w-full text-right hover:text-emerald-700 hover:underline underline-offset-2 transition-colors truncate"
+                                                    title="Click to edit service"
+                                                >
+                                                    {ticket.service || "-"}
+                                                </button>
+                                            )}
+                                        </dd>
                                     </div>
                                 </dl>
                             </div>
@@ -1221,17 +1605,30 @@ export default function TicketDetailClient({
                             {/* TAGS */}
                             <div className="border-t border-gray-200 dark:border-gray-800 pt-4 pb-3 space-y-2">
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tags</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {/* Mock Tags (sementara) */}
-                                    <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2 py-1 text-[11px] rounded-full">#support</span>
-                                    <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2 py-1 text-[11px] rounded-full">#bug</span>
+                                <div className="flex flex-wrap items-center gap-1.5 min-h-9 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1.5 focus-within:ring-1 focus-within:ring-emerald-500 focus-within:border-emerald-500">
+                                    {tags.map((tag) => (
+                                        <span key={tag} className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-2 py-0.5 text-[11px] rounded-md flex items-center gap-1">
+                                            {tag}
+                                            <button onClick={() => removeTag(tag)} className="text-gray-500 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                        </span>
+                                    ))}
+                                    <input
+                                        value={tagInput}
+                                        onChange={e => setTagInput(e.target.value)}
+                                        onKeyDown={handleTagKeyDown}
+                                        placeholder={tags.length > 0 ? "Tambah tag..." : "Type tag and press Enter..."}
+                                        className="h-6 flex-1 min-w-[120px] border-0 bg-transparent text-xs outline-none placeholder:text-gray-400"
+                                    />
                                 </div>
                             </div>
 
                             {/* ASSIGNEE */}
                             <div className="border-t border-gray-200 dark:border-gray-800 pt-4 pb-2">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignee</h4>
-                                <div className="relative">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                    Assignee
+                                    {isSavingAssignee && <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />}
+                                </h4>
+                                <div className="relative" ref={assigneeDropdownRef}>
                                     <div
                                         className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md cursor-pointer bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
                                         onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
@@ -1239,41 +1636,53 @@ export default function TicketDetailClient({
                                         {selectedAssignee ? (
                                             <>
                                                 <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">
-                                                    {selectedAssignee.name.charAt(0)}
+                                                    {selectedAssignee.name.charAt(0).toUpperCase()}
                                                 </div>
                                                 <span className="text-sm truncate flex-1">{selectedAssignee.name}</span>
                                             </>
                                         ) : (
-                                            <span className="text-sm text-gray-400 italic">Unassigned</span>
+                                            <>
+                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center"><UserCheck className="w-3 h-3" /></div>
+                                                <span className="text-sm text-gray-400 italic flex-1">Unassigned</span>
+                                            </>
                                         )}
                                         <ChevronDown className="w-4 h-4 text-gray-400" />
                                     </div>
 
                                     {showAssigneeDropdown && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                                            <div className="p-2 sticky top-0 bg-white dark:bg-gray-900 border-b">
+                                        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 flex flex-col">
+                                            <div className="p-2 sticky top-0 bg-white dark:bg-gray-900 border-b z-10">
                                                 <input
                                                     type="text"
                                                     placeholder="Search staff..."
                                                     value={assigneeSearch}
                                                     onChange={(e) => setAssigneeSearch(e.target.value)}
-                                                    className="w-full text-xs p-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                                    className="w-full text-xs p-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:bg-gray-800 dark:border-gray-700"
                                                 />
                                             </div>
-                                            {filteredUsers.map(user => (
-                                                <div
-                                                    key={user.id}
-                                                    onClick={() => handleSelectAssignee(user)}
-                                                    className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer text-sm"
-                                                >
-                                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">
-                                                        {user.name.charAt(0)}
+                                            <div className="overflow-y-auto p-1 flex-1">
+                                                {adminUsers.filter(u => u.name.toLowerCase().includes(assigneeSearch.toLowerCase()) || u.email.toLowerCase().includes(assigneeSearch.toLowerCase())).map(user => (
+                                                    <div
+                                                        key={user.id}
+                                                        onClick={() => handleSelectAssignee(user)}
+                                                        className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer text-sm rounded"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">
+                                                            {user.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div className="truncate flex-1">
+                                                            <p className="font-medium text-gray-900 dark:text-gray-100">{user.name}</p>
+                                                            <p className="text-[10px] text-gray-500">{user.role}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="truncate">
-                                                        <p>{user.name}</p>
+                                                ))}
+                                                {adminUsers.length === 0 && (
+                                                    <div className="p-3 text-center text-xs text-gray-500 flex flex-col items-center gap-2">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        Loading admins...
                                                     </div>
-                                                </div>
-                                            ))}
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

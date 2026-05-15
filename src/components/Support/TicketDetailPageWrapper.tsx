@@ -38,11 +38,11 @@ import {
   type TicketListItem,
 } from "@/utils/api/tickets/fetch"
 import { createTicketReply } from "@/utils/api/tickets/insert"
-import { updateTicketStatus, updateTicketPriority } from "@/utils/api/tickets/update"
+import { updateTicketStatus, updateTicketPriority, updateTicketDetails } from "@/utils/api/tickets/update"
 import { useAuth } from "@/hooks/use-auth"
 // DISABLED: Supabase realtime subscription
 // import { createClient } from "@/utils/supabase/client"
-import { fetchRegularUsers, type RegularUser } from "@/utils/api/users/fetch-users"
+import { fetchAdminUsers, type RegularUser } from "@/utils/api/users/fetch-users"
 import { cn } from "@/lib/utils"
 
 type DetailTab = "reply" | "note" | "reminder" | "others" | "task"
@@ -75,6 +75,21 @@ interface TicketDetailPageWrapperProps {
   backUrl?: string
 }
 
+interface TicketLocalMeta {
+  project?: string
+  service?: string
+  tags?: string[]
+  assignee?: {
+    id: string
+    name: string
+    email?: string
+    avatar_url?: string
+  } | null
+}
+
+const TICKET_META_KEY = "support_ticket_meta_v1"
+const SERVICE_OPTIONS_KEY = "support_ticket_services_v1"
+
 export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/tickets" }: TicketDetailPageWrapperProps) {
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -86,6 +101,13 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
   const [selectedAssignee, setSelectedAssignee] = useState<RegularUser | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState("")
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
+  const [ticketTags, setTicketTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
+  const [isEditingProject, setIsEditingProject] = useState(false)
+  const [projectDraft, setProjectDraft] = useState("")
+  const [serviceOptions, setServiceOptions] = useState<string[]>(["technical"])
+  const [showAddService, setShowAddService] = useState(false)
+  const [newServiceInput, setNewServiceInput] = useState("")
 
   const [notes, setNotes] = useState<Note[]>([])
   const [newNote, setNewNote] = useState("")
@@ -131,6 +153,56 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     localStorage.setItem(`ticket_${ticketId}_tasks`, JSON.stringify(newTasks))
   }
 
+  const readTicketMeta = useCallback((id: string): TicketLocalMeta => {
+    try {
+      const raw = localStorage.getItem(TICKET_META_KEY)
+      if (!raw) return {}
+      const parsed = JSON.parse(raw) as Record<string, TicketLocalMeta>
+      return parsed[id] || {}
+    } catch {
+      return {}
+    }
+  }, [])
+
+  const writeTicketMeta = useCallback((id: string, patch: TicketLocalMeta) => {
+    try {
+      const raw = localStorage.getItem(TICKET_META_KEY)
+      const all = raw ? (JSON.parse(raw) as Record<string, TicketLocalMeta>) : {}
+      const current = all[id] || {}
+      all[id] = { ...current, ...patch }
+      localStorage.setItem(TICKET_META_KEY, JSON.stringify(all))
+    } catch (error) {
+      console.warn("[TicketDetail] Failed to persist ticket meta:", error)
+    }
+  }, [])
+
+  const loadServiceOptions = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(SERVICE_OPTIONS_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as string[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const cleaned = Array.from(new Set(parsed.map(s => s.trim()).filter(Boolean)))
+        if (cleaned.length > 0) setServiceOptions(cleaned)
+      }
+    } catch (error) {
+      console.warn("[TicketDetail] Failed to load service options:", error)
+    }
+  }, [])
+
+  const persistServiceOptions = useCallback((services: string[]) => {
+    try {
+      const cleaned = Array.from(new Set(services.map(s => s.trim()).filter(Boolean)))
+      localStorage.setItem(SERVICE_OPTIONS_KEY, JSON.stringify(cleaned))
+    } catch (error) {
+      console.warn("[TicketDetail] Failed to save service options:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadServiceOptions()
+  }, [loadServiceOptions])
+
   const [activeTab, setActiveTab] = useState<DetailTab>("reply")
   const [replyContent, setReplyContent] = useState("")
   const [ticket, setTicket] = useState<TicketWithReplies | null>(null)
@@ -154,9 +226,35 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
       const ticketResult = await fetchTicketById(parseInt(ticketId))
 
       if (ticketResult.success && ticketResult.data) {
-        setTicket(ticketResult.data)
-        setTicketStatus(ticketResult.data.status)
-        setTicketPriority(ticketResult.data.priority)
+        const localMeta = readTicketMeta(ticketId)
+        const mergedTicket: TicketWithReplies = {
+          ...ticketResult.data,
+          project: localMeta.project ?? ticketResult.data.project,
+          service: localMeta.service ?? ticketResult.data.service,
+        }
+        setTicket(mergedTicket)
+        setTicketStatus(mergedTicket.status)
+        setTicketPriority(mergedTicket.priority)
+        setProjectDraft(mergedTicket.project || "")
+        setTicketTags(localMeta.tags || [])
+        if (localMeta.assignee) {
+          setSelectedAssignee({
+            id: localMeta.assignee.id,
+            name: localMeta.assignee.name,
+            email: localMeta.assignee.email || "",
+            avatar_url: localMeta.assignee.avatar_url,
+          })
+        } else {
+          setSelectedAssignee(null)
+        }
+
+        if (mergedTicket.service) {
+          setServiceOptions(prev => {
+            const merged = Array.from(new Set([...prev, mergedTicket.service!]))
+            persistServiceOptions(merged)
+            return merged
+          })
+        }
       }
     } catch (error) {
       console.error("Error loading ticket:", error)
@@ -170,7 +268,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     try {
       const [relatedResult, userResult] = await Promise.all([
         fetchRelatedTickets(parseInt(ticketId)),
-        fetchRegularUsers()
+        fetchAdminUsers()
       ])
 
       if (relatedResult.success && relatedResult.data) {
@@ -185,7 +283,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     } finally {
       setIsSecondaryLoading(false)
     }
-  }, [ticketId])
+  }, [ticketId, persistServiceOptions, readTicketMeta])
 
   useEffect(() => {
     loadTicket()
@@ -196,10 +294,26 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     user.email.toLowerCase().includes(assigneeSearch.toLowerCase())
   )
 
+  useEffect(() => {
+    if (!selectedAssignee) return
+    const latest = users.find(u => u.id === selectedAssignee.id)
+    if (latest && (latest.name !== selectedAssignee.name || latest.avatar_url !== selectedAssignee.avatar_url)) {
+      setSelectedAssignee(latest)
+    }
+  }, [users, selectedAssignee])
+
   const handleSelectAssignee = (user: RegularUser) => {
     setSelectedAssignee(user)
     setAssigneeSearch(user.name)
     setShowAssigneeDropdown(false)
+    writeTicketMeta(ticketId, {
+      assignee: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+      }
+    })
     showSuccessToast()
   }
 
@@ -402,6 +516,80 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     } catch (error) {
       console.error("Error updating priority:", error)
     }
+  }
+
+  const handleProjectSave = async () => {
+    if (!ticket) return
+    const value = projectDraft.trim()
+
+    setTicket(prev => prev ? { ...prev, project: value || null } : prev)
+    writeTicketMeta(ticketId, { project: value || "" })
+    setIsEditingProject(false)
+
+    const result = await updateTicketDetails(ticket.id, { project: value || null })
+    if (!result.success) {
+      console.warn("[TicketDetail] Project sync failed, kept local cache:", result.error)
+    }
+    showSuccessToast()
+  }
+
+  const handleServiceChange = async (service: string) => {
+    if (!ticket) return
+    const value = service.trim()
+    if (!value) return
+
+    setTicket(prev => prev ? { ...prev, service: value } : prev)
+    writeTicketMeta(ticketId, { service: value })
+
+    setServiceOptions(prev => {
+      const next = Array.from(new Set([...prev, value]))
+      persistServiceOptions(next)
+      return next
+    })
+
+    const result = await updateTicketDetails(ticket.id, { service: value })
+    if (!result.success) {
+      console.warn("[TicketDetail] Service sync failed, kept local cache:", result.error)
+    }
+    showSuccessToast()
+  }
+
+  const handleAddServiceOption = () => {
+    const value = newServiceInput.trim()
+    if (!value) return
+
+    setServiceOptions(prev => {
+      const next = Array.from(new Set([...prev, value]))
+      persistServiceOptions(next)
+      return next
+    })
+    setNewServiceInput("")
+    setShowAddService(false)
+    handleServiceChange(value)
+  }
+
+  const handleAddTag = () => {
+    const raw = tagInput.trim()
+    if (!raw) return
+
+    const normalized = raw.startsWith("#") ? raw : `#${raw}`
+    if (ticketTags.some(t => t.toLowerCase() === normalized.toLowerCase())) {
+      setTagInput("")
+      return
+    }
+
+    const next = [...ticketTags, normalized]
+    setTicketTags(next)
+    setTagInput("")
+    writeTicketMeta(ticketId, { tags: next })
+    showSuccessToast()
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    const next = ticketTags.filter(t => t !== tag)
+    setTicketTags(next)
+    writeTicketMeta(ticketId, { tags: next })
+    showSuccessToast()
   }
 
 
@@ -827,26 +1015,46 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
               )}
 
               {activeTab === 'others' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
+                    Menampilkan tiket lain dengan Department ({ticket.department}) atau Contact ({ticket.contact}) yang sama.
+                  </div>
+
                   {isSecondaryLoading && relatedTickets.length === 0 ? (
                     [...Array(4)].map((_, i) => (
-                      <div key={i} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <div key={i} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
                         <div className="flex justify-between mb-2"><Skeleton className="h-3 w-12" /><Skeleton className="h-3 w-16" /></div>
                         <Skeleton className="h-4 w-3/4 mb-1" />
                         <Skeleton className="h-3 w-1/4" />
                       </div>
                     ))
+                  ) : relatedTickets.length === 0 ? (
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-6 text-center text-sm text-gray-500">
+                      Tidak ada tiket terkait yang ditemukan.
+                    </div>
                   ) : (
                     relatedTickets.map(t => (
-                      <div key={t.id} onClick={() => router.push(`/support/tickets/${t.id}`)} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:ring-2 hover:ring-emerald-500/20 cursor-pointer transition-all">
-                        <div className="flex justify-between text-xs mb-2">
-                          <span className="font-mono text-gray-500">#{t.id}</span>
-                          <span className={cn("px-2 py-0.5 rounded-full", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700")}>{t.status}</span>
+                      <div
+                        key={t.id}
+                        onClick={() => router.push(`/support/tickets/${t.id}`)}
+                        className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:ring-2 hover:ring-emerald-500/20 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="font-semibold text-base mb-1 line-clamp-1">{t.subject}</h4>
+                            <div className="text-xs text-gray-500 flex items-center gap-3">
+                              <span>{t.contact}</span>
+                              <span>{t.department}</span>
+                              <span>{formatDateTime(t.submitted_date)}</span>
+                            </div>
+                          </div>
+                          <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700 dark:text-gray-200 whitespace-nowrap")}>
+                            {t.status}
+                          </span>
                         </div>
-                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">{t.subject}</h4>
-                        <p className="text-xs text-gray-500">{formatDateTime(t.submitted_date)}</p>
                       </div>
-                    )))}
+                    ))
+                  )}
                 </div>
               )}
 
@@ -922,8 +1130,80 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
                   <dd className="font-medium">{ticket.department}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Service</dt>
-                  <dd className="font-medium">{ticket.service || "-"}</dd>
+                  <dt className="text-gray-500 pt-2">Project</dt>
+                  <dd className="font-medium w-[180px]">
+                    {isEditingProject ? (
+                      <input
+                        value={projectDraft}
+                        onChange={(e) => setProjectDraft(e.target.value)}
+                        onBlur={handleProjectSave}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleProjectSave()
+                          if (e.key === "Escape") {
+                            setProjectDraft(ticket.project || "")
+                            setIsEditingProject(false)
+                          }
+                        }}
+                        autoFocus
+                        className="w-full text-right border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900"
+                        placeholder="Klik isi project"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingProject(true)}
+                        className="w-full text-right text-emerald-600 hover:text-emerald-700"
+                        title="Klik untuk edit project"
+                      >
+                        {ticket.project || "-"}
+                      </button>
+                    )}
+                  </dd>
+                </div>
+                <div className="flex justify-between items-start gap-2">
+                  <dt className="text-gray-500 pt-2">Service</dt>
+                  <dd className="w-[180px] space-y-2">
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={ticket.service || ""}
+                        onChange={(e) => handleServiceChange(e.target.value)}
+                        className="w-full border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900 text-right"
+                      >
+                        <option value="">-</option>
+                        {serviceOptions.map((service) => (
+                          <option key={service} value={service}>{service}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddService((prev) => !prev)}
+                        className="w-6 h-6 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center"
+                        title="Tambah service baru"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {showAddService && (
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={newServiceInput}
+                          onChange={(e) => setNewServiceInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleAddServiceOption()
+                          }}
+                          className="w-full border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900 text-xs"
+                          placeholder="Service baru..."
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddServiceOption}
+                          className="px-2 py-1 rounded bg-emerald-600 text-white text-xs"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Submitted</dt>
@@ -934,6 +1214,42 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
                   <dd className="font-medium text-right">{formatDateTime(ticket.last_reply)}</dd>
                 </div>
               </dl>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-1">Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {ticketTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full text-xs"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag)}
+                      className="text-gray-500 hover:text-red-500"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                {ticketTags.length === 0 && (
+                  <span className="text-xs text-gray-400">Belum ada tags</span>
+                )}
+              </div>
+              <input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    handleAddTag()
+                  }
+                }}
+                className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-900 text-sm"
+                placeholder="ketik tag lalu Enter (contoh: bug)"
+              />
             </div>
 
             <div className="pt-4 border-t border-gray-200 dark:border-gray-800">

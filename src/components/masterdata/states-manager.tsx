@@ -170,7 +170,7 @@ export function StatesManager() {
         }
     }, [])
 
-    // Fetch states
+    // Fetch states from Supabase-backed API (includes citiesCount, sorted by ID)
     const fetchStates = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
@@ -181,47 +181,31 @@ export function StatesManager() {
         setError(null)
 
         try {
-            let allStates: StateData[] = []
-
-            if (selectedCountryCode && selectedCountryCode !== "all") {
-                // Filter by country - single request
-                const response = await masterdataApi.states.getByCountryCode(
-                    selectedCountryCode,
-                    undefined,
-                    abortControllerRef.current.signal
-                )
-
-                if (response && response.success && response.data) {
-                    allStates = response.data
-                }
-            } else {
-                // Get all states - single request with larger pageSize
-                // Note: Backend may limit results, but this avoids infinite loop
-                const response = await masterdataApi.states.getAll(
-                    { page: 1, pageSize: 1000 },
-                    undefined,
-                    abortControllerRef.current.signal
-                )
-
-                if (response && response.success && response.data) {
-                    allStates = response.data
-                }
-
-                console.log(`✅ Loaded ${allStates.length} states`)
+            const params = new URLSearchParams()
+            if (selectedCountryCode && selectedCountryCode !== 'all') {
+                params.set('countryCode', selectedCountryCode)
             }
+
+            const res = await fetch(`/api/masterdata/states?${params.toString()}`, {
+                signal: abortControllerRef.current.signal
+            })
+
+            if (!res.ok) throw new Error(`Failed to fetch states: ${res.status}`)
+
+            const json = await res.json()
+            const allStates: StateData[] = json.success && Array.isArray(json.data) ? json.data : []
 
             setStates(allStates)
+            console.log(`✅ Loaded ${allStates.length} states`)
         } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') {
-                return
-            }
+            if (err instanceof Error && err.name === 'AbortError') return
             const errorMsg = err instanceof Error ? err.message : "Failed to fetch states"
             setError(errorMsg)
             console.error("Failed to fetch states:", err)
         } finally {
             setIsLoading(false)
         }
-    }, [selectedCountryCode, countries])
+    }, [selectedCountryCode])
 
     // Initial data load - fetch both countries and states on mount
     useEffect(() => {
@@ -238,7 +222,7 @@ export function StatesManager() {
         }
     }, [selectedCountryCode, fetchStates])
 
-    // Search states using API with debounce
+    // Search states using Supabase-backed API
     const searchStates = useCallback(async (keyword: string) => {
         // Cancel any pending search request
         if (searchAbortRef.current) {
@@ -246,7 +230,7 @@ export function StatesManager() {
         }
 
         // If keyword is empty or too short, clear search results
-        if (!keyword.trim() || keyword.trim().length < 3) {
+        if (!keyword.trim() || keyword.trim().length < 2) {
             setSearchResults(null)
             setIsSearching(false)
             return
@@ -257,53 +241,34 @@ export function StatesManager() {
         setIsSearching(true)
 
         try {
-            const response = await masterdataApi.search.states(
-                { keyword: keyword.trim(), pageSize: 50 },
-                undefined,
-                searchAbortRef.current.signal
-            )
-
-            // Handle different response formats
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const responseData = response.data as any
-
-            // Debug: log the response to understand the format
-            console.log('[Search States] Response:', { success: response.success, data: responseData })
-
-            let searchItems: StateData[] | null = null
-
-            if (response.success && responseData?.items && Array.isArray(responseData.items)) {
-                // Format: { success, data: { items: [...] } }
-                searchItems = responseData.items as StateData[]
-            } else if (response.success && Array.isArray(responseData)) {
-                // Format: { success, data: [...] }
-                searchItems = responseData as StateData[]
-            } else if (responseData?.items && Array.isArray(responseData.items)) {
-                // Format: { data: { items: [...] } } without success field
-                searchItems = responseData.items as StateData[]
+            const params = new URLSearchParams({ q: keyword.trim(), limit: '50' })
+            if (selectedCountryCode && selectedCountryCode !== 'all') {
+                params.set('countryCode', selectedCountryCode)
             }
 
-            // If API returns results, use them. If empty, fallback to client-side filter.
-            // This handles cases where API search is too strict (e.g. case-sensitive)
-            if (searchItems && searchItems.length > 0) {
+            const res = await fetch(`/api/masterdata/states/search?${params.toString()}`, {
+                signal: searchAbortRef.current.signal
+            })
+
+            if (!res.ok) throw new Error(`Search failed: ${res.status}`)
+
+            const json = await res.json()
+            const searchItems: StateData[] = json.success && Array.isArray(json.data) ? json.data : []
+
+            if (searchItems.length > 0) {
                 setSearchResults(searchItems)
             } else {
-                // API returned empty or unknown format -> fallback to client-side filter
-                console.log('[Search States] API returned empty/unknown, using client-side filter')
+                // Fallback to client-side filter if API returns empty
                 setSearchResults(null)
             }
         } catch (err) {
-            // Don't set error if request was cancelled
-            if (err instanceof Error && err.name === 'AbortError') {
-                return
-            }
-            console.warn('Search error:', err)
-            // Fallback to client-side filtering on API error
+            if (err instanceof Error && err.name === 'AbortError') return
+            console.warn('Search states error:', err)
             setSearchResults(null)
         } finally {
             setIsSearching(false)
         }
-    }, [])
+    }, [selectedCountryCode])
 
     // Search effect - triggers immediately when searchQuery changes (only on button click/Enter)
     useEffect(() => {
@@ -376,7 +341,7 @@ export function StatesManager() {
         }
 
         // Sort by ID (ascending) - create new array to avoid mutation
-        const sorted = [...result].sort((a, b) => a.id - b.id)
+        const sorted = [...result].sort((a, b) => a.name.localeCompare(b.name))
         console.log('🔢 States sorted by ID:', sorted.slice(0, 5).map(s => ({ id: s.id, name: s.name })))
         return sorted
     }, [enrichedStates, selectedType, searchQuery, searchResults, countries])
@@ -658,7 +623,7 @@ export function StatesManager() {
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-600 dark:hover:bg-emerald-700">
-                                    <TableHead className="w-20 text-white font-bold">ID</TableHead>
+                                    <TableHead className="w-20 text-white font-bold">No.</TableHead>
                                     <TableHead className="min-w-[200px] text-white font-bold">State Name</TableHead>
                                     <TableHead className="w-[180px] text-white font-bold">Country</TableHead>
                                     <TableHead className="w-32 text-white font-bold">Type</TableHead>
@@ -668,7 +633,7 @@ export function StatesManager() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {paginatedStates.map((state) => (
+                                {paginatedStates.map((state, index) => (
                                     <TableRow
                                         key={state.id}
                                         className="group hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer"
@@ -676,7 +641,7 @@ export function StatesManager() {
                                     >
                                         {/* ID Column */}
                                         <TableCell className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                                            #{state.id}
+                                            #{(currentPage - 1) * pageSize + index + 1}
                                         </TableCell>
 
                                         {/* State Name Column */}

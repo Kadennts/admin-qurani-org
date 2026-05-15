@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { createAdminClient } from "@/utils/supabase/server";
 
-const API_BASE = process.env.NEXT_PUBLIC_MY_API_URL || 'https://api.myqurani.com';
-
-// Server-side in-memory cache for full country details
-// Data rarely changes, so 24h TTL is safe
+const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 let _cache: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 jam
 
-/**
- * GET /api/masterdata/countries
- *
- * Aggregates full country details (with currency, region, etc.) from the backend.
- * The backend /api/v1/Countries only returns simplified data (no currency field),
- * so this route batch-fetches each country by ID in parallel on the server side,
- * caches the result for 24h, and returns it as a single response to the client.
- *
- * Optional query param: ?currency=IDR  → filters results to only countries using that currency
- */
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -39,67 +25,57 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Read auth token from cookies
-        const cookieStore = await cookies();
-        const token = cookieStore.get("myqurani_access_token")?.value;
+        const supabase = await createAdminClient();
 
-        if (!token) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-        }
+        // Fetch from Supabase directly for speed and to get states/cities counts natively
+        const { data: dbData, error } = await supabase
+            .from("countries")
+            .select("*, states(count), cities(count)");
 
-        // Step 1: Get all simplified country IDs (1 request)
-        const listRes = await fetch(`${API_BASE}/api/v1/Countries`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-            },
-            cache: 'no-store',
-        });
+        if (error) throw error;
 
-        if (!listRes.ok) {
-            return NextResponse.json({ success: false, error: "Failed to fetch country list" }, { status: 502 });
-        }
+        // Map snake_case from DB to camelCase for the frontend CountryData interface
+        const mappedData = dbData.map(c => ({
+            id: c.id,
+            name: c.name,
+            iso3: c.iso3,
+            iso2: c.iso2,
+            numericCode: c.numeric_code,
+            phoneCode: c.phonecode, // notice db is phonecode
+            capital: c.capital,
+            currency: c.currency,
+            currencyName: c.currency_name,
+            currencySymbol: c.currency_symbol,
+            tld: c.tld,
+            native: c.native,
+            population: c.population,
+            gdp: c.gdp,
+            region: c.region,
+            regionId: c.region_id,
+            subregion: c.subregion,
+            subregionId: c.subregion_id,
+            nationality: c.nationality,
+            timezones: c.timezones,
+            latitude: c.latitude,
+            longitude: c.longitude,
+            emoji: c.emoji,
+            emojiU: c.emojiU,
+            flag: c.flag,
+            wikiDataId: c.wikiDataId,
+            statesCount: Array.isArray(c.states) && c.states.length > 0 ? c.states[0].count : 0,
+            citiesCount: Array.isArray(c.cities) && c.cities.length > 0 ? c.cities[0].count : 0,
+        }));
 
-        const listJson = await listRes.json();
-        if (!listJson?.data || !Array.isArray(listJson.data)) {
-            return NextResponse.json({ success: true, data: [], count: 0, cached: false });
-        }
+        // Sort by ID naturally
+        mappedData.sort((a, b) => a.id - b.id);
 
-        const ids: number[] = listJson.data.map((c: any) => c.id);
-
-        // Step 2: Fetch all country details in full parallel (server-to-server is fast)
-        // Split into batches of 50 to avoid overwhelming the backend
-        const BATCH = 50;
-        const allDetails: any[] = [];
-
-        for (let i = 0; i < ids.length; i += BATCH) {
-            const batch = ids.slice(i, i + BATCH);
-            const results = await Promise.allSettled(
-                batch.map(id =>
-                    fetch(`${API_BASE}/api/v1/Countries/${id}`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Accept': 'application/json',
-                        },
-                        cache: 'no-store',
-                    }).then(r => r.ok ? r.json() : null)
-                )
-            );
-
-            results.forEach(r => {
-                if (r.status === 'fulfilled' && r.value?.data) {
-                    allDetails.push(r.value.data);
-                }
-            });
-        }
-
-        // Save to server-side cache
-        _cache = { data: allDetails, timestamp: Date.now() };
+        // Save to cache
+        _cache = { data: mappedData, timestamp: Date.now() };
 
         // Filter if currency query param was provided
         const filtered = currencyFilter
-            ? allDetails.filter(c => c.currency?.trim().toUpperCase() === currencyFilter)
-            : allDetails;
+            ? mappedData.filter(c => c.currency?.trim().toUpperCase() === currencyFilter)
+            : mappedData;
 
         return NextResponse.json({
             success: true,

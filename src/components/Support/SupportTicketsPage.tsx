@@ -51,7 +51,7 @@ import { id, enUS } from "date-fns/locale"
 
 type StatusType = "Open" | "In Progress" | "Answered" | "On Hold" | "Closed"
 type PriorityType = "Low" | "Medium" | "High"
-const DEPARTMENTS = ["Marketing", "Teknis", "Produk", "Engineering", "Data", "Audio", "Sales", "Support"]
+const DEPARTMENTS = ["Marketing", "Billing", "Support"]
 
 export default function SupportTicketsPage() {
   const router = useRouter()
@@ -60,7 +60,39 @@ export default function SupportTicketsPage() {
 
   // Timezone dari profile user (disimpan di Supabase user_profiles.timezone saat user set lokasi)
   // Fallback ke 'UTC' jika belum di-set — auth-provider sudah meng-supplement dari Supabase
-  const userTimezone = profile?.timezone || 'UTC'
+  const resolveTimezone = useCallback(() => {
+    const isValidTimezone = (tz: string) => {
+      try {
+        new Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date())
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    let cachedTimezone = ""
+    try {
+      const raw = localStorage.getItem('myqurani_user_profile_v2')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        cachedTimezone = (parsed?.timezone || "").trim()
+      }
+    } catch {
+      // no-op
+    }
+
+    const fromProfile = (profile?.timezone || "").trim()
+    const preferred = cachedTimezone || fromProfile
+    if (preferred && isValidTimezone(preferred)) return preferred
+    if (fromProfile && isValidTimezone(fromProfile)) return fromProfile
+    return "UTC"
+  }, [profile?.timezone])
+
+  const [userTimezone, setUserTimezone] = useState<string>("UTC")
+
+  useEffect(() => {
+    setUserTimezone(resolveTimezone())
+  }, [resolveTimezone])
 
   // -- State --
   const [searchQuery, setSearchQuery] = useState("")
@@ -175,11 +207,9 @@ export default function SupportTicketsPage() {
 
           // Department mapping (ID → Name) - API returns string IDs
           const departmentMap: Record<string, string> = {
-            '1': 'TECHNICAL',
+            '1': 'MARKETING',
             '2': 'BILLING',
-            '3': 'SALES',
-            '4': 'GENERAL',
-            '5': 'SUPPORT',
+            '3': 'SUPPORT',
           };
 
 
@@ -215,7 +245,7 @@ export default function SupportTicketsPage() {
           // Check for items array (MyQurani API format), then data array, then direct array
           let tickets = responseData?.items || responseData?.data || (Array.isArray(responseData) ? responseData : []);
           let total = responseData?.totalCount || tickets.length;
-
+          
           // If no tickets from admin endpoint, try /api/v1/tickets/my (user's own tickets)
           if (tickets.length === 0 && (!signal || !signal.aborted)) {
             try {
@@ -378,44 +408,36 @@ export default function SupportTicketsPage() {
   // Load stats via client-side API (sama seperti loadTickets agar konsisten)
   const loadStats = useCallback(async () => {
     try {
-      const { ticketsApi, getStoredAuth } = await import('@/lib/api');
+      const { getStoredAuth } = await import('@/lib/api');
       const auth = getStoredAuth();
       if (!auth?.accessToken) return;
 
-      // Helper — ikuti logika persis loadTickets agar parsing konsisten
-      const getTotal = (res: any): number => {
-        if (!res) return 0;
-        const d = res?.data ?? res;
-        // Jika data adalah array, totalCount ada di root (e.g. { data: [...], totalCount: N })
-        if (Array.isArray(d)) return res?.totalCount ?? 0;
-        // Jika data adalah objek (e.g. { data: { items: [...], totalCount: N } })
-        return d?.totalCount ?? res?.totalCount ?? 0;
-      };
-
-      const statusMap: Record<string, number> = {
-        Open: 1, 'In Progress': 2, Answered: 3, 'On Hold': 4, Closed: 5,
-      };
-
-      // Kirim 6 request paralel, pageSize=1 cukup — yang penting totalCount dari API
-      const [resAll, resOpen, resInProgress, resAnswered, resOnHold, resClosed] =
-        await Promise.all([
-          ticketsApi.getTickets({ page: 1, pageSize: 1 }, auth.accessToken),
-          ticketsApi.getTickets({ page: 1, pageSize: 1, status: statusMap['Open'] }, auth.accessToken),
-          ticketsApi.getTickets({ page: 1, pageSize: 1, status: statusMap['In Progress'] }, auth.accessToken),
-          ticketsApi.getTickets({ page: 1, pageSize: 1, status: statusMap['Answered'] }, auth.accessToken),
-          ticketsApi.getTickets({ page: 1, pageSize: 1, status: statusMap['On Hold'] }, auth.accessToken),
-          ticketsApi.getTickets({ page: 1, pageSize: 1, status: statusMap['Closed'] }, auth.accessToken),
-        ]);
-
-      const stats = {
-        all: getTotal(resAll),
-        open: getTotal(resOpen),
-        in_progress: getTotal(resInProgress),
-        answered: getTotal(resAnswered),
-        on_hold: getTotal(resOnHold),
-        closed: getTotal(resClosed),
-      };
-
+      const API = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
+      const res = await fetch(`${API}/api/v1/tickets/statuses`, {
+        headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' }
+      });
+      if (!res.ok) return;
+      
+      const json = await res.json();
+      const statusData = json?.data || json || [];
+      
+      let totalAll = 0;
+      const stats = { all: 0, open: 0, in_progress: 0, answered: 0, on_hold: 0, closed: 0 };
+      
+      if (Array.isArray(statusData)) {
+          statusData.forEach((s: any) => {
+              const name = (s.name || '').toLowerCase();
+              const count = s.count || s.total || s.totalCount || s.ticketCount || 0;
+              totalAll += count;
+              if (name === 'open') stats.open = count;
+              else if (name === 'in progress') stats.in_progress = count;
+              else if (name === 'answered') stats.answered = count;
+              else if (name === 'on hold') stats.on_hold = count;
+              else if (name === 'closed') stats.closed = count;
+          });
+          stats.all = totalAll;
+      }
+      
       console.log('[Tickets] Stats (client):', stats);
       setStatusCounts(stats);
     } catch (e) {
@@ -632,13 +654,23 @@ export default function SupportTicketsPage() {
     }
   }
 
+  const handleNavigateToTicket = (ticket: TicketListItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      localStorage.setItem(`ticket_cache_${ticket.id}`, JSON.stringify(ticket));
+    } catch (err) {
+      console.error("Failed to save ticket cache:", err);
+    }
+    router.push(`/support/tickets/${ticket.id}`);
+  }
+
   const getStatusConfig = (status: string) => {
-    const config: Record<string, { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning"; icon: React.ReactNode }> = {
+    const config: Record<string, { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
       Open: { label: t("status_labels.open", "Open"), badgeVariant: 'destructive', icon: <AlertCircle className="w-3 h-3 mr-1" /> },
-      "In Progress": { label: t("status_labels.in_progress", "In Progress"), badgeVariant: 'warning', icon: <Clock className="w-3 h-3 mr-1" /> },
+      "In Progress": { label: t("status_labels.in_progress", "In Progress"), badgeVariant: 'secondary', icon: <Clock className="w-3 h-3 mr-1" /> },
       Answered: { label: t("status_labels.answered", "Answered"), badgeVariant: 'secondary', icon: <MessageSquare className="w-3 h-3 mr-1" /> },
       "On Hold": { label: t("status_labels.on_hold", "On Hold"), badgeVariant: 'outline', icon: <Clock className="w-3 h-3 mr-1" /> },
-      Closed: { label: t("status_labels.closed", "Closed"), badgeVariant: 'success', icon: <CheckCircle className="w-3 h-3 mr-1" /> },
+      Closed: { label: t("status_labels.closed", "Closed"), badgeVariant: 'secondary', icon: <CheckCircle className="w-3 h-3 mr-1" /> },
     }
     const fallbackClass: Record<string, string> = {
       Open: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200",
@@ -988,28 +1020,30 @@ export default function SupportTicketsPage() {
                 return (
                   <Card key={ticket.id} className="overflow-hidden border-l-4 border-l-transparent hover:border-l-emerald-500 transition-all shadow-sm active:scale-[0.99]">
                     <CardContent className="p-4 space-y-3">
-                      <div className="flex justify-between items-start">
+                      <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-gray-500">{String(ticket.id).replace(/^#+/, '')}</span>
-                          <Badge className={cn("text-[10px] h-5 px-1.5", statusConfig.className)} variant="outline">
-                            {statusConfig.icon} {statusConfig.label}
+                          <span className="text-xs font-mono text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                            {ticket.ticket_number}
+                          </span>
+                          <Badge variant={statusConfig.badgeVariant} className={cn("text-[10px] h-5 px-1.5 border-0", statusConfig.className)}>
+                            {statusConfig.icon}
+                            {statusConfig.label}
                           </Badge>
                         </div>
-
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2 text-gray-400">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 -mr-2">
                               <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => router.push(`/support/tickets/${ticket.id}`)}>{t('view_details')}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleNavigateToTicket(ticket, e as any)}>{t('view_details')}</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
 
-                      <div onClick={() => router.push(`/support/tickets/${ticket.id}`)}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight mb-1 text-sm">
+                      <div onClick={(e) => handleNavigateToTicket(ticket, e as any)} className="cursor-pointer group">
+                        <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight mb-1 text-sm group-hover:text-emerald-600 transition-colors">
                           {ticket.subject}
                         </h3>
                         <p className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
@@ -1039,7 +1073,7 @@ export default function SupportTicketsPage() {
                             {formatDate(ticket.last_reply, 'relative')}
                           </span>
                         </div>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2" onClick={() => router.push(`/support/tickets/${ticket.id}`)}>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2" onClick={(e) => handleNavigateToTicket(ticket, e as any)}>
                           {t('view')}
                         </Button>
                       </div>
@@ -1130,7 +1164,7 @@ export default function SupportTicketsPage() {
                             isSelected && "bg-emerald-50/60 dark:bg-emerald-900/10",
                             index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-900/50"
                           )}
-                          onClick={() => router.push(`/support/tickets/${ticket.id}`)}
+                          onClick={(e) => handleNavigateToTicket(ticket, e as any)}
                         >
                           <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <input
@@ -1205,7 +1239,7 @@ export default function SupportTicketsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => router.push(`/support/tickets/${ticket.id}`)}>
+                                <DropdownMenuItem onClick={(e) => handleNavigateToTicket(ticket, e as any)}>
                                   <Eye className="w-3.5 h-3.5 mr-2" /> {t("view_details", "View Details")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

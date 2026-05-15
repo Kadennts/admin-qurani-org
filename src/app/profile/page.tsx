@@ -38,7 +38,7 @@ import { useImageCrop } from "@/hooks/use-image-crop"
 import { useLocationData } from "@/hooks/use-location-data"
 
 function ProfilePageContent() {
-  const { userId } = useAuth()
+  const { userId, refreshProfile } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t } = useI18n()
   const router = useRouter()
@@ -126,7 +126,8 @@ function ProfilePageContent() {
     selectedCity,
     setSelectedCity,
     selectedCountry,
-    setSelectedCountry
+    setSelectedCountry,
+    resolvedTimezone
   } = useLocationData()
 
   // Check if edit param is present
@@ -210,7 +211,12 @@ function ProfilePageContent() {
         setCurrentCity({ id: profile.cityId, name: profile.cityName || "", timezone: profile.timezone || "" })
       }
       if (profile.countryId) {
-        setCurrentCountry({ id: profile.countryId, name: profile.countryName || "" })
+        const countryRow = countries.find(c => c.id === profile.countryId)
+        setCurrentCountry({
+          id: profile.countryId,
+          name: profile.countryName || countryRow?.name || "",
+          iso2: countryRow?.iso2 || ""
+        })
       }
     }
   }, [profile, states, countries, setCurrentState, setCurrentCity, setCurrentCountry])
@@ -243,6 +249,15 @@ function ProfilePageContent() {
   const getAvatarUrl = (user: SearchUser) => {
     return user.avatar || undefined
   }
+
+  const isCountryTouched = selectedCountry.id !== 0
+  const isStateTouched = selectedState.id !== 0
+  const effectiveCountry = selectedCountry.id !== 0 ? selectedCountry : currentCountry
+  const effectiveState = selectedState.id !== 0 ? selectedState : (isCountryTouched ? { id: 0, name: "" } : currentState)
+  const effectiveCity = selectedCity.id !== 0 ? selectedCity : ((isCountryTouched || isStateTouched) ? { id: 0, name: "", timezone: "" } : currentCity)
+  const displayTimezone = resolvedTimezone
+    || effectiveCity.timezone
+    || ((isCountryTouched || isStateTouched) ? "" : (currentCity.timezone || profileData.timezone || ""))
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'username') {
@@ -365,21 +380,27 @@ function ProfilePageContent() {
         profilePhotoUrl = urlData.publicUrl
       }
 
-      // Prepare update data
-      const state = selectedState.id !== 0 ? selectedState : currentState
-      const city = selectedCity.id !== 0 ? selectedCity : currentCity
-      const country = selectedCountry.id !== 0 ? selectedCountry : currentCountry
+      if (isCountryTouched && effectiveState.id === 0) {
+        toast.warning(t('profile.messages.warning.state_not_valid', 'Please select a state/province'))
+        return
+      }
+      if ((isCountryTouched || isStateTouched) && effectiveCity.id === 0) {
+        toast.warning(t('profile.messages.warning.city_not_valid', 'Please select a city'))
+        return
+      }
+
+      const timezoneToSave = displayTimezone || ""
 
       // Update profile
       const result = await updateUserProfile(
         userId,
-        country.id,
-        state.id,
-        city.id,
-        country.name,
-        state.name,
-        city.name,
-        city.timezone,
+        effectiveCountry.id,
+        effectiveState.id,
+        effectiveCity.id,
+        effectiveCountry.name,
+        effectiveState.name,
+        effectiveCity.name,
+        timezoneToSave,
         profileData.fullName,
         profileData.nickname,
         profileData.username,
@@ -408,22 +429,52 @@ function ProfilePageContent() {
       setIsEditing(false)
 
       // Update current location values
-      if (state.id && city.id) {
-        const stateName = states.find(p => p.id === state.id)?.name || ""
-        const cityName = cities.find(c => c.id === city.id)?.name || ""
-        const cityTimeZone = cities.find(c => c.id === city.id)?.timezone || ""
-        setCurrentState({ id: state.id, name: stateName })
-        setCurrentCity({ id: city.id, name: cityName, timezone: cityTimeZone })
+      if (effectiveState.id) {
+        const stateName = states.find(p => p.id === effectiveState.id)?.name || effectiveState.name || ""
+        setCurrentState({ id: effectiveState.id, name: stateName })
+      } else {
+        setCurrentState({ id: 0, name: "" })
       }
 
-      if (country) {
-        const countryName = countries.find(c => c.id === country.id)?.name || ""
-        setCurrentCountry({ id: country.id, name: countryName })
+      if (effectiveCity.id) {
+        const cityName = cities.find(c => c.id === effectiveCity.id)?.name || effectiveCity.name || ""
+        const cityTimeZone = timezoneToSave || cities.find(c => c.id === effectiveCity.id)?.timezone || ""
+        setCurrentCity({ id: effectiveCity.id, name: cityName, timezone: cityTimeZone })
+      } else {
+        setCurrentCity({ id: 0, name: "", timezone: "" })
       }
+
+      const countryFound = countries.find(c => c.id === effectiveCountry.id)
+      setCurrentCountry({
+        id: effectiveCountry.id,
+        name: countryFound?.name || effectiveCountry.name || "",
+        iso2: countryFound?.iso2 || effectiveCountry.iso2 || ""
+      })
 
       setSelectedState({ id: 0, name: "" })
       setSelectedCity({ id: 0, name: "", timezone: "" })
       setSelectedCountry({ id: 0, name: "" })
+      setProfileData(prev => ({ ...prev, timezone: timezoneToSave }))
+
+      try {
+        const cached = localStorage.getItem('myqurani_user_profile_v2')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          localStorage.setItem('myqurani_user_profile_v2', JSON.stringify({
+            ...parsed,
+            timezone: timezoneToSave,
+            cachedAt: new Date().toISOString(),
+          }))
+        }
+      } catch {
+        // no-op
+      }
+
+      try {
+        await refreshProfile()
+      } catch {
+        // no-op
+      }
 
       toast.success(t('profile.messages.success.update_success', 'Profile updated successfully!'))
       refresh()
@@ -681,6 +732,7 @@ function ProfilePageContent() {
               <>
                 <ProfileEditForm
                   profileData={profileData}
+                  displayTimezone={displayTimezone}
                   usernameError={usernameError}
                   isCheckingUsername={isCheckingUsername}
                   handleInputChange={handleInputChange}

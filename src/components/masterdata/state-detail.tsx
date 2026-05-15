@@ -129,9 +129,12 @@ export function StateDetail({ id }: StateDetailProps) {
 
     // Filter cities by search
     const filteredCities = useMemo(() => {
-        if (!searchQuery.trim()) return cities
-        const q = searchQuery.toLowerCase()
-        return cities.filter(city => city.name.toLowerCase().includes(q))
+        let result = cities;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            result = cities.filter(city => city.name.toLowerCase().includes(q))
+        }
+        return [...result].sort((a, b) => a.name.localeCompare(b.name))
     }, [cities, searchQuery])
 
     // Pagination
@@ -370,6 +373,7 @@ export function StateDetail({ id }: StateDetailProps) {
                             <TableHeader>
                                 <TableRow className="bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                     <TableHead className="min-w-[200px]">City Name</TableHead>
+                                    <TableHead className="w-[150px]">State/Province</TableHead>
                                     <TableHead className="w-[150px]">Coordinates</TableHead>
                                     <TableHead className="w-[120px] text-right">Actions</TableHead>
                                 </TableRow>
@@ -392,6 +396,11 @@ export function StateDetail({ id }: StateDetailProps) {
                                                 </div>
                                                 <span className="font-medium text-gray-900 dark:text-white">{city.name}</span>
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                {state?.name || "—"}
+                                            </span>
                                         </TableCell>
                                         <TableCell>
                                             {city.latitude && city.longitude ? (

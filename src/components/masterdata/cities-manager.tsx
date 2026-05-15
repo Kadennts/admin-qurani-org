@@ -124,6 +124,7 @@ export function CitiesManager() {
     // Filter states list (for state dropdown in filter modal)
     const [filterStates, setFilterStates] = useState<StateData[]>([])
     const [isLoadingFilterStates, setIsLoadingFilterStates] = useState(false)
+    const [allStates, setAllStates] = useState<StateData[]>([])
 
     // Applied filter state
     const [selectedStateCode, setSelectedStateCode] = useState<string>("All")
@@ -172,6 +173,23 @@ export function CitiesManager() {
             }
         }
         fetchCountries()
+    }, [])
+
+    // Preload states for state/province label fallback
+    useEffect(() => {
+        const fetchAllStates = async () => {
+            try {
+                const res = await fetch("/api/masterdata/states")
+                if (!res.ok) return
+                const json = await res.json()
+                if (json?.success && Array.isArray(json.data)) {
+                    setAllStates(json.data as StateData[])
+                }
+            } catch (err) {
+                console.warn("[CitiesManager] Failed to preload states:", err)
+            }
+        }
+        fetchAllStates()
     }, [])
 
     // Track how many countries we've already tried to load cities from
@@ -290,7 +308,7 @@ export function CitiesManager() {
 
 
 
-    // Search cities using API with debounce
+    // Search cities using Supabase-backed API (fixes the {} error from external backend)
     const searchCities = useCallback(async (keyword: string) => {
         // Cancel any pending search request
         if (searchAbortRef.current) {
@@ -308,46 +326,34 @@ export function CitiesManager() {
         searchAbortRef.current = new AbortController()
         setIsSearching(true)
 
-        // Find IDs for server-side filtering
-        const countryId = countries.find(c => (c.iso2 || c.id.toString()) === selectedCountryCode)?.id
-        const stateId = filterStates.find(s => (s.iso2 || s.id.toString()) === selectedStateCode)?.id
-
         try {
-            // Use the specific cities search API that supports country/state filtering
-            const response = await masterdataApi.cities.search(
-                keyword.trim(),
-                stateId,
-                countryId,
-                100, // Limit
-                undefined,
-                searchAbortRef.current.signal
-            )
+            const params = new URLSearchParams({ q: keyword.trim(), limit: '100' })
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const responseData = response.data as any
-            let searchItems: CityData[] | null = null
-
-            if (response.success && responseData) {
-                if (Array.isArray(responseData)) {
-                    searchItems = responseData as CityData[]
-                } else if (responseData.items && Array.isArray(responseData.items)) {
-                    searchItems = responseData.items as CityData[]
-                }
+            if (selectedStateCode && selectedStateCode !== 'All') {
+                const stateEntry = filterStates.find(s => (s.iso2 || s.id.toString()) === selectedStateCode)
+                if (stateEntry) params.set('stateId', stateEntry.id.toString())
+            } else if (selectedCountryCode && selectedCountryCode !== 'All') {
+                params.set('countryCode', selectedCountryCode)
             }
 
-            // Update search results
-            setSearchResults(searchItems)
+            const res = await fetch(`/api/masterdata/cities/search?${params.toString()}`, {
+                signal: searchAbortRef.current.signal
+            })
+
+            if (!res.ok) throw new Error(`Search failed: ${res.status}`)
+
+            const json = await res.json()
+            const searchItems: CityData[] = json.success && Array.isArray(json.data) ? json.data : []
+
+            setSearchResults(searchItems.length > 0 ? searchItems : null)
         } catch (err) {
-            // Don't set error if request was cancelled
-            if (err instanceof Error && err.name === 'AbortError') {
-                return
-            }
-            console.warn('Search error:', err)
+            if (err instanceof Error && err.name === 'AbortError') return
+            console.warn('Search cities error:', err)
             setSearchResults(null)
         } finally {
             setIsSearching(false)
         }
-    }, [selectedCountryCode, selectedStateCode, countries, filterStates])
+    }, [selectedCountryCode, selectedStateCode, filterStates])
 
     // Search effect - triggers immediately when searchQuery changes (only on button click/Enter)
     useEffect(() => {
@@ -366,46 +372,74 @@ export function CitiesManager() {
             handleSearch()
         }
     }
+
+    const stateNameById = useMemo(() => {
+        const map = new Map<number, string>()
+        const addState = (s: StateData) => {
+            if (typeof s.id === "number" && s.name) map.set(s.id, s.name)
+        }
+        allStates.forEach(addState)
+        filterStates.forEach(addState)
+        formStates.forEach(addState)
+        return map
+    }, [allStates, filterStates, formStates])
+
+    const stateNameByCode = useMemo(() => {
+        const map = new Map<string, string>()
+        const addState = (s: StateData) => {
+            if (s.iso2 && s.name) map.set(s.iso2.toUpperCase(), s.name)
+        }
+        allStates.forEach(addState)
+        filterStates.forEach(addState)
+        formStates.forEach(addState)
+        return map
+    }, [allStates, filterStates, formStates])
+
+    const getCityStateLabel = useCallback((city: CityData) => {
+        if (city.state && city.state.trim()) return city.state
+        if (typeof city.stateId === "number" && stateNameById.has(city.stateId)) {
+            return stateNameById.get(city.stateId) as string
+        }
+        if (city.stateCode && stateNameByCode.has(city.stateCode.toUpperCase())) {
+            return stateNameByCode.get(city.stateCode.toUpperCase()) as string
+        }
+        if (city.stateCode && city.stateCode.trim()) return city.stateCode
+        return "—"
+    }, [stateNameByCode, stateNameById])
+
     // ====== PAGINATION / SEARCH LOGIC ======
     // Hybrid Filter - Merge API search results with local client-side filter for maximum reliability
     const filteredCities = useMemo(() => {
         const query = searchQuery.trim().toLowerCase()
+        let result: CityData[]
 
-        // Case 1: No search query - return all cities (which are already filtered geographically by fetchCities)
+        // Case 1: No search query - return all cities
         if (query.length < 2) {
-            // Sort by ID (ascending)
-            return [...cities].sort((a, b) => a.id - b.id)
+            result = [...cities]
+        } else {
+            // Case 2: User is searching. Get local matches
+            const localMatches = cities.filter(city =>
+                city.name.toLowerCase().includes(query) ||
+                getCityStateLabel(city).toLowerCase().includes(query) ||
+                city.country?.toLowerCase().includes(query) ||
+                city.countryCode?.toLowerCase().includes(query)
+            )
+
+            if (searchResults !== null) {
+                // Merge API results with local matches, deduplicate by ID
+                const mergedMap = new Map<number, CityData>()
+                searchResults.forEach(c => mergedMap.set(c.id, c))
+                localMatches.forEach(c => { if (!mergedMap.has(c.id)) mergedMap.set(c.id, c) })
+                result = Array.from(mergedMap.values())
+            } else {
+                result = localMatches
+            }
         }
 
-        // Case 2: User is searching. First, get matches from our locally loaded cities pool
-        const localMatches = cities.filter(city =>
-            city.name.toLowerCase().includes(query) ||
-            city.state?.toLowerCase().includes(query) ||
-            city.stateCode?.toLowerCase().includes(query) ||
-            city.country?.toLowerCase().includes(query) ||
-            city.countryCode?.toLowerCase().includes(query)
-        )
-
-        // Case 3: We have API search results, merge them with local matches
-        if (searchResults !== null) {
-            // Keep all API results
-            const merged = [...searchResults]
-
-            // Add local matches that aren't already in the API results (avoiding duplicates by id)
-            localMatches.forEach(localCity => {
-                if (!merged.some(apiCity => apiCity.id === localCity.id)) {
-                    merged.push(localCity)
-                }
-            })
-
-            // Sort by ID (ascending)
-            return merged.sort((a, b) => a.id - b.id)
-        }
-
-        // Case 4: API search is still loading (searchResults is null), show local matches as placeholder
-        // Sort by ID (ascending)
-        return localMatches.sort((a, b) => a.id - b.id)
-    }, [cities, searchQuery, searchResults])
+        // Always deduplicate by ID before returning to prevent React key errors
+        const deduped = Array.from(new Map(result.map(c => [c.id, c])).values())
+        return deduped.sort((a, b) => a.name.localeCompare(b.name))
+    }, [cities, searchQuery, searchResults, getCityStateLabel])
 
     const totalPages = Math.ceil(filteredCities.length / itemsPerPage)
 
@@ -874,7 +908,7 @@ export function CitiesManager() {
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-600 dark:hover:bg-emerald-700">
-                                <TableHead className="w-20 text-white font-bold">ID</TableHead>
+                                <TableHead className="w-20 text-white font-bold">No.</TableHead>
                                 <TableHead className="min-w-[200px] text-white font-bold">City Name</TableHead>
                                 <TableHead className="w-[150px] text-white font-bold">State/Province</TableHead>
                                 <TableHead className="w-[150px] text-white font-bold">Country</TableHead>
@@ -883,7 +917,7 @@ export function CitiesManager() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {displayedCities.map((city) => (
+                            {displayedCities.map((city, index) => (
                                 <TableRow
                                     key={city.id}
                                     className="group hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer"
@@ -891,7 +925,7 @@ export function CitiesManager() {
                                 >
                                     {/* ID Column */}
                                     <TableCell className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                                        #{city.id}
+                                        #{((currentPage - 1) * itemsPerPage) + index + 1}
                                     </TableCell>
 
                                     {/* City Name Column */}
@@ -906,7 +940,7 @@ export function CitiesManager() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-gray-600 dark:text-gray-400">
-                                        {city.state || city.stateCode || "—"}
+                                        {getCityStateLabel(city)}
                                     </TableCell>
                                     <TableCell className="text-gray-600 dark:text-gray-400">
                                         {city.country || city.countryCode || "—"}
@@ -1311,3 +1345,4 @@ export function CitiesManager() {
         </div >
     )
 }
+

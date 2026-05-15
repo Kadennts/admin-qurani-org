@@ -178,8 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             timezone: userData.timezone || "",
                         } as UserProfile;
 
-                        // Jika API tidak mengembalikan timezone, ambil dari Supabase user_profiles
-                        if (!profile.timezone && (userData.id || authId)) {
+                        // Selalu utamakan timezone dari Supabase user_profiles
+                        // karena ini source of truth saat user update profil location.
+                        if (userData.id || authId) {
                             try {
                                 const { data: tzData } = await supabase
                                     .from("user_profiles")
@@ -188,11 +189,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                     .maybeSingle();
 
                                 if (tzData?.timezone) {
-                                    // Timezone tersimpan langsung di user_profiles
                                     profile.timezone = tzData.timezone;
-                                    console.log('[AuthProvider] Timezone from Supabase profile:', profile.timezone);
-                                } else if (tzData?.cityId) {
-                                    // Fallback: timezone tidak tersimpan, derivasi dari kota user
+                                    console.log('[AuthProvider] Timezone from Supabase profile (preferred):', profile.timezone);
+                                } else if (!profile.timezone && tzData?.cityId) {
                                     const { data: cityData } = await supabase
                                         .from("cities")
                                         .select("timezone")
@@ -240,13 +239,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         [supabase]
     );
 
+    const swrProfileKey = (user?.id || customUser?.userId) ? `user-profile-${user?.id || customUser?.userId}` : null;
+    const swrProfileId = user?.id?.toString() || customUser?.userId?.toString() || null;
+
     const {
         data: profile,
         error: profileError,
         mutate,
     } = useSWR(
-        (user?.id || customUser?.userId) ? `user-profile-${user?.id || customUser?.userId}` : null,
-        (user?.id || customUser?.userId) ? () => fetchUserProfile((user?.id || customUser?.userId!).toString()) : null,
+        swrProfileKey,
+        swrProfileId ? () => fetchUserProfile(swrProfileId) : null,
         {
             // Disable automatic revalidation to prevent duplicate 'me' requests
             revalidateOnFocus: false,

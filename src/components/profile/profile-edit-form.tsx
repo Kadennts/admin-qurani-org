@@ -23,6 +23,7 @@ interface ProfileEditFormProps {
     timezone: string
     bio: string
   }
+  displayTimezone: string
   usernameError: string
   isCheckingUsername: boolean
   handleInputChange: (field: string, value: string) => void
@@ -30,25 +31,26 @@ interface ProfileEditFormProps {
   countries: CountryData[]
   states: ProvinceData[]
   cities: CityData[]
-  selectedCountry: { id: number; name: string }
-  currentCountry: { id: number; name: string }
+  selectedCountry: { id: number; name: string; iso2?: string }
+  currentCountry: { id: number; name: string; iso2?: string }
   selectedState: { id: number; name: string }
   currentState: { id: number; name: string }
   selectedCity: { id: number; name: string, timezone: string }
-  currentCity: { id: number; name: string }
+  currentCity: { id: number; name: string, timezone?: string }
   openCountry: boolean
   openState: boolean
   openCity: boolean
   setOpenCountry: (open: boolean) => void
   setOpenState: (open: boolean) => void
   setOpenCity: (open: boolean) => void
-  setSelectedCountry: (country: { id: number; name: string }) => void
+  setSelectedCountry: (country: { id: number; name: string; iso2?: string }) => void
   setSelectedState: (state: { id: number; name: string }) => void
   setSelectedCity: (city: { id: number; name: string, timezone: string }) => void
 }
 
 export function ProfileEditForm({
   profileData,
+  displayTimezone,
   usernameError,
   isCheckingUsername,
   handleInputChange,
@@ -216,7 +218,7 @@ export function ProfileEditForm({
           currentCity={currentCity}
           openCity={openCity}
           setOpenCity={setOpenCity}
-          timezone={selectedCity.timezone || profileData.timezone}
+          timezone={displayTimezone}
         />
       </div>
 

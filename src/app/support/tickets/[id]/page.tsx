@@ -97,7 +97,24 @@ export default function TicketDetailRoute() {
                         console.log('[TicketDetail] Method 3 (list search) succeeded');
                     }
                 } catch (e3) {
-                    console.log('[TicketDetail] Method 3 failed, trying Supabase...');
+                    console.log('[TicketDetail] Method 3 failed');
+                }
+            }
+
+            // Method 3.5: Search in all tickets (admin fallback)
+            if ((!apiData || !apiData.id) && !controller.signal.aborted) {
+                try {
+                    const allTickets = await ticketsApi.getTickets({ keyword: ticketId, pageSize: 10 }, auth.accessToken, { signal: controller.signal });
+                    const ticketsList = allTickets?.data?.items || allTickets?.data || allTickets?.items || [];
+                    const found = Array.isArray(ticketsList) 
+                        ? ticketsList.find((t: any) => String(t.id) === String(ticketId))
+                        : null;
+                    if (found) {
+                        apiData = found;
+                        console.log('[TicketDetail] Method 3.5 (admin list search) succeeded');
+                    }
+                } catch (e35) {
+                    console.log('[TicketDetail] Method 3.5 failed');
                 }
             }
 

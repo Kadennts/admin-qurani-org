@@ -443,7 +443,7 @@ export function RegisterForm({
                             </PopoverContent>
                         </Popover>
                     </div>
-                    <div className="grid gap-1">
+                    <div className="grid gap-2">
                         <Label htmlFor="province_id">{isClient ? t("register.province", "Province") : "Province"}</Label>
                         <Popover open={openProvince} onOpenChange={setOpenProvince}>
                             <PopoverTrigger asChild className="w-full text-left" disabled={Number(data.country_id) === 0}>

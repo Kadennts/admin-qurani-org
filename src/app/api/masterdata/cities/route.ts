@@ -8,6 +8,33 @@ const API_BASE = process.env.NEXT_PUBLIC_MY_API_URL || 'https://api.myqurani.com
 const cityCache = new Map<string, { data: any[]; timestamp: number }>();
 const CACHE_TTL = 1000 * 60 * 60; // 1 Jam cache
 
+function toNumber(value: unknown): number | undefined {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+        const n = Number(value);
+        if (Number.isFinite(n)) return n;
+    }
+    return undefined;
+}
+
+function mapCityRecord(raw: any) {
+    return {
+        id: toNumber(raw?.id) || 0,
+        name: raw?.name || "",
+        stateId: toNumber(raw?.stateId ?? raw?.state_id),
+        state: raw?.state ?? raw?.state_name ?? raw?.stateName ?? null,
+        stateCode: raw?.stateCode ?? raw?.state_code ?? null,
+        countryId: toNumber(raw?.countryId ?? raw?.country_id),
+        country: raw?.country ?? raw?.country_name ?? raw?.countryName ?? null,
+        countryCode: raw?.countryCode ?? raw?.country_code ?? null,
+        latitude: typeof raw?.latitude === "number" ? raw.latitude : (toNumber(raw?.latitude) ?? null),
+        longitude: typeof raw?.longitude === "number" ? raw.longitude : (toNumber(raw?.longitude) ?? null),
+        native: raw?.native ?? null,
+        timezone: raw?.timezone ?? null,
+        population: toNumber(raw?.population) ?? null,
+    };
+}
+
 /**
  * Enhanced Cities Proxy Route
  * Handles multiple backend pages on the server side to provide a single "bundle" response to the client.
@@ -24,10 +51,11 @@ export async function POST(request: NextRequest) {
         const now = Date.now();
         const cached = cityCache.get(cacheKey);
         if (cached && (now - cached.timestamp < CACHE_TTL)) {
+            const normalized = (cached.data || []).map(mapCityRecord).filter((city) => city.id > 0 && city.name);
             return NextResponse.json({
                 success: true,
-                data: cached.data,
-                count: cached.data.length,
+                data: normalized,
+                count: normalized.length,
                 cached: true
             });
         }
@@ -117,15 +145,19 @@ export async function POST(request: NextRequest) {
         // Remove duplicates if any
         const uniqueCities = Array.from(new Map(allCities.map(item => [item.id, item])).values());
 
-        // Save to cache for next time
-        if (uniqueCities.length > 0) {
-            cityCache.set(cacheKey, { data: uniqueCities, timestamp: Date.now() });
+        const mapped = uniqueCities
+            .map(mapCityRecord)
+            .filter((city) => city.id > 0 && city.name);
+
+        // Save mapped data to cache for next time
+        if (mapped.length > 0) {
+            cityCache.set(cacheKey, { data: mapped, timestamp: Date.now() });
         }
 
         return NextResponse.json({
             success: true,
-            data: uniqueCities,
-            count: uniqueCities.length,
+            data: mapped,
+            count: mapped.length,
             cached: false
         });
 

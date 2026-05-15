@@ -242,7 +242,9 @@ export async function apiRequest<T>(
 
         try {
             const errorJson = JSON.parse(errorText);
-            console.error('[API] Error response body:', errorJson);
+            // Suppress console.error here to avoid triggering Next.js Error Overlay for expected fallbacks (e.g. 404s).
+            // The error is thrown and handled by the caller anyway.
+            
             // Handle .NET ProblemDetails format (errors object with field names)
             if (errorJson.errors) {
                 const errorParts: string[] = [];
@@ -330,7 +332,7 @@ export const authApi = {
                 countryId: data.countryId || 0,
                 stateId: data.stateId || 0,
                 cityId: data.cityId || 0,
-                timezone: data.timezone || 'Asia/Jakarta',
+                timezone: data.timezone || 0,
             }),
         });
 
@@ -466,6 +468,10 @@ export const usersApi = {
     updateMe: (data: any, token?: string) =>
         apiRequest<any>('/api/v1/Users/me', { method: 'PUT', body: data, token }),
 
+    // Update user by ID (Admin)
+    updateById: (userId: number | string, data: any, token?: string) =>
+        apiRequest<any>(`/api/v1/Users/${userId}`, { method: 'PUT', body: data, token }),
+
     // Get user by ID
     getById: (userId: number | string, token?: string) =>
         apiRequest<any>(`/api/v1/Users/${userId}`, { token }),
@@ -475,6 +481,11 @@ export const usersApi = {
     search: (params: UserSearchParams = {}, token?: string, signal?: AbortSignal) => {
         const searchParams = new URLSearchParams();
         if (params.keyword) searchParams.append('Keyword', params.keyword);
+        if (params.role) searchParams.append('Role', params.role);
+        if (typeof params.isBlocked === 'boolean') searchParams.append('IsBlocked', String(params.isBlocked));
+        if (params.countryId) searchParams.append('CountryId', params.countryId.toString());
+        if (params.stateId) searchParams.append('StateId', params.stateId.toString());
+        if (params.cityId) searchParams.append('CityId', params.cityId.toString());
         if (params.page) searchParams.append('Page', params.page.toString());
         if (params.pageSize) searchParams.append('PageSize', params.pageSize.toString());
         const query = searchParams.toString();
@@ -485,6 +496,11 @@ export const usersApi = {
     searchCursor: (params: UserSearchParams & { cursor?: number } = {}, token?: string) => {
         const searchParams = new URLSearchParams();
         if (params.keyword) searchParams.append('Keyword', params.keyword);
+        if (params.role) searchParams.append('Role', params.role);
+        if (typeof params.isBlocked === 'boolean') searchParams.append('IsBlocked', String(params.isBlocked));
+        if (params.countryId) searchParams.append('CountryId', params.countryId.toString());
+        if (params.stateId) searchParams.append('StateId', params.stateId.toString());
+        if (params.cityId) searchParams.append('CityId', params.cityId.toString());
         if (params.cursor) searchParams.append('Cursor', params.cursor.toString());
         if (params.pageSize) searchParams.append('PageSize', params.pageSize.toString());
         const query = searchParams.toString();
@@ -1330,9 +1346,21 @@ export interface LanguageRequest {
 export const masterdataApi = {
     // ========== Countries ==========
     countries: {
-        // Get all countries (cached for 24 hours)
-        getAll: (token?: string, signal?: AbortSignal) =>
-            apiRequest<CountriesApiResponse>('/api/v1/Countries', { token, signal }),
+        // Get all countries (cached for 24 hours, now includes region and states/cities counts via Supabase)
+        getAll: async (token?: string, signal?: AbortSignal): Promise<CountriesApiResponse> => {
+            try {
+                const res = await fetch('/api/masterdata/countries', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal
+                });
+                if (!res.ok) throw new Error("Failed to fetch from Next.js proxy");
+                return await res.json();
+            } catch (error) {
+                console.error("Error fetching all countries:", error);
+                return { success: false, data: [] };
+            }
+        },
 
         // Get country by ID
         getById: (id: number | string, token?: string, signal?: AbortSignal) =>
