@@ -260,55 +260,9 @@ export default function SupportTicketsPage() {
 
           if (signal?.aborted) return;
 
-          // Always save to cache (even if empty) to prevent refetching
-          const convertedTickets = tickets.length > 0 ? convertTickets(tickets) : [];
-
-          // ============================================
-          // TAMBAHAN: Ambil tiket dari Supabase dan gabungkan
-          // ============================================
-          let finalTickets = convertedTickets;
-          let finalTotal = total;
-          try {
-            const sbParams = new URLSearchParams();
-            if (singleStatus) sbParams.set('status', singleStatus);
-            if (singlePriority) sbParams.set('priority', singlePriority);
-            if (searchQuery) sbParams.set('search', searchQuery);
-            sbParams.set('limit', '100');
-
-            const sbRes = await fetch(`/api/tickets/supabase/list?${sbParams.toString()}`, { signal });
-            if (sbRes.ok) {
-              const sbResult = await sbRes.json();
-              if (sbResult.success && Array.isArray(sbResult.data) && sbResult.data.length > 0) {
-                const apiIds = new Set(convertedTickets.map((t: any) => String(t.id)));
-                const sbTickets = sbResult.data
-                  .filter((t: any) => !apiIds.has(String(t.id)))
-                  .map((t: any) => ({
-                    id: t.id,
-                    ticket_number: t.ticket_number || `#${t.id}`,
-                    subject: t.subject,
-                    contact: t.contact,
-                    department: t.department || 'GENERAL',
-                    project: null,
-                    service: null,
-                    priority: t.priority || 'Medium',
-                    status: t.status || 'Open',
-                    last_reply: t.last_reply || null,
-                    submitted_date: t.submitted_date,
-                    body: t.body || null,
-                  }));
-
-                if (sbTickets.length > 0) {
-                  finalTickets = [...convertedTickets, ...sbTickets];
-                  finalTotal = total + sbTickets.length;
-                  console.log('[Tickets] +', sbTickets.length, 'from Supabase, total:', finalTotal);
-                }
-              }
-            }
-          } catch (sbErr) {
-            // Non-critical, jangan crash
-            console.warn('[Tickets] Supabase fetch skipped:', sbErr);
-          }
-          // ============================================
+          // API Qurani only (no Supabase merge/fallback)
+          const finalTickets = tickets.length > 0 ? convertTickets(tickets) : [];
+          const finalTotal = total;
 
           try {
             sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -334,37 +288,7 @@ export default function SupportTicketsPage() {
 
       if (signal?.aborted) return;
 
-      // Jika API sama sekali tidak ada tiket, coba Supabase saja
-      try {
-        const sbRes = await fetch(`/api/tickets/supabase/list?limit=100`, { signal });
-        if (sbRes.ok) {
-          const sbResult = await sbRes.json();
-          if (sbResult.success && Array.isArray(sbResult.data) && sbResult.data.length > 0) {
-            const sbTickets = sbResult.data.map((t: any) => ({
-              id: t.id,
-              ticket_number: t.ticket_number || `#${t.id}`,
-              subject: t.subject,
-              contact: t.contact,
-              department: t.department || 'GENERAL',
-              project: null,
-              service: null,
-              priority: t.priority || 'Medium',
-              status: t.status || 'Open',
-              last_reply: t.last_reply || null,
-              submitted_date: t.submitted_date,
-              body: t.body || null,
-            }));
-            setTickets(sbTickets);
-            setTotalCount(sbTickets.length);
-            setIsLoading(false);
-            return;
-          }
-        }
-      } catch (sbFallbackErr) {
-        console.warn('[Tickets] Supabase fallback failed:', sbFallbackErr);
-      }
-
-      // Only set empty if both API and Supabase didn't find tickets
+      // Empty state when Qurani API doesn't return tickets
       setTickets([]);
       setTotalCount(0);
 
@@ -1014,7 +938,7 @@ export default function SupportTicketsPage() {
                   </CardContent>
                 </Card>
               ))
-              : tickets.map((ticket) => {
+              : tickets.slice(0, itemsPerPage).map((ticket) => {
                 const statusConfig = getStatusConfig(ticket.status)
                 const priorityConfig = getPriorityConfig(ticket.priority)
                 return (
@@ -1151,7 +1075,7 @@ export default function SupportTicketsPage() {
                         </td>
                       </tr>
                     ))
-                    : tickets.map((ticket, index) => {
+                    : tickets.slice(0, itemsPerPage).map((ticket, index) => {
                       const statusConfig = getStatusConfig(ticket.status)
                       const priorityConfig = getPriorityConfig(ticket.priority)
                       const isSelected = selectedTickets.includes(ticket.id)
@@ -1256,8 +1180,8 @@ export default function SupportTicketsPage() {
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
                 <p className="text-xs text-gray-500">
                   {t("pagination.showing", "Showing {{start}}-{{end}} of {{total}}", {
-                    start: tickets.length > 0 ? (currentPage - 1) * 10 + 1 : 0,
-                    end: (currentPage - 1) * 10 + tickets.length,
+                    start: tickets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0,
+                    end: (currentPage - 1) * itemsPerPage + Math.min(tickets.length, itemsPerPage),
                     total: totalCount
                   })}
                 </p>

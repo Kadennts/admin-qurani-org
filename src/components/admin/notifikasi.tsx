@@ -52,7 +52,7 @@ interface MappedNotification {
     examinerName?: string;
     conclusion?: string;
     memorization?: string;
-    ticket_id?: number | null;
+    ticket_id?: number | string | null;
     ticketContact?: string;
     ticketSubject?: string;
     ticketNumber?: string;
@@ -63,6 +63,20 @@ interface MappedNotification {
 interface NotifikasiProps {
     userId: string
 }
+
+interface StoredTicketReminder {
+    id?: string
+    title?: string
+    date?: string
+    dueAt?: string
+    staff?: string
+    ticketId?: string
+    ticketSubject?: string
+    ticketNumber?: string
+    createdAt?: string
+}
+
+const TICKET_REMINDER_NOTIFICATION_STORAGE_KEY = "ticket_due_reminder_notifications_v1"
 
 // Utility function untuk debounce
 function debounce<TArgs extends readonly unknown[]>(
@@ -137,6 +151,10 @@ const NotificationItem = memo(function NotificationItem({
     const { t } = useI18n()
 
     const isConfirmed = notification.is_action_taken || clickedNotifications.has(notification.id)
+    const isTicketNotification =
+        notification.type === "ticket_reply" ||
+        notification.type === "ticket_new_message" ||
+        notification.type === "ticket_reminder_due"
 
     // No need for container click handler since we have dedicated delete button
     const handleClick = () => {
@@ -179,7 +197,7 @@ const NotificationItem = memo(function NotificationItem({
                             )
 
                             // For ticket notifications, don't show user avatar link
-                            if (notification.type === "ticket_reply" || notification.type === "ticket_new_message") {
+                            if (isTicketNotification) {
                                 return (
                                     <>
                                         <AvatarImage
@@ -225,7 +243,7 @@ const NotificationItem = memo(function NotificationItem({
                         {notification.type === "group_invite" && <Users className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />}
                         {notification.type === "friend_request" && <UserPlus className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />}
                         {notification.type === "recap_notification" && <BookOpen className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />}
-                        {(notification.type === "ticket_reply" || notification.type === "ticket_new_message") && <MessageSquare className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />}
+                        {isTicketNotification && <MessageSquare className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />}
                     </div>
                 </div>
 
@@ -234,18 +252,20 @@ const NotificationItem = memo(function NotificationItem({
                         <div className="flex-1 pr-0 sm:pr-3">
                             <div className="mb-1.5 flex items-center justify-between">
                                 <h3
-                                    className={(notification.type === "ticket_reply" || notification.type === "ticket_new_message")
+                                    className={isTicketNotification
                                         ? "font-semibold text-sm sm:text-base text-slate-700 dark:text-slate-200"
                                         : "font-semibold text-sm sm:text-base text-slate-700 dark:text-slate-200 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
                                     }
-                                    onClick={(notification.type === "ticket_reply" || notification.type === "ticket_new_message") ? undefined : (e) => {
+                                    onClick={isTicketNotification ? undefined : (e) => {
                                         e.stopPropagation()
                                         router.push('/profile/' + notification.fromUserUsername?.replace(/^@/, ''))
                                     }}
-                                    title={(notification.type === "ticket_reply" || notification.type === "ticket_new_message") ? undefined : `View ${notification.fromUserName}'s profile`}
+                                    title={isTicketNotification ? undefined : `View ${notification.fromUserName}'s profile`}
                                 >
-                                    {(notification.type === "ticket_reply" || notification.type === "ticket_new_message")
-                                        ? `${t('notifikasi.ticket_reply_title', 'Update Ticket')}: ${notification.ticketSubject || 'Support'}`
+                                    {isTicketNotification
+                                        ? (notification.type === "ticket_reminder_due"
+                                            ? `${t('notifikasi.ticket_reminder_due_title', 'Reminder Selesai')}: ${notification.ticketSubject || 'Support Ticket'}`
+                                            : `${t('notifikasi.ticket_reply_title', 'Update Ticket')}: ${notification.ticketSubject || 'Support'}`)
                                         : notification.fromUserName
                                     }
                                 </h3>
@@ -365,10 +385,12 @@ const NotificationItem = memo(function NotificationItem({
                                         </div>
                                     </div>
                                 )}
-                                {(notification.type === "ticket_reply" || notification.type === "ticket_new_message") && (
+                                {isTicketNotification && (
                                     <div className="flex justify-between gap-5">
                                         <p className="break-words hyphens-auto">
-                                            {notification.latestReplyAuthor && notification.latestReplyMessage
+                                            {notification.type === "ticket_reminder_due"
+                                                ? `${t('notifikasi.ticket_reminder_due_message', 'Reminder ticket telah selesai')}${notification.ticketNumber ? ` (${notification.ticketNumber})` : ''}.`
+                                                : notification.latestReplyAuthor && notification.latestReplyMessage
                                                 ? `${notification.latestReplyAuthor} ${t('notifikasi.replied_message', 'membalas')}: "${notification.latestReplyMessage}"`
                                                 : `${t('notifikasi.ticket_reply', 'Pesan baru pada ticket support')} ${notification.ticketNumber || ''}`
                                             }
@@ -482,7 +504,7 @@ const NotificationItem = memo(function NotificationItem({
                         </div>
                     )}
 
-                    {(notification.type === "ticket_reply" || notification.type === "ticket_new_message") && notification.ticket_id && (
+                    {isTicketNotification && notification.ticket_id && (
                         <div className="flex flex-row gap-2 justify-end sm:hidden">
                             <Button
                                 onClick={() => {
@@ -531,12 +553,121 @@ export function Notifikasi({ userId }: NotifikasiProps) {
     // Fetch notifications for current user
     const { notifications: hookNotifications, loading, error, refresh } = useNotifications(userId)
 
-    // Mirror hook data to local state to keep existing UI/optimistic flows
+    const parseReminderDueAt = useCallback((reminder: StoredTicketReminder): Date | null => {
+        if (reminder?.dueAt) {
+            const fromDueAt = new Date(reminder.dueAt)
+            if (!Number.isNaN(fromDueAt.getTime())) return fromDueAt
+        }
+
+        if (reminder?.date && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(reminder.date)) {
+            const fromDate = new Date(reminder.date)
+            if (!Number.isNaN(fromDate.getTime())) return fromDate
+        }
+
+        return null
+    }, [])
+
+    const removeLocalReminderNotificationById = useCallback((notificationId: string) => {
+        if (typeof window === "undefined") return
+        try {
+            const raw = localStorage.getItem(TICKET_REMINDER_NOTIFICATION_STORAGE_KEY)
+            const parsed = raw ? JSON.parse(raw) : {}
+            if (parsed && typeof parsed === "object") {
+                delete parsed[notificationId]
+                localStorage.setItem(TICKET_REMINDER_NOTIFICATION_STORAGE_KEY, JSON.stringify(parsed))
+            }
+        } catch (error) {
+            console.error("Failed removing local reminder notification:", error)
+        }
+    }, [])
+
+    const buildLocalReminderDueNotifications = useCallback((): MappedNotification[] => {
+        if (typeof window === "undefined") return []
+
+        const now = Date.now()
+        const dueNotifications: MappedNotification[] = []
+        let changed = false
+
+        let createdMap: Record<string, string> = {}
+        try {
+            const raw = localStorage.getItem(TICKET_REMINDER_NOTIFICATION_STORAGE_KEY)
+            const parsed = raw ? JSON.parse(raw) : {}
+            if (parsed && typeof parsed === "object") {
+                createdMap = parsed
+            }
+        } catch {
+            createdMap = {}
+        }
+
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i)
+            if (!key || !/^ticket_(.+)_reminders$/.test(key)) continue
+
+            const ticketId = key.replace(/^ticket_(.+)_reminders$/, "$1")
+            if (!ticketId) continue
+
+            try {
+                const rawReminders = localStorage.getItem(key)
+                if (!rawReminders) continue
+                const reminders = JSON.parse(rawReminders)
+                if (!Array.isArray(reminders)) continue
+
+                reminders.forEach((reminder: StoredTicketReminder) => {
+                    if (!reminder?.id) return
+                    const dueAt = parseReminderDueAt(reminder)
+                    if (!dueAt) return
+                    if (dueAt.getTime() > now) return
+
+                    const notificationId = `ticket_reminder_due_${ticketId}_${reminder.id}`
+                    if (!createdMap[notificationId]) {
+                        createdMap[notificationId] = new Date().toISOString()
+                        changed = true
+                    }
+
+                    const createdAt = createdMap[notificationId]
+                    dueNotifications.push({
+                        id: notificationId,
+                        type: "ticket_reminder_due",
+                        is_read: false,
+                        is_action_taken: true,
+                        is_accept_friend: null,
+                        created_at: createdAt,
+                        group_id: null,
+                        groupName: "",
+                        fromUserName: "Reminder Ticket",
+                        fromUserUsername: "",
+                        fromUserAvatar: null,
+                        fromUserProfileUser: null,
+                        fromUserId: "system",
+                        userId,
+                        ticket_id: reminder.ticketId || ticketId,
+                        ticketContact: reminder.staff || "Support Staff",
+                        ticketSubject: reminder.title || reminder.ticketSubject || "Support Ticket Reminder",
+                        ticketNumber: reminder.ticketNumber || `#${ticketId}`,
+                        latestReplyAuthor: "",
+                        latestReplyMessage: "",
+                    })
+                })
+            } catch (error) {
+                console.error("Failed parsing ticket reminders:", error)
+            }
+        }
+
+        if (changed) {
+            localStorage.setItem(TICKET_REMINDER_NOTIFICATION_STORAGE_KEY, JSON.stringify(createdMap))
+        }
+
+        return dueNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }, [parseReminderDueAt, userId])
+
+    // Mirror hook data + local due reminders to local state
     useEffect(() => {
         const incoming = hookNotifications || []
+        const dueReminderNotifications = buildLocalReminderDueNotifications()
+        const mergedIncoming = [...incoming, ...dueReminderNotifications]
 
         // Remove duplicates by ID to ensure uniqueness at frontend level
-        const uniqueIncoming = incoming.filter((item: MappedNotification, index: number, self: MappedNotification[]) =>
+        const uniqueIncoming = mergedIncoming.filter((item: MappedNotification, index: number, self: MappedNotification[]) =>
             index === self.findIndex((t: MappedNotification) => t.id === item.id)
         );
 
@@ -559,7 +690,33 @@ export function Notifikasi({ userId }: NotifikasiProps) {
 
             return uniqueIncoming
         })
-    }, [hookNotifications]) // FIXED: Remove notifications from dependencies
+    }, [hookNotifications, buildLocalReminderDueNotifications])
+
+    useEffect(() => {
+        const syncLocalReminderNotifications = () => {
+            const dueReminderNotifications = buildLocalReminderDueNotifications()
+            setNotifications((prev) => {
+                const nonReminderNotifications = prev.filter(
+                    (item) => item.type !== "ticket_reminder_due"
+                )
+                const merged = [...nonReminderNotifications, ...dueReminderNotifications]
+                return merged.filter((item, index, self) =>
+                    index === self.findIndex((t) => t.id === item.id)
+                )
+            })
+        }
+
+        syncLocalReminderNotifications()
+        window.addEventListener("ticket-reminder-updated", syncLocalReminderNotifications)
+        window.addEventListener("focus", syncLocalReminderNotifications)
+        window.addEventListener("storage", syncLocalReminderNotifications)
+
+        return () => {
+            window.removeEventListener("ticket-reminder-updated", syncLocalReminderNotifications)
+            window.removeEventListener("focus", syncLocalReminderNotifications)
+            window.removeEventListener("storage", syncLocalReminderNotifications)
+        }
+    }, [buildLocalReminderDueNotifications])
 
     // Initial error toast (matches previous UX on first load failure)
     useEffect(() => {
@@ -745,14 +902,18 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         } else if (showSetoranOnly) {
             base = base.filter(n => n.type === "recap_notification");
         } else if (showReportsOnly) {
-            base = base.filter(n => n.type === "ticket_reply" || n.type === "ticket_new_message");
+            base = base.filter(
+                n => n.type === "ticket_reply" || n.type === "ticket_new_message" || n.type === "ticket_reminder_due"
+            );
         }
         if (searchQuery.trim() !== "") {
             const q = searchQuery.trim().toLowerCase();
             base = base.filter(n =>
                 (n.fromUserName && n.fromUserName.toLowerCase().includes(q)) ||
                 (n.fromUserUsername && n.fromUserUsername.toLowerCase().includes(q)) ||
-                (n.groupName && n.groupName.toLowerCase().includes(q))
+                (n.groupName && n.groupName.toLowerCase().includes(q)) ||
+                (n.ticketSubject && n.ticketSubject.toLowerCase().includes(q)) ||
+                (n.ticketNumber && n.ticketNumber.toLowerCase().includes(q))
             );
         }
         return base;
@@ -1130,6 +1291,20 @@ export function Notifikasi({ userId }: NotifikasiProps) {
 
     // Delete single notification function - direct delete without dialog
     const handleDeleteNotification = async (notificationId: string) => {
+        if (notificationId.startsWith("ticket_reminder_due_")) {
+            removeLocalReminderNotificationById(notificationId)
+            setNotifications(prevNotifications =>
+                prevNotifications.filter(notification => notification.id !== notificationId)
+            )
+            setClickedNotifications(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(notificationId)
+                return newSet
+            })
+            toast.success(t('notifikasi.berhasil_dihapus', 'Notification deleted successfully'))
+            return
+        }
+
         try {
             const supabase = createClient()
             const { error } = await supabase
@@ -1164,12 +1339,17 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         setDeleteAllLoading(true)
 
         try {
-            const supabase = createClient()
-
             // Get IDs of confirmed notifications (is_action_taken = true OR in clickedNotifications OR is recap_notification)
             const confirmedNotificationIds = notifications
                 .filter(n => n.is_action_taken || clickedNotifications.has(n.id) || n.type === "recap_notification")
                 .map(n => n.id)
+
+            const localReminderNotificationIds = confirmedNotificationIds.filter((id) =>
+                id.startsWith("ticket_reminder_due_")
+            )
+            const remoteNotificationIds = confirmedNotificationIds.filter((id) =>
+                !id.startsWith("ticket_reminder_due_")
+            )
 
             if (confirmedNotificationIds.length === 0) {
                 toast.info(t('notifikasi.tidak_ada_notifikasi_terkonfirmasi', 'No confirmed notifications to delete'))
@@ -1178,12 +1358,17 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                 return
             }
 
-            const { error } = await supabase
-                .from("notifications")
-                .delete()
-                .in("id", confirmedNotificationIds)
+            if (remoteNotificationIds.length > 0) {
+                const supabase = createClient()
+                const { error } = await supabase
+                    .from("notifications")
+                    .delete()
+                    .in("id", remoteNotificationIds)
 
-            if (error) throw error
+                if (error) throw error
+            }
+
+            localReminderNotificationIds.forEach((id) => removeLocalReminderNotificationById(id))
 
             // Remove only confirmed notifications from local state
             setNotifications(prevNotifications =>

@@ -518,6 +518,22 @@ export function GrupSaya() {
     [filteredGroups.length, itemsPerPage]
   )
 
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, 5]
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+    }
+
+    return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2]
+  }, [currentPage, totalPages])
+
   // Memoize current page groups for performance and stability
   const currentPageGroups = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -1402,7 +1418,7 @@ export function GrupSaya() {
                       />
                     </PaginationItem>
 
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    {visiblePages.map((page) => (
                       <PaginationItem key={page}>
                         <PaginationLink
                           href="#"

@@ -61,8 +61,13 @@ interface Reminder {
     id: string
     title: string
     date: string
+    dueAt?: string
     notifyEmail: boolean
     staff: string
+    ticketId?: string
+    ticketSubject?: string
+    ticketNumber?: string
+    createdAt?: string
 }
 
 interface Task {
@@ -140,6 +145,7 @@ export default function TicketDetailClient({
     const saveReminders = (newReminders: Reminder[]) => {
         setReminders(newReminders)
         localStorage.setItem(`ticket_${ticketId}_reminders`, JSON.stringify(newReminders))
+        window.dispatchEvent(new Event("ticket-reminder-updated"))
     }
 
     const saveTasks = (newTasks: Task[]) => {
@@ -761,13 +767,19 @@ export default function TicketDetailClient({
 
     const handleAddReminder = () => {
         if (!newReminder.title.trim() || !newReminder.date) return
+        const createdAt = new Date().toISOString()
         // Store the date as a pre-formatted display string (no timezone conversion ever)
         const reminder: Reminder = {
             id: Date.now().toString(),
             title: newReminder.title,
             date: formatReminderDateForDisplay(newReminder.date),
+            dueAt: newReminder.date,
             notifyEmail: newReminder.notifyEmail,
             staff: newReminder.staff,
+            ticketId: String(ticketId),
+            ticketSubject: ticket?.subject || "",
+            ticketNumber: ticket?.ticket_number || `#${ticketId}`,
+            createdAt,
         }
         saveReminders([...reminders, reminder])
         setNewReminder({ title: "", date: "", notifyEmail: false, staff: "" })
