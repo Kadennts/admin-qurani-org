@@ -284,7 +284,6 @@
         }
     ],
     "payments": [
-
         {
             "id": 1002,
             "userId": 2034,
@@ -474,7 +473,6 @@
             "paidOutAt": "2025-12-25T09:00:00Z",
             "notes": null
         },
-
         {
             "id": 1012,
             "userId": 2034,
@@ -666,7 +664,6 @@
         }
     ],
     "bookings": [
-
         {
             "id": 3002,
             "userId": 2034,
@@ -858,7 +855,6 @@
         }
     ],
     "bookingDetails": [
-
         {
             "bookingId": 3002,
             "member": {
@@ -1810,4 +1806,3 @@
         }
     ]
 }
-

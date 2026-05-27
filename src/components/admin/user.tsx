@@ -30,6 +30,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 // Import from centralized API lib
 import {
     usersApi,
+    rolesApi,
     masterdataApi,
     API_BASE,
     UserData,
@@ -129,29 +130,9 @@ const parseTotalCount = (result: any): number | null => {
     return null
 }
 
-const parseNumberish = (value: unknown): number | null => {
-    if (typeof value === "number" && Number.isFinite(value)) return value
-    if (typeof value === "string" && value.trim()) {
-        const parsed = Number(value)
-        if (Number.isFinite(parsed)) return parsed
-    }
-    return null
-}
-
-const parseBooleanish = (value: unknown): boolean | null => {
-    if (typeof value === "boolean") return value
-    if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase()
-        if (normalized === "true") return true
-        if (normalized === "false") return false
-    }
-    return null
-}
-
 export default function Users() {
     const { t } = useI18n()
     const [searchQuery, setSearchQuery] = useState("")
-    const [searchTerm, setSearchTerm] = useState("")
     const [currentPage, setCurrentPage] = useState(1)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingUser, setEditingUser] = useState<UserItem | null>(null)
@@ -290,20 +271,86 @@ export default function Users() {
             const summaryList = parseUserItems(result)
             const parsedTotal = parseTotalCount(result)
             const paginationInfo = result?.data?.pagination || result?.pagination || {}
-            const parsedPageSize = parseNumberish(paginationInfo?.pageSize) || ITEMS_PER_PAGE
-            const parsedTotalPages = parseNumberish(paginationInfo?.totalPages)
+            const parsedPageSize = (
+                typeof paginationInfo?.pageSize === "number" ? paginationInfo.pageSize :
+                typeof paginationInfo?.pageSize === "string" && Number.isFinite(Number(paginationInfo.pageSize)) ? Number(paginationInfo.pageSize) :
+                ITEMS_PER_PAGE
+            )
+            const rawTotalPages = paginationInfo?.totalPages
+            const parsedTotalPages: number | null = (
+                typeof rawTotalPages === "number" ? rawTotalPages :
+                typeof rawTotalPages === "string" && Number.isFinite(Number(rawTotalPages)) ? Number(rawTotalPages) :
+                null
+            )
             const derivedTotalFromPages = parsedTotalPages !== null ? parsedTotalPages * parsedPageSize : null
             const totalFromResponse = parsedTotal ?? derivedTotalFromPages
             const fallbackTotal = summaryList.length
-            const parsedHasNext = parseBooleanish(paginationInfo?.hasNext)
+            const rawHasNext = paginationInfo?.hasNext
+            const parsedHasNext: boolean | null = (
+                typeof rawHasNext === "boolean" ? rawHasNext :
+                typeof rawHasNext === "string" ? rawHasNext.trim().toLowerCase() === "true" :
+                null
+            )
 
             console.log('[Users] Parsed totalCount:', parsedTotal, 'from result structure')
-
+            
             // NOTE: Search API only returns UserSummaryDto (userId, username, name, image)
-            // User requested to minimize requests to 1 per page, so we use summary data.
-            // Fields like email, role, createdAt will be empty/undefined.
-
+            // We need to fetch profiles and roles in parallel to populate the table properly
             let mergedUsers = summaryList
+
+            if (summaryList.length > 0) {
+                // Fetch profiles and roles in parallel
+                const fetchPromises = summaryList.map(async (user: any) => {
+                    const id = getUserId(user);
+                    try {
+                        const [profileRes, rolesRes] = await Promise.allSettled([
+                            usersApi.getById(id).catch(() => null),
+                            rolesApi.getUserRoles(id).catch(() => null)
+                        ]);
+
+                        let profileData = null;
+                        let rolesData = null;
+
+                        if (profileRes.status === 'fulfilled' && profileRes.value) {
+                            const resData = profileRes.value as any;
+                            profileData = resData?.data ?? resData;
+                        }
+
+                        if (rolesRes.status === 'fulfilled' && rolesRes.value) {
+                            const resData = rolesRes.value as any;
+                            rolesData = resData?.data ?? resData;
+                        }
+
+                        // Determine primary role
+                        let role = 'member';
+                        if (rolesData && Array.isArray(rolesData)) {
+                            const roles = rolesData.map((r: any) => (typeof r === 'string' ? r : r?.name || '').toLowerCase());
+                            if (roles.includes('admin')) role = 'admin';
+                            else if (roles.includes('support')) role = 'support';
+                            else if (roles.includes('billing')) role = 'billing';
+                        } else if (profileData?.roles && Array.isArray(profileData.roles)) {
+                            const roles = profileData.roles.map((r: any) => (typeof r === 'string' ? r : r?.name || '').toLowerCase());
+                            if (roles.includes('admin')) role = 'admin';
+                            else if (roles.includes('support')) role = 'support';
+                            else if (roles.includes('billing')) role = 'billing';
+                        } else if (profileData?.role) {
+                            role = String(profileData.role).toLowerCase();
+                        }
+
+                        return {
+                            ...user,
+                            ...profileData, // Merge profile data (email, created, isBlocked, etc.)
+                            userId: id,     // Ensure userId is preserved
+                            role: role      // Set calculated role
+                        };
+                    } catch (err) {
+                        console.warn(`[Users] Failed to fetch details for user ${id}:`, err);
+                        return user;
+                    }
+                });
+
+                mergedUsers = await Promise.all(fetchPromises);
+            }
 
             try {
                 const overrideResponse = await fetch("/api/admin/users/overrides", {
@@ -313,8 +360,8 @@ export default function Users() {
                         "Accept": "application/json",
                     },
                     body: JSON.stringify({
-                        userIds: summaryList.map((u) => getUserId(u)).filter(Boolean),
-                        usernames: summaryList.map((u) => u.username).filter(Boolean),
+                        userIds: mergedUsers.map((u) => getUserId(u)).filter(Boolean),
+                        usernames: mergedUsers.map((u) => u.username).filter(Boolean),
                     }),
                 })
 
@@ -329,7 +376,7 @@ export default function Users() {
                                 .map((row: any) => [String(row.username), row])
                         )
 
-                        mergedUsers = summaryList.map((user) => {
+                        mergedUsers = mergedUsers.map((user) => {
                             const fromId = byId.get(getUserId(user))
                             const fromUsername = !fromId ? byUsername.get(String(user.username || "")) : null
                             const patch = fromId || fromUsername
@@ -341,7 +388,7 @@ export default function Users() {
                 console.warn("[Users] Failed to load local overrides:", overrideError)
             }
 
-            console.log('[Users] Loaded', mergedUsers.length, 'users (Summary + Overrides). Total:', totalFromResponse ?? fallbackTotal)
+            console.log('[Users] Loaded', mergedUsers.length, 'users (Summary + Details + Overrides). Total:', totalFromResponse ?? fallbackTotal)
             setUsers(mergedUsers)
             setTotalCount((prev) => {
                 if (typeof totalFromResponse === "number" && totalFromResponse >= mergedUsers.length) {
@@ -449,8 +496,8 @@ export default function Users() {
     }, [debouncedUsername, editingUser, checkUsernameAvailability])
 
     useEffect(() => {
-        const roleParam = searchParams.get("role")
-        const statusParam = searchParams.get("status")
+        const roleParam = searchParams?.get("role")
+        const statusParam = searchParams?.get("status")
 
         const validRoles = new Set(["admin", "member", "support", "billing"])
         const validStatuses = new Set(["active", "blocked"])
@@ -506,9 +553,8 @@ export default function Users() {
         })
 
     // Pagination - API handles this, but we keep display logic
-    const itemsPerPage = ITEMS_PER_PAGE
     const actualTotalUsers = totalCount || filteredUsers.length
-    const totalPages = Math.ceil(actualTotalUsers / itemsPerPage)
+    const totalPages = Math.ceil(actualTotalUsers / ITEMS_PER_PAGE)
     const inferredTotalPages = Math.max(
         currentPage,
         totalPages > 0 ? totalPages : 1,
@@ -519,19 +565,13 @@ export default function Users() {
     const paginatedUsers = filteredUsers // Already paginated by API
 
     // Pagination display
-    const startIndex = (currentPage - 1) * itemsPerPage
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
     const startItem = actualTotalUsers > 0 ? startIndex + 1 : 0
     const endItem = Math.min(startIndex + paginatedUsers.length, actualTotalUsers)
 
     const handleSearch = () => {
         setCurrentPage(1) // Reset to first page when searching
-        setSearchTerm(searchQuery)
-
-        // If search query is empty, reset to show all users
-        if (!searchQuery.trim()) {
-            setSearchTerm('')
-        }
-        // SWR will handle the fetch based on searchTerm
+        // debouncedSearch syncs with searchQuery automatically via useDebounce
     }
 
     // Removed handleSort function since we're not using sorting anymore
@@ -838,7 +878,7 @@ export default function Users() {
                                 ) : paginatedUsers.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={8} className="text-center py-12 text-gray-500 dark:text-gray-400">
-                                            {searchTerm ? t('search_no_results', `Data "${searchTerm}" tidak ditemukan`).replace('{searchTerm}', searchTerm) : t('no_data', 'Tidak ada pengguna ditemukan')}
+                                            {searchQuery.trim() ? t('search_no_results', `Data "${searchQuery}" tidak ditemukan`).replace('{searchTerm}', searchQuery) : t('no_data', 'Tidak ada pengguna ditemukan')}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -945,7 +985,7 @@ export default function Users() {
                                     .replace('{start}', startItem.toString())
                                     .replace('{end}', endItem.toString())
                                     .replace('{total}', actualTotalUsers.toString())}
-                                {searchTerm && ` (hasil pencarian "${searchTerm}")`}
+                                {searchQuery.trim() && ` (hasil pencarian "${searchQuery}")`}
                             </div>
                             <div className="flex items-center flex-wrap gap-1">
                                 {/* Previous Button */}

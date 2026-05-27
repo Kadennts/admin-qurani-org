@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import Link from "next/link"
@@ -18,6 +18,11 @@ function formatRupiah(n: number) {
         style: "currency", currency: "IDR",
         minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(n)
+}
+
+function getClientToken(): string | null {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? null
 }
 
 // ── status config ─────────────────────────────────────────────────────────────
@@ -74,12 +79,60 @@ const PAGE_SIZE = 10
 
 function GuruContent() {
     const baseGuruList = useMemo(() => buildGuruList(), [])
+    const [apiGurus, setApiGurus] = useState<any[]>([])
     const [guruStatuses, setGuruStatuses] = useState<Record<number, "verified" | "pending" | "suspended">>({})
 
-    const guruList = baseGuruList.map(g => ({
-        ...g,
-        status: guruStatuses[g.id] ?? g.status,
-    }))
+    useEffect(() => {
+        const token = getClientToken()
+        const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
+        fetch(`${API_BASE_URL}/api/v1/Trainers/pending`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+            .then(res => {
+                if (res.status === 401) {
+                    console.warn("API returned 401 Unauthorized. Using dummy data instead. Please ensure you have a valid token.")
+                    return []
+                }
+                if (!res.ok) throw new Error(`HTTP Error ${res.status}`)
+                return res.json()
+            })
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setApiGurus(data.map(d => ({
+                        id: d.id,
+                        name: d.userName || d.name || `Guru #${d.id}`,
+                        email: d.username || d.email || `guru${d.id}@qurani.com`,
+                        specialization: d.expertise?.join(", ") || d.headline || "Pengajar Al-Qur'an",
+                        avatar: d.userImage || d.avatar || `https://i.pravatar.cc/150?img=${(d.id % 70) + 1}`,
+                        rating: d.averageRating || d.rating || 0,
+                        status: d.status || "pending",
+                        paymentMethod: "Transfer Bank",
+                        joinDate: d.createdAt ? d.createdAt.substring(0, 10) : "2025-01-01",
+                        stats: {
+                            totalStudents: d.totalStudents || 0,
+                            totalSessions: d.totalCourses || 0,
+                            totalRevenue: d.totalRevenue || 0,
+                            activeBookings: 0
+                        }
+                    })))
+                }
+            })
+            .catch(err => console.error("Failed to fetch pending trainers:", err))
+    }, [])
+
+    const guruList = useMemo(() => {
+        const combined = [...baseGuruList]
+        // Merge API gurus, avoiding duplicates
+        apiGurus.forEach(apiG => {
+            if (!combined.find(g => g.id === apiG.id)) {
+                combined.push(apiG)
+            }
+        })
+        return combined.map(g => ({
+            ...g,
+            status: guruStatuses[g.id] ?? g.status,
+        }))
+    }, [baseGuruList, apiGurus, guruStatuses])
 
     function handleGuruAction(guruId: number, guruName: string, currentStatus: "verified" | "pending" | "suspended") {
         if (currentStatus === "pending") {
@@ -157,36 +210,38 @@ function GuruContent() {
                     </div>
                 </div>
 
-                {/* ── Status filter tabs ── */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    {STATUS_TABS.map(t => {
-                        const active = statusFilter === t.key
-                        const colorMap: Record<string, string> = {
-                            emerald: active ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-400",
-                            amber: active ? "bg-amber-500 text-white border-amber-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-amber-400",
-                            red: active ? "bg-red-500 text-white border-red-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-red-400",
-                        }
-                        return (
-                            <button key={t.key}
-                                onClick={() => { setStatus(t.key); setPage(1) }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${colorMap[t.color]}`}>
-                                {t.key === "all" && <Sparkles className="w-3.5 h-3.5" />}
-                                {t.label}: {t.count}
-                            </button>
-                        )
-                    })}
-                </div>
+                {/* ── Status filter tabs + Search bar ── */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {STATUS_TABS.map(t => {
+                            const active = statusFilter === t.key
+                            const colorMap: Record<string, string> = {
+                                emerald: active ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-400",
+                                amber: active ? "bg-amber-500 text-white border-amber-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-amber-400",
+                                red: active ? "bg-red-500 text-white border-red-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-red-400",
+                            }
+                            return (
+                                <button key={t.key}
+                                    onClick={() => { setStatus(t.key); setPage(1) }}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${colorMap[t.color]}`}>
+                                    {t.key === "all" && <Sparkles className="w-3.5 h-3.5" />}
+                                    {t.label}: {t.count}
+                                </button>
+                            )
+                        })}
+                    </div>
 
-                {/* ── Search bar ── */}
-                <div className="flex items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            value={search}
-                            onChange={e => { setSearch(e.target.value); setPage(1) }}
-                            placeholder="Cari nama, email, atau spesialisasi..."
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-                        />
+                    {/* ── Search bar (kanan, sejajar tabs) ── */}
+                    <div className="flex items-center gap-3">
+                        <div className="relative w-full lg:w-72">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                value={search}
+                                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                                placeholder="Cari nama, email, atau spesialisasi..."
+                                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -241,7 +296,11 @@ function GuruContent() {
                                             {/* Guru */}
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30">
+                                                    <Link
+                                                        href={`/billing/guru/${guru.id}`}
+                                                        className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30 hover:ring-emerald-400 dark:hover:ring-emerald-500 transition-all hover:scale-110"
+                                                        title={`Lihat profil ${guru.name}`}
+                                                    >
                                                         <Image
                                                             src={guru.avatar}
                                                             alt={guru.name}
@@ -249,9 +308,14 @@ function GuruContent() {
                                                             className="object-cover"
                                                             unoptimized
                                                         />
-                                                    </div>
+                                                    </Link>
                                                     <div>
-                                                        <p className="font-bold text-gray-900 dark:text-white text-xs leading-tight">{guru.name}</p>
+                                                        <Link
+                                                            href={`/billing/guru/${guru.id}`}
+                                                            className="font-bold text-gray-900 dark:text-white text-xs leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors"
+                                                        >
+                                                            {guru.name}
+                                                        </Link>
                                                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">{guru.email}</p>
                                                     </div>
                                                 </div>

@@ -2,27 +2,40 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { useI18n } from "../providers/i18n-provider";
 
 export default function DynamicTitle() {
   const pathname = usePathname();
-  const { t } = useI18n()
 
   useEffect(() => {
-    let title = "Qurani - Modern Quran App";
+    const p = pathname ?? "/"
+    const APP = "Qurani"
 
-    if (pathname === "/") title = t('title_meta.default');
-    else if (pathname.startsWith("/dashboard")) title = t('title_meta.dashboard');
-    else if (pathname.startsWith("/grup")) title = t('title_meta.group');
-    else if (pathname.startsWith("/notifikasi")) title = t('title_meta.notification');
-    else if (pathname.startsWith("/peta-statistik")) title = t('title_meta.statistik');
-    else if (pathname.startsWith("/profile")) title = t('title_meta.profile');
+    const exactMap: Record<string, string> = {
+      "/": `${APP} - Dashboard`,
+      "/dashboard": `${APP} - Dashboard`,
+      "/grup": `${APP} - Grup`,
+      "/notifikasi": `${APP} - Notifikasi`,
+      "/peta-statistik": `${APP} - Peta Statistik`,
+      "/profile": `${APP} - Profil`,
+      "/teman": `${APP} - Teman`,
+      "/tentang": `${APP} - Tentang`,
+      "/billing": `${APP} - Billing`,
+      "/billing/guru": `${APP} - Manajemen Guru`,
+      "/billing/paket": `${APP} - Manajemen Paket`,
+      "/billing/payout": `${APP} - Payout`,
+    }
 
-    else if (pathname.startsWith("/teman")) title = t('title_meta.friend');
-    else if (pathname.startsWith("/tentang")) title = t('title_meta.about');
+    if (exactMap[p]) { document.title = exactMap[p]; return }
+    if (/^\/billing\/guru\/\d+/.test(p)) { document.title = `${APP} - Profil Guru`; return }
 
-    document.title = title;
-  }, [pathname, t]);
+    const segments = p.split("/").filter(Boolean)
+    if (segments.length > 0) {
+      const readable = segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ")).join(" - ")
+      document.title = `${APP} - ${readable}`
+    } else {
+      document.title = `${APP} - Modern Quran App`
+    }
+  }, [pathname]);
 
   return null;
 }
