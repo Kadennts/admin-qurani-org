@@ -366,6 +366,7 @@ export function GrupSaya() {
 
   // Handle query parameter to open create modal
   useEffect(() => {
+    if (!searchParams) return
     const createParam = searchParams.get('create')
     if (createParam === 'true') {
       setIsCreateModalOpen(true)
@@ -1402,21 +1403,35 @@ export function GrupSaya() {
                       />
                     </PaginationItem>
 
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            setCurrentPage(page)
-                          }}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
+                    {(() => {
+                      const maxVisible = 5;
+                      let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                      let endPage = startPage + maxVisible - 1;
+
+                      if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(1, endPage - maxVisible + 1);
+                      }
+
+                      return Array.from(
+                        { length: endPage - startPage + 1 },
+                        (_, i) => startPage + i
+                      ).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCurrentPage(page);
+                            }}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ));
+                    })()}
 
                     <PaginationItem>
                       <PaginationNext

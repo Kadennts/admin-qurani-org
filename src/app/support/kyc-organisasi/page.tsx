@@ -8,7 +8,8 @@ import {
     ChevronLeft, ChevronRight, Clock, CheckCircle2, XCircle,
     Building2, Users, ChevronDown, Check,
     X, FileText, Mail, Phone, MapPin, Globe,
-    Building, AlertCircle, CheckCircle, Eye, RotateCcw
+    Building, AlertCircle, CheckCircle, Eye, RotateCcw,
+    ArrowDown, ArrowUp, ArrowUpDown
 } from "lucide-react"
 import { useKycOrganisasi, ApiOrg, FilterState, EMPTY_FILTER } from "@/hooks/use-kyc-organisasi"
 
@@ -261,7 +262,7 @@ function KycDetailModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ maxWidth: "calc(100vw - 80px)", height: "96vh" }}>
+            <div className="relative w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ maxWidth: "calc(100vw - 80px)", maxHeight: "96vh" }}>
 
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                     <div className="flex items-center gap-3">
@@ -282,107 +283,222 @@ function KycDetailModal({
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-8">
-                    <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8">
-                        <div className="md:col-span-4 space-y-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 shadow-inner">
-                                    {org.logoUrl ? (
-                                        <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover rounded-2xl" />
-                                    ) : (
-                                        <span className="text-3xl font-black text-emerald-600">{String(org.name || "O").charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
-                                <div className="pt-1">
-                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-tight mb-1.5">{org.name}</h2>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2.5 py-0.5 rounded-md">
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 dark:bg-gray-950/50">
+                    <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* LEFT COLUMN - INFO UTAMA & HUKUM */}
+                        <div className="lg:col-span-4 space-y-6">
+
+                            {/* Card Profil Utama */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 shadow-inner mb-4">
+                                        {org.logoUrl ? (
+                                            <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover rounded-3xl" />
+                                        ) : (
+                                            <span className="text-4xl font-black text-emerald-600">{String(org.name || "O").charAt(0).toUpperCase()}</span>
+                                        )}
+                                    </div>
+                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-tight mb-3">{org.name}</h2>
+                                    <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+                                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full uppercase tracking-wider">
                                             {org.type || "Organisasi"}
                                         </span>
-                                        <span className="text-xs font-medium text-gray-500 flex items-center gap-1 bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded-md">
-                                            <Building className="w-3 h-3" /> {org.categoryName || org.category || "Umum"}
+                                        <span className="text-xs font-semibold text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-300 px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wider">
+                                            <Building className="w-3.5 h-3.5" /> {org.categoryName || org.category || "Umum"}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="pt-5 border-t border-gray-100 dark:border-gray-800">
+                                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 text-center">Penanggung Jawab</span>
+                                    <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                            <Users className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                                {org.ownerName || (org as any).user || org.ownerUsername || "Tanpa Pemilik"}
+                                            </p>
+                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">@{org.ownerUsername || (org as any).userUsername || "anon"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card Data Hukum */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-emerald-500" /> Legalitas & Hukum
+                                </h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="block text-xs font-medium text-gray-500 mb-1">Nama Resmi (Legal)</span>
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{org.legalName || org.name || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-medium text-gray-500 mb-1">Tipe Legalitas</span>
+                                        <span className="inline-block px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-md">{org.legalType || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-medium text-gray-500 mb-1">No. Izin / NIB / Registrasi</span>
+                                        <span className="text-sm font-mono font-bold text-gray-900 dark:text-white break-all">{org.registrationNumber || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-medium text-gray-500 mb-1">NPWP</span>
+                                        <span className="text-sm font-mono font-bold text-gray-900 dark:text-white break-all">{org.taxId || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-medium text-gray-500 mb-1">Tanggal Berdiri</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                            {org.foundedDate ? new Date(org.foundedDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-"}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight mb-0.5">
-                                    {org.ownerName || org.user || org.ownerUsername || "-"}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">@{org.ownerUsername || org.userUsername || "-"}</p>
-                            </div>
-                            <div className="p-4 border border-gray-100 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900">
-                                <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                                    <Building2 className="w-3.5 h-3.5" /> Data Hukum
-                                </h4>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-gray-500 text-xs">Nama Resmi</span>
-                                        <span className="font-medium text-gray-900 dark:text-gray-200">{org.legalName || org.name || "-"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-gray-500 text-xs">No. Izin / NIB</span>
-                                        <span className="font-medium text-gray-900 dark:text-gray-200 font-mono text-xs">{org.registrationNumber || "-"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-gray-500 text-xs">NPWP</span>
-                                        <span className="font-medium text-gray-900 dark:text-gray-200 font-mono text-xs">{org.taxId || "-"}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="p-4 border border-gray-100 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900">
-                                <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                                    <Globe className="w-3.5 h-3.5" /> Kontak & Alamat
-                                </h4>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
-                                        <Mail className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                                        <span className="break-all">{org.email || org.ownerEmail || "-"}</span>
-                                    </div>
-                                    <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
-                                        <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                                        <span>{org.phone || "-"}</span>
-                                    </div>
-                                    <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
-                                        <Globe className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                                        <span className="break-all text-blue-500 hover:underline cursor-pointer">{org.website || "-"}</span>
-                                    </div>
-                                    <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300 pt-1">
-                                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                                        <span className="leading-relaxed">
-                                            {org.address || "-"}{org.cityId ? `, City ID: ${org.cityId}` : ""}{org.postalCode ? ` ${org.postalCode}` : ""}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+
                         </div>
 
-                        <div className="md:col-span-8 flex flex-col gap-4">
-                            <div className="p-4 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-800/30">
-                                <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Deskripsi</h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                                    {org.description || "Tidak ada deskripsi."}
-                                </p>
+                        {/* RIGHT COLUMN - DETAIL & DOKUMEN */}
+                        <div className="lg:col-span-8 space-y-6">
+
+                            {/* Deskripsi & Info Sistem */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Deskripsi Organisasi</h4>
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-5 mb-6 border border-gray-100 dark:border-gray-800">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                        {org.description || <span className="italic text-gray-400">Belum ada deskripsi yang ditambahkan.</span>}
+                                    </p>
+                                </div>
+
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Pengaturan Sistem</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Slug URL</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white truncate block">{org.slug || "-"}</span>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Bahasa</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white truncate block">{(org as any).language || "-"}</span>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Mata Uang</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white truncate block">{(org as any).currency || "-"}</span>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Timezone</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white truncate block">{(org as any).timezone || "-"}</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="flex items-center justify-between mt-2 mb-1">
-                                <h4 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-emerald-500" /> Dokumen Verifikasi
-                                </h4>
-                                <span className="text-xs font-semibold px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md">
-                                    {org.verificationDocs ? "1 Dokumen" : "0 Dokumen"}
-                                </span>
+                            {/* Kontak & Alamat */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+                                        <Mail className="w-4 h-4 text-emerald-500" /> Informasi Kontak
+                                    </h4>
+                                    <div className="space-y-5">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 border border-blue-100 dark:border-blue-800/50">
+                                                <Mail className="w-4 h-4 text-blue-500" />
+                                            </div>
+                                            <div className="pt-0.5">
+                                                <span className="block text-xs font-medium text-gray-500 mb-0.5">Email</span>
+                                                <span className="text-sm font-bold text-gray-900 dark:text-white break-all">{org.email || org.ownerEmail || "-"}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0 border border-emerald-100 dark:border-emerald-800/50">
+                                                <Phone className="w-4 h-4 text-emerald-500" />
+                                            </div>
+                                            <div className="pt-0.5">
+                                                <span className="block text-xs font-medium text-gray-500 mb-0.5">Telepon</span>
+                                                <span className="text-sm font-bold text-gray-900 dark:text-white break-all">{org.phone || "-"}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0 border border-purple-100 dark:border-purple-800/50">
+                                                <Globe className="w-4 h-4 text-purple-500" />
+                                            </div>
+                                            <div className="pt-0.5">
+                                                <span className="block text-xs font-medium text-gray-500 mb-0.5">Website</span>
+                                                {org.website ? (
+                                                    <a href={org.website.startsWith('http') ? org.website : `https://${org.website}`} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-500 hover:text-blue-600 hover:underline break-all transition-colors">
+                                                        {org.website}
+                                                    </a>
+                                                ) : <span className="text-sm font-bold text-gray-900 dark:text-white">-</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-emerald-500" /> Alamat Lengkap
+                                    </h4>
+                                    <div className="flex items-start gap-4 mb-5">
+                                        <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-800/50">
+                                            <MapPin className="w-4 h-4 text-orange-500" />
+                                        </div>
+                                        <div className="pt-0.5">
+                                            <span className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
+                                                {org.address || <span className="text-gray-400 italic">Alamat belum diisi</span>}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <div>
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Kota</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{(org as any).city || "-"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Provinsi</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{(org as any).state || "-"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Negara</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{(org as any).country || "-"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Kode Pos</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{org.postalCode || "-"}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <DocCard
-                                    nama="Dokumen Verifikasi"
-                                    file={org.verificationDocs || undefined}
-                                    noPreview={!org.verificationDocs}
-                                    hasValidasi={!!org.verificationDocs}
-                                    iconType="building"
-                                />
+                            {/* Dokumen Verifikasi */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-emerald-500" /> Dokumen Pendukung
+                                    </h4>
+                                    <span className="text-xs font-bold px-3 py-1.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        {org.verificationDocs ? "1 Dokumen" : "0 Dokumen"}
+                                    </span>
+                                </div>
+
+                                {org.verificationDocs ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <DocCard
+                                            nama="Dokumen Registrasi"
+                                            file={org.verificationDocs || undefined}
+                                            hasValidasi={true}
+                                            iconType="building"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-10 px-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-800/30">
+                                        <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center mb-4 shadow-sm">
+                                            <FileText className="w-7 h-7 text-gray-400" />
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white text-center mb-1.5">Belum Ada Dokumen</p>
+                                        <p className="text-xs text-gray-500 text-center max-w-sm">
+                                            Organisasi ini belum mengunggah dokumen verifikasi legalitas.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -425,11 +541,10 @@ function KycDetailModal({
                                             key={reason}
                                             onClick={() => toggleReason(reason)}
                                             disabled={selectedReasons.length >= 3 && !selectedReasons.includes(reason)}
-                                            className={`px-3.5 py-2 rounded-full border text-[11px] font-bold transition-all ${
-                                                selectedReasons.includes(reason)
+                                            className={`px-3.5 py-2 rounded-full border text-[11px] font-bold transition-all ${selectedReasons.includes(reason)
                                                     ? "bg-[#FF7070] border-[#FF7070] text-white shadow-md shadow-red-500/10"
                                                     : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-300 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                                            }`}
+                                                }`}
                                         >
                                             {reason}
                                         </button>
@@ -594,6 +709,8 @@ function KycOrganisasiContent() {
         setActiveTab,
         setSearch,
         setFilter: setAppliedFilter,
+        sortOrder,
+        setSortOrder,
         verifyOrg,
         rejectOrg,
         toasts,
@@ -614,14 +731,21 @@ function KycOrganisasiContent() {
         { key: "semua", label: "Semua" },
     ]
 
+    const getVisiblePages = () => {
+        if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        if (page <= 3) return [1, 2, 3, 4, 5];
+        if (page >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        return [page - 2, page - 1, page, page + 1, page + 2];
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
             <Toast toasts={toasts} onRemove={removeToast} />
             {/* Detail Modal */}
             {selectedOrg && (
-                <KycDetailModal 
-                    org={selectedOrg} 
-                    onClose={() => setSelectedOrg(null)} 
+                <KycDetailModal
+                    org={selectedOrg}
+                    onClose={() => setSelectedOrg(null)}
                     onVerify={verifyOrg}
                     onReject={rejectOrg}
                 />
@@ -683,7 +807,7 @@ function KycOrganisasiContent() {
                             {tab.label}
                             {activeTab === tab.key && tabCounts[tab.key] > 0 && (
                                 <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold rounded-full bg-emerald-500 text-white">
-                                    {tabCounts[tab.key]}
+                                    {tabCounts[tab.key] > 99 ? "99+" : tabCounts[tab.key]}
                                 </span>
                             )}
                         </button>
@@ -696,24 +820,39 @@ function KycOrganisasiContent() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-5 py-3 w-[33%]">Organisasi</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[18%]">Tipe &amp; Kategori</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-5 py-3 w-[28%]">Organisasi</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[10%]">Tipe</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">Kategori</th>
                                     <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">User</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">Tgl Pengajuan</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[12%]">Status</th>
+                                    <th
+                                        className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%] cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 group transition-colors select-none"
+                                        onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            Tgl Pengajuan
+                                            {sortOrder === "newest" ? (
+                                                <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
+                                            ) : sortOrder === "oldest" ? (
+                                                <ArrowUp className="w-3.5 h-3.5 text-emerald-500" />
+                                            ) : (
+                                                <ArrowUpDown className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[10%]">Status</th>
                                     <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[7%]">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-20 text-gray-400 text-sm">
+                                        <td colSpan={7} className="text-center py-20 text-gray-400 text-sm">
                                             Memuat data organisasi...
                                         </td>
                                     </tr>
                                 ) : filteredData.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-20 text-gray-400 text-sm">
+                                        <td colSpan={7} className="text-center py-20 text-gray-400 text-sm">
                                             Tidak ada data organisasi ditemukan
                                         </td>
                                     </tr>
@@ -746,21 +885,25 @@ function KycOrganisasiContent() {
                                                 </div>
                                             </td>
 
-                                            {/* Tipe & Kategori */}
+                                            {/* Tipe */}
                                             <td className="px-4 py-4">
-                                                <div className="flex flex-wrap gap-1 mb-1.5">
+                                                <div className="flex flex-wrap gap-1">
                                                     <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
                                                         {org.type || "Organisasi"}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-400">{org.categoryName || org.category || "Umum"}</p>
+                                            </td>
+
+                                            {/* Kategori */}
+                                            <td className="px-4 py-4">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{org.categoryName || org.category || "Umum"}</p>
                                             </td>
 
                                             {/* User */}
                                             <td className="px-4 py-4">
                                                 <div className="flex flex-col">
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300">{org.ownerName || org.user || org.ownerUsername || "-"}</p>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{org.ownerUsername || org.userUsername || "-"}</p>
+                                                    <p className="text-sm text-gray-700 dark:text-gray-300">{org.ownerName || (org as any).user || org.ownerUsername || "-"}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{org.ownerUsername || (org as any).userUsername || "-"}</p>
                                                 </div>
                                             </td>
 
@@ -806,13 +949,13 @@ function KycOrganisasiContent() {
                     </div>
                     <div className="flex items-center gap-1">
                         <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            onClick={() => setPage(Math.max(1, page - 1))}
                             disabled={page === 1}
                             className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        {getVisiblePages().map(p => (
                             <button
                                 key={p}
                                 onClick={() => setPage(p)}
@@ -825,7 +968,7 @@ function KycOrganisasiContent() {
                             </button>
                         ))}
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            onClick={() => setPage(Math.min(totalPages, page + 1))}
                             disabled={page === totalPages}
                             className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >

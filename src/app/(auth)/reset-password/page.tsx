@@ -12,6 +12,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 
+
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")

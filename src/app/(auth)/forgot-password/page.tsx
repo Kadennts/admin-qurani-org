@@ -1,5 +1,11 @@
 import { ForgotPasswordForm } from "@/components/ui/auth-form/forgot-password-form"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: "Lupa Password - Qurani",
+    description: "Lupa password akun Qurani"
+};
 
 export default function ForgotPasswordPage() {
     return (

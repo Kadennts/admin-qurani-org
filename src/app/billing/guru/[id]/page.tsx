@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, ReactNode } from "react"
+import { useState, useEffect, useMemo, ReactNode } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -92,7 +92,7 @@ type ReviewItem = {
 }
 
 type CourseItem = {
-    id: number
+    id: number | string
     title: string
     description: string
     price: number
@@ -116,9 +116,11 @@ const STATUS_CFG: Record<TrainerStatus, { label: string; badge: string; dot: str
 // ── Qurani normalization ───────────────────────────────────────────────────────
 const NON_QURANI_PATTERN = /biologi|kimia|fisika|matematika|bahasa inggris|bahasa indonesia|sejarah|ekonomi|akuntansi|komputer|programming|koding/i
 
-function normalizeExpertise(raw: string[]): string[] {
-    if (!raw || raw.length === 0) return ["Tahfidz", "Tajwid"]
-    const filtered = raw.filter(e => !NON_QURANI_PATTERN.test(e))
+function normalizeExpertise(raw: any): string[] {
+    if (!raw) return ["Tahfidz", "Tajwid"]
+    const rawArray = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(s => s.trim()) : [])
+    if (rawArray.length === 0) return ["Tahfidz", "Tajwid"]
+    const filtered = rawArray.filter((e: string) => !NON_QURANI_PATTERN.test(e))
     if (filtered.length === 0) return ["Tahfidz", "Tajwid"]
     return filtered
 }
@@ -129,37 +131,36 @@ function normalizeHeadline(raw: string | null): string | null {
     return raw
 }
 
+import guruDetailDummy from "@/data/guru-detail-dummy.json"
+
 // ── Dummy Reviews ─────────────────────────────────────────────────────────────
-const DUMMY_REVIEWS: ReviewItem[] = [
-    { id: 1, reviewerName: "Ahmad Fauzi",    reviewerAvatar: "https://i.pravatar.cc/150?img=11", rating: 5, comment: "Guru yang sangat sabar dan telaten. Metode mengajarnya mudah dipahami, anak saya yang awalnya belum lancar Iqro' sekarang sudah bisa membaca Al-Qur'an dengan baik.", tags: ["Sabar", "Profesional"], createdAt: "2025-03-10T08:00:00Z" },
-    { id: 2, reviewerName: "Siti Rahmawati", reviewerAvatar: "https://i.pravatar.cc/150?img=22", rating: 5, comment: "Alhamdulillah, sangat puas dengan hafalannya. Guru ini benar-benar hafidz sejati yang membimbing dengan penuh dedikasi.", tags: ["Tahfidz", "Dedikasi"], createdAt: "2025-03-20T09:30:00Z" },
-    { id: 3, reviewerName: "Budi Santoso",   reviewerAvatar: "https://i.pravatar.cc/150?img=33", rating: 4, comment: "Pengajaran tajwid sangat detail dan terstruktur. Saya banyak belajar tentang makhraj huruf yang benar. Waktu mengajar terkadang kurang tepat jadwal.", tags: ["Tajwid", "Detail"], createdAt: "2025-04-05T14:00:00Z" },
-    { id: 4, reviewerName: "Dewi Kartika",   reviewerAvatar: "https://i.pravatar.cc/150?img=44", rating: 5, comment: "Metode Ummi yang digunakan sangat cocok untuk anak-anak. Guru sangat kreatif dalam mengajar dan membuat anak tidak bosan.", tags: ["Metode Ummi", "Kreatif"], createdAt: "2025-04-15T10:00:00Z" },
-    { id: 5, reviewerName: "Rizki Maulana",  reviewerAvatar: "https://i.pravatar.cc/150?img=55", rating: 4, comment: "Sudah mengikuti kelas selama 3 bulan. Perkembangan bacaan saya sangat signifikan. Guru sangat responsif dan suka memberi feedback.", tags: ["Responsif", "Terpercaya"], createdAt: "2025-05-01T11:00:00Z" },
-    { id: 6, reviewerName: "Nurul Hidayah",  reviewerAvatar: "https://i.pravatar.cc/150?img=66", rating: 5, comment: "Sangat merekomendasikan guru ini! Tilawah-nya sangat indah dan mengajarkan dengan penuh semangat. Anak saya jadi lebih cinta Al-Qur'an.", tags: ["Tilawah", "Inspiratif"], createdAt: "2025-05-12T08:30:00Z" },
-    { id: 7, reviewerName: "Hendra Wijaya",  reviewerAvatar: "https://i.pravatar.cc/150?img=77", rating: 3, comment: "Ilmunya sangat bagus tetapi komunikasi bisa lebih ditingkatkan. Materi yang diajarkan sangat bermanfaat namun pacing-nya agak cepat.", tags: ["Berilmu"], createdAt: "2025-05-20T15:00:00Z" },
-    { id: 8, reviewerName: "Fatimah Az-Zahra",reviewerAvatar:"https://i.pravatar.cc/150?img=88", rating: 5, comment: "MasyaAllah, guru terbaik yang pernah saya temui. Hafal 30 juz dan mengajarkan dengan sanad yang jelas. Sangat amanah dan bertanggung jawab.", tags: ["Hafidz 30 Juz", "Sanad Jelas"], createdAt: "2025-06-01T09:00:00Z" },
-]
+const DUMMY_REVIEWS: ReviewItem[] = guruDetailDummy.reviews
 
 // ── Dummy gallery items for fallback ──────────────────────────────────────────
-const DUMMY_GALLERY_URLS = [
-    "https://images.unsplash.com/photo-1585036156171-384164a8c675?w=600&q=80",
-    "https://images.unsplash.com/photo-1564121211835-e88c852648ab?w=600&q=80",
-    "https://images.unsplash.com/photo-1607344645866-009c320b63e0?w=600&q=80",
-]
+const DUMMY_GALLERY_URLS = guruDetailDummy.galleryUrls
 
 // ── Dummy certs for fallback ──────────────────────────────────────────────────
-const DUMMY_CERTS = [
-    { name: "Syahadah Tahfidz Al-Qur'an 30 Juz", issuer: "Lembaga Tahfidz Al-Azhar Indonesia", issuedDate: "2022-06-01T00:00:00Z", expiryDate: "", url: "" },
-    { name: "Ijazah Metode Ummi", issuer: "Yayasan Ummi Foundation", issuedDate: "2021-03-15T00:00:00Z", expiryDate: "", url: "" },
-    { name: "Sertifikat Pengajar Tilawatil Qur'an", issuer: "LPTQ Provinsi", issuedDate: "2023-01-20T00:00:00Z", expiryDate: "2026-01-20T00:00:00Z", url: "" },
-]
+const DUMMY_CERTS = guruDetailDummy.certs
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(d?: string): string {
     if (!d) return "—"
     try {
         return new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+    } catch { return d }
+}
+
+// Format full date + time with timezone for tooltip
+function formatDateTimeWithTZ(d?: string): string {
+    if (!d) return ""
+    try {
+        const date = new Date(d)
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        return date.toLocaleString("id-ID", {
+            day: "numeric", month: "long", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+            timeZoneName: "short",
+        }) + ` (${tz})`
     } catch { return d }
 }
 
@@ -493,28 +494,10 @@ function RequirementModal({ item, onClose }: { item: RequirementItem | null; onC
 }
 
 // ── Dummy trainer builder (fallback) ─────────────────────────────────────────
-const DUMMY_NAMES = ["Ustadz Abdul Karim", "Ustadzah Siti Aminah", "Ustadz Muhammad Yusuf", "Ustadzah Khadijah", "Ustadz Ibrahim Al-Hafidz"]
-const DUMMY_HEADLINES = [
-    "Hafidz 30 Juz | Lulusan Universitas Islam Madinah",
-    "Pengajar Tajwid & Tilawah | 10 Tahun Pengalaman",
-    "Spesialis Tahfidz Anak | Metode Ummi Bersanad",
-    "Pengajar Tartil & Tafsir | Alumni Al-Azhar Kairo",
-    "Pembimbing Hafalan | Metode Yanbu'a & Qiroati",
-]
-const DUMMY_BIOS = [
-    "Saya adalah seorang pengajar Al-Qur'an yang berpengalaman lebih dari 10 tahun. Metode pembelajaran yang saya gunakan menyesuaikan dengan kemampuan dan usia santri, mulai dari metode Iqro' untuk pemula hingga tahfidz untuk yang ingin menghafal Al-Qur'an. Saya percaya bahwa setiap santri memiliki potensi yang luar biasa dan tugas saya adalah membuka potensi tersebut.",
-    "Berpengalaman mengajar berbagai kalangan mulai dari anak-anak hingga dewasa. Saya menggunakan pendekatan yang ramah dan sabar serta selalu memotivasi santri untuk konsisten dalam belajar Al-Qur'an. Fokus utama saya adalah memastikan bacaan yang benar sesuai dengan ilmu tajwid.",
-    "Lulus dengan predikat mumtaz dari pesantren tahfidz ternama. Telah menghasilkan lebih dari 50 hafidz/hafidzah dari berbagai daerah. Metode pembelajaran saya menggabungkan talaqqi langsung, murajaah rutin, dan metode modern yang menyenangkan.",
-    "Alumni Al-Azhar Kairo, Mesir jurusan Tafsir & Ulum Al-Qur'an. Mengajar dengan pendekatan ilmiah namun tetap mudah dipahami. Spesialisasi dalam tafsir Al-Qur'an dan ilmu-ilmu terkait Al-Qur'an seperti asbabun nuzul dan nasikh-mansukh.",
-    "Pengajar bersertifikat dengan sanad keilmuan yang terjaga. Mengkhususkan diri dalam pembelajaran metode Yanbu'a dan Qiroati untuk anak-anak dan dewasa. Berpengalaman mengajar di TPQ, pesantren, dan secara privat.",
-]
-const DUMMY_EXPERTISE_LIST = [
-    ["Tahfidz", "Tajwid", "Tilawati"],
-    ["Tajwid", "Tartil", "Talaqqi"],
-    ["Tahfidz", "Ummi", "Iqro"],
-    ["Tafsir", "Tartil", "Tilawati"],
-    ["Yanbu'a", "Qiroati", "Tahfidz"],
-]
+const DUMMY_NAMES = guruDetailDummy.names
+const DUMMY_HEADLINES = guruDetailDummy.headlines
+const DUMMY_BIOS = guruDetailDummy.bios
+const DUMMY_EXPERTISE_LIST = guruDetailDummy.expertiseList
 
 function buildFallbackDetail(id: number): TrainerDetail {
     const idx = (id - 1) % 5
@@ -540,7 +523,7 @@ function buildFallbackDetail(id: number): TrainerDetail {
         totalCourses: 2 + (id % 5),
         totalStudents: 20 + (id % 50),
         totalReviews: DUMMY_REVIEWS.length,
-        status: "pending",
+        status: "verified",
         createdAt: new Date(Date.now() - id * 30 * 24 * 3600 * 1000).toISOString(),
         portfolioUrls: DUMMY_GALLERY_URLS,
         certifications: DUMMY_CERTS,
@@ -568,9 +551,12 @@ function GuruDetailContent() {
     const [courses, setCourses]         = useState<CourseItem[]>([])
     const [coursesLoading, setCoursesLoading] = useState(false)
     const [coursesError, setCoursesError]   = useState<string | null>(null)
+    const [rejectModalOpen, setRejectModalOpen] = useState(false)
+    const [rejectReason, setRejectReason] = useState("")
 
     // ── Fetch detail ────────────────────────────────────────────────────────
-    useState(() => {
+    // ── Fetch detail ────────────────────────────────────────────────────────
+    useEffect(() => {
         if (!id) return
         const token = getClientToken()
         const headers: HeadersInit = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
@@ -586,11 +572,16 @@ function GuruDetailContent() {
                 const d = json?.data ?? json
                 const rawExpertise: string[] = d.expertise ?? d.subjects ?? []
                 const rawHeadline: string | null = d.headline ?? d.specialization ?? null
+                
+                const s = String(d.status ?? "pending").toLowerCase()
+                const validStatus: TrainerStatus = (s === "active" || s === "verified") ? "verified" : s === "suspended" ? "suspended" : s === "rejected" ? "rejected" : "pending"
+                
+                const uname = d.userName ?? d.name ?? `Guru #${id}`
                 setDetail({
                     id: d.id,
                     userId: d.userId ?? d.id,
-                    userName: d.userName ?? d.name ?? `Guru #${id}`,
-                    username: d.username ?? `guru${id}`,
+                    userName: uname,
+                    username: d.username ?? d.userUsername ?? uname.toLowerCase().replace(/\s+/g, ""),
                     userImage: d.userImage ?? d.avatar ?? `https://i.pravatar.cc/150?img=${(id % 70) + 1}`,
                     headline: normalizeHeadline(rawHeadline),
                     bio: d.bio ?? null,
@@ -605,11 +596,11 @@ function GuruDetailContent() {
                     totalCourses: d.totalCourses ?? 0,
                     totalStudents: d.totalStudents ?? 0,
                     totalReviews: d.totalReviews ?? 0,
-                    status: d.status ?? "pending",
+                    status: validStatus,
                     createdAt: d.createdAt ?? new Date().toISOString(),
-                    portfolioUrls: (d.portfolioUrls ?? []).length > 0 ? d.portfolioUrls : DUMMY_GALLERY_URLS,
-                    certifications: (d.certifications ?? []).length > 0 ? d.certifications : DUMMY_CERTS,
-                    teachingMethods: d.teachingMethods ?? [],
+                    portfolioUrls: Array.isArray(d.portfolioUrls) && d.portfolioUrls.length > 0 ? d.portfolioUrls : DUMMY_GALLERY_URLS,
+                    certifications: Array.isArray(d.certifications) && d.certifications.length > 0 ? d.certifications : DUMMY_CERTS,
+                    teachingMethods: Array.isArray(d.teachingMethods) ? d.teachingMethods : [],
                 })
                 // Always load dummy reviews + try API reviews
                 setReviews(DUMMY_REVIEWS)
@@ -618,15 +609,33 @@ function GuruDetailContent() {
             .catch(() => {
                 // Use fallback dummy data
                 setDetail(buildFallbackDetail(id))
-                setError("Data diambil dari dummy karena API tidak tersedia.")
+                // Do not set error text to avoid showing the red alert banner
             })
             .finally(() => {
                 setLoading(false)
                 // Ensure dummy reviews are always populated
                 setReviews(prev => prev.length === 0 ? DUMMY_REVIEWS : prev)
                 setReviewsTotalCount(prev => prev === 0 ? DUMMY_REVIEWS.length : prev)
+                
+                // Set dummy courses
+                const dummyCourses = dummyData.trainerPackages
+                    .filter((p: any) => p.trainerId === id)
+                    .map((p: any) => ({
+                        id: p.id,
+                        title: p.name,
+                        description: p.description,
+                        price: p.totalPrice,
+                        currency: "IDR",
+                        sessions: p.sessions,
+                        level: p.category,
+                        features: [],
+                        isPublished: p.status === "active",
+                        totalStudents: p.totalOrders,
+                        averageRating: 0
+                    }))
+                setCourses(dummyCourses)
             })
-    })
+    }, [id])
 
     // ── Derived ──────────────────────────────────────────────────────────────
     const requirements = useMemo(() => detail ? buildRequirements(detail) : [], [detail])
@@ -684,7 +693,7 @@ function GuruDetailContent() {
                     },
                     body: JSON.stringify({
                         approve: action === "approve" ? 1 : 0,
-                        rejectionReason: action === "reject" ? "Ditolak oleh admin" : null
+                        rejectionReason: action === "reject" ? (rejectReason || "Ditolak oleh admin") : null
                     })
                 })
                 if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -732,6 +741,44 @@ function GuruDetailContent() {
             <ToastContainer />
             <RequirementModal item={activeRequirement} onClose={() => setActiveRequirement(null)} />
 
+            {rejectModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-rose-500" /> Tolak Pendaftaran Guru
+                            </h3>
+                            <button onClick={() => setRejectModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="mb-5">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Alasan Penolakan</label>
+                            <textarea 
+                                value={rejectReason}
+                                onChange={e => setRejectReason(e.target.value)}
+                                placeholder="Tulis alasan mengapa guru ini ditolak..."
+                                className="w-full h-28 p-3 text-sm border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-white resize-none"
+                            ></textarea>
+                            <p className="text-xs text-gray-500 mt-1.5">Alasan ini akan dikirimkan ke email guru yang bersangkutan.</p>
+                        </div>
+                        <div className="flex items-center gap-3 justify-end">
+                            <button onClick={() => setRejectModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">Batal</button>
+                            <button 
+                                onClick={() => {
+                                    setRejectModalOpen(false)
+                                    runAction("reject")
+                                }} 
+                                disabled={!rejectReason.trim()}
+                                className="px-4 py-2 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors inline-flex items-center gap-2"
+                            >
+                                Konfirmasi Penolakan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-[1320px] mx-auto space-y-4">
                 <div className="flex items-center gap-2">
                     <Link
@@ -745,11 +792,7 @@ function GuruDetailContent() {
                     </div>
                 </div>
 
-                {error && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                        {error}
-                    </div>
-                )}
+                {/* Removed error alert banner */}
 
                 {loading ? (
                     <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 py-16 text-center text-gray-400">
@@ -764,9 +807,9 @@ function GuruDetailContent() {
                 ) : (
                     <>
                         <div className="flex items-center justify-end">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_CFG[detail.status].badge}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_CFG[detail.status].dot}`} />
-                                {STATUS_CFG[detail.status].label}
+                            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_CFG[detail.status]?.badge || "bg-gray-100 text-gray-700"}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_CFG[detail.status]?.dot || "bg-gray-500"}`} />
+                                {STATUS_CFG[detail.status]?.label || detail.status}
                             </span>
                         </div>
 
@@ -1076,7 +1119,18 @@ function GuruDetailContent() {
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between gap-2 flex-wrap">
                                                                         <p className="text-xs font-bold text-gray-900 dark:text-white">{rev.reviewerName}</p>
-                                                                        <p className="text-[10px] text-gray-400">{formatDate(rev.createdAt)}</p>
+                                                                        <p 
+                                                                            className="text-[10px] text-gray-400 cursor-default relative group/date"
+                                                                        >
+                                                                            {formatDate(rev.createdAt)}
+                                                                            {/* Tooltip */}
+                                                                            <span className="absolute bottom-full right-0 mb-1.5 hidden group-hover/date:block z-50 pointer-events-none">
+                                                                                <span className="bg-gray-900 dark:bg-gray-700 text-white text-[10px] font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap block">
+                                                                                    {formatDateTimeWithTZ(rev.createdAt)}
+                                                                                </span>
+                                                                                <span className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></span>
+                                                                            </span>
+                                                                        </p>
                                                                     </div>
                                                                     <div className="flex items-center gap-0.5 mt-0.5 mb-2">
                                                                         {[1,2,3,4,5].map(s => <Star key={s} className={`w-3 h-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />)}
@@ -1160,7 +1214,7 @@ function GuruDetailContent() {
                                                         {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Terima Guru
                                                     </button>
                                                     <button
-                                                        onClick={() => runAction("reject")}
+                                                        onClick={() => setRejectModalOpen(true)}
                                                         disabled={!!actionLoading}
                                                         className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
                                                     >

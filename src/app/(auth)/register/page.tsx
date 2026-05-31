@@ -2,6 +2,13 @@ import { RegisterForm } from "@/components/ui/auth-form/register-form"
 import { Suspense } from "react"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: "Daftar - Qurani",
+    description: "Daftar akun Qurani - Islamic Social Media"
+};
+
 export default function RegisterPage() {
     return (
         <div className="min-h-svh bg-gray-50 dark:bg-slate-950">

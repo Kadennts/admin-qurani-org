@@ -20,9 +20,10 @@ export default function DynamicTitle() {
       "/teman": `${APP} - Teman`,
       "/tentang": `${APP} - Tentang`,
       "/billing": `${APP} - Billing`,
-      "/billing/guru": `${APP} - Manajemen Guru`,
-      "/billing/paket": `${APP} - Manajemen Paket`,
+      "/billing/guru": `${APP} - Guru`,
+      "/billing/paket": `${APP} - Paket`,
       "/billing/payout": `${APP} - Payout`,
+      "/groups/categories": `${APP} - Group Categories`,
     }
 
     if (exactMap[p]) { document.title = exactMap[p]; return }
