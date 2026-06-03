@@ -249,6 +249,7 @@ function TaxRatesContent() {
     const [deletingId, setDeletingId] = useState<number | null>(null)
 
     const [search, setSearch] = useState("")
+    const [searchInput, setSearchInput] = useState("")
     const [typeFilter, setTypeFilter] = useState<TaxType>("all")
     const [showInactive, setShowInactive] = useState(false)
     const [sortField, setSortField] = useState<SortField>("countryName")
@@ -531,11 +532,27 @@ function TaxRatesContent() {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${showInactive ? "bg-gray-800 text-white border-gray-700" : "bg-white dark:bg-gray-900 text-gray-500 border-gray-200 dark:border-gray-700"}`}>
                         <Filter className="w-3 h-3" /> {showInactive ? "Sembunyikan Nonaktif" : "Tampilkan Nonaktif"}
                     </button>
-                    <div className="relative flex-1 max-w-md ml-auto">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+                    <div className="flex items-center w-full md:max-w-md h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400 ml-auto">
+                        <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <input
+                            type="text"
                             placeholder="Cari kode, nama, negara..."
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                            value={searchInput}
+                            onChange={e => setSearchInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    setSearch(searchInput);
+                                    setPage(1);
+                                }
+                            }}
+                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
+                        />
+                        <button
+                            onClick={() => { setSearch(searchInput); setPage(1); }}
+                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
+                        >
+                            <Search className="w-4 h-4" /> Cari
+                        </button>
                     </div>
                 </div>
 

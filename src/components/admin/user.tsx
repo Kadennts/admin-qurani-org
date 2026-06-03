@@ -133,6 +133,7 @@ const parseTotalCount = (result: any): number | null => {
 export default function Users() {
     const { t } = useI18n()
     const [searchQuery, setSearchQuery] = useState("")
+    const [searchInput, setSearchInput] = useState("")
     const [currentPage, setCurrentPage] = useState(1)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingUser, setEditingUser] = useState<UserItem | null>(null)
@@ -184,7 +185,6 @@ export default function Users() {
     const [isLoading, setIsLoading] = useState(true)
 
     const debouncedUsername = useDebounce(editForm.username, 500)
-    const debouncedSearch = useDebounce(searchQuery, 500)
 
     const checkUsernameAvailability = useCallback(async (username: string, currentUserId: string | number) => {
         // Clear error immediately for empty username
@@ -430,11 +430,10 @@ export default function Users() {
         }
     }, [currentPage, roleFilter, statusFilter, t])
 
-    // Load users on mount and when filters change
     useEffect(() => {
         // No AbortController to avoid "canceled" status logging in dev console
-        loadUsers(debouncedSearch || undefined)
-    }, [loadUsers, debouncedSearch])
+        loadUsers(searchQuery || undefined)
+    }, [loadUsers, searchQuery])
 
     // Load countries on mount
     useEffect(() => {
@@ -779,23 +778,26 @@ export default function Users() {
                     <div className="space-y-4">
                         {/* Search Row */}
                         <div className="flex gap-2 sm:gap-3 items-center">
-                            <div className="relative w-full sm:w-64">
-                                <Input
+                            <div className="flex items-center w-full md:w-96 h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                                <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
+                                <input
+                                    type="text"
                                     placeholder={t('search_placeholder', 'Cari berdasarkan username...')}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => {
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    onKeyDown={e => {
                                         if (e.key === 'Enter') {
-                                            handleSearch()
+                                            setSearchQuery(searchInput);
+                                            setCurrentPage(1);
                                         }
                                     }}
-                                    className="pl-3 pr-8 h-8 text-xs border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 focus:bg-white dark:focus:bg-gray-900 focus:ring-emerald-500 rounded-lg"
+                                    className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
                                 />
                                 <button
-                                    onClick={() => { handleSearch(); }}
-                                    className="absolute right-0 top-0 bottom-0 w-8 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white rounded-r-lg transition-colors"
+                                    onClick={() => { setSearchQuery(searchInput); setCurrentPage(1); }}
+                                    className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
                                 >
-                                    <Search className="w-3.5 h-3.5" />
+                                    <Search className="w-4 h-4" /> Cari
                                 </button>
                             </div>
 

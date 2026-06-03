@@ -2,8 +2,37 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useDebounce } from "@/hooks/use-debounce"
+import dummyOrgsBase from "@/data/dummy-orgs.json"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
+
+const DUMMY_STATUS_KEY = "qurani_dummy_org_status"
+
+type DummyOverride = { isVerified: number; status: string; isActive: boolean }
+
+function getDummyOverrides(): Record<string, DummyOverride> {
+    if (typeof window === "undefined") return {}
+    try {
+        const raw = localStorage.getItem(DUMMY_STATUS_KEY)
+        return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+}
+
+function setDummyOverride(id: number | string, patch: DummyOverride) {
+    if (typeof window === "undefined") return
+    const current = getDummyOverrides()
+    current[String(id)] = patch
+    localStorage.setItem(DUMMY_STATUS_KEY, JSON.stringify(current))
+}
+
+function getDummyOrgs() {
+    const overrides = getDummyOverrides()
+    return dummyOrgsBase.map(d => {
+        const ov = overrides[String(d.id)]
+        if (!ov) return d
+        return { ...d, isVerified: ov.isVerified, status: ov.status, isActive: ov.isActive }
+    })
+}
 
 function getClientToken(): string | null {
     if (typeof window === "undefined") return null
@@ -22,7 +51,7 @@ function getClientToken(): string | null {
 export type OrgStatus = "PENDING" | "APPROVED" | "REJECTED" | "ACTIVE" | "INACTIVE"
 
 export type ApiOrg = {
-    id: number
+    id: number | string
     name: string
     slug?: string
     description?: string
@@ -43,10 +72,14 @@ export type ApiOrg = {
     countryId?: number
     stateId?: number
     cityId?: number
+    city?: string
     isVerified?: number  // 0=pending, 1=approved, 2=rejected
     isActive?: boolean
     memberCount?: number
     inviteCode?: string
+    logo?: string
+    image?: string
+    banner?: string
     logoUrl?: string
     ownerId?: number
     ownerName?: string
@@ -59,7 +92,16 @@ export type ApiOrg = {
     status?: string
 }
 
-export type TabKey = "menunggu" | "disetujui" | "ditolak" | "semua"
+export type OrgMember = {
+    id: number
+    orgId: number
+    userId: number
+    userName: string
+    role: string
+    joinedAt: string
+}
+
+export type TabKey = "semua" | "menunggu" | "aktif" | "nonaktif" | "ditolak"
 
 export type FilterState = {
     type: string
@@ -96,6 +138,8 @@ export type KycOrganisasiState = {
     detailLoading: boolean
     actionLoading: boolean
     toasts: ToastData[]
+    orgMembers: OrgMember[]
+    orgMembersLoading: boolean
     // setters
     setPage: (p: number) => void
     setPerPage: (p: number) => void
@@ -105,26 +149,19 @@ export type KycOrganisasiState = {
     setSortOrder: (s: SortOrder) => void
     setSelectedOrg: (o: ApiOrg | null) => void
     // actions
-    fetchDetail: (id: number) => Promise<void>
-    verifyOrg: (id: number) => Promise<void>
-    rejectOrg: (id: number, reason: string) => Promise<void>
-    editOrg: (id: number, body: Partial<ApiOrg>) => Promise<void>
-    regenerateInvite: (id: number) => Promise<string>
-    toggleActive: (id: number, currentStatus: string) => Promise<void>
-    removeToast: (id: number) => void
+    fetchDetail: (id: number | string) => Promise<void>
+    fetchOrgMembers: (id: number | string) => Promise<void>
+    verifyOrg: (id: number | string) => Promise<void>
+    rejectOrg: (id: number | string, reason: string) => Promise<void>
+    editOrg: (id: number | string, body: Partial<ApiOrg>) => Promise<void>
+    regenerateInvite: (id: number | string) => Promise<string>
+    toggleActive: (id: number | string, currentStatus: string) => Promise<void>
+    removeToast: (id: number | string) => void
     retry: () => void
+    clearDetail: () => void
 }
 
 export type ToastData = { id: number; message: string; type: "success" | "error" }
-
-// ─── Tab → IsVerified mapping ────────────────────────────────────────────────
-
-function tabToIsVerified(tab: TabKey): number | undefined {
-    if (tab === "menunggu") return 0
-    if (tab === "disetujui") return 1
-    if (tab === "ditolak") return 2
-    return undefined // "semua"
-}
 
 // ─── Parse API response ───────────────────────────────────────────────────────
 
@@ -159,13 +196,17 @@ function parseTotalCount(payload: unknown, itemsLength = 0): number {
 }
 
 function statusToTabKey(org: ApiOrg): TabKey {
-    const isV = Number(org.isVerified ?? -1)
-    if (isV === 1) return "disetujui"
-    if (isV === 2) return "ditolak"
-    const st = String(org.status || "").toUpperCase()
-    if (st.includes("APPROVED") || st.includes("VERIFIED")) return "disetujui"
-    if (st.includes("REJECTED") || st.includes("DECLINED")) return "ditolak"
-    return "menunggu"
+    if (org.status) {
+        const s = org.status.toLowerCase();
+        if (s === 'active' || s === 'aktif' || s === 'approved') return "aktif";
+        if (s === 'pending') return "menunggu";
+        if (s === 'rejected' || s === 'ditolak') return "ditolak";
+        if (s === 'inactive' || s === 'nonaktif') return "nonaktif";
+    }
+    if (org.isVerified === 2) return "ditolak";
+    if (org.isVerified === 0 && !org.isActive) return "menunggu";
+    if (org.isActive) return "aktif";
+    return "nonaktif";
 }
 
 // ─── Main Hook ────────────────────────────────────────────────────────────────
@@ -177,7 +218,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
     const [totalCount, setTotalCount] = useState(0)
     const [page, setPageRaw] = useState(1)
     const [perPage, setPerPageRaw] = useState(10)
-    const [activeTab, setActiveTabRaw] = useState<TabKey>("menunggu")
+    const [activeTab, setActiveTabRaw] = useState<TabKey>("aktif")
     const [search, setSearchRaw] = useState("")
     const [filter, setFilterRaw] = useState<FilterState>(EMPTY_FILTER)
     const [sortOrder, setSortOrderRaw] = useState<SortOrder>("name_asc")
@@ -186,18 +227,19 @@ export function useKycOrganisasi(): KycOrganisasiState {
     const [detailLoading, setDetailLoading] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
     const [toasts, setToasts] = useState<ToastData[]>([])
+    const [orgMembers, setOrgMembers] = useState<OrgMember[]>([])
+    const [orgMembersLoading, setOrgMembersLoading] = useState(false)
     const [tabCounts, setTabCounts] = useState<Record<TabKey, number>>({
-        menunggu: 0, disetujui: 0, ditolak: 0, semua: 0,
+        semua: 0, menunggu: 0, aktif: 0, nonaktif: 0, ditolak: 0,
     })
 
-    const debouncedSearch = useDebounce(search, 500)
     const retryRef = useRef(0)
     const fetchSeqRef = useRef(0)
     // Cache all filtered rows when using fallback mode (for correct total count)
     const fallbackCacheRef = useRef<{ key: string; rows: ApiOrg[] } | null>(null)
 
     // ── Toast helpers ──────────────────────────────────────────────────────────
-    const removeToast = useCallback((id: number) => {
+    const removeToast = useCallback((id: number | string) => {
         setToasts(prev => prev.filter(t => t.id !== id))
     }, [])
 
@@ -219,7 +261,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
     }, [])
 
     const fetchAllOrgsForCounts = useCallback(async (): Promise<Record<TabKey, number>> => {
-        const counts: Record<TabKey, number> = { menunggu: 0, disetujui: 0, ditolak: 0, semua: 0 }
+        const counts: Record<TabKey, number> = { semua: 0, menunggu: 0, aktif: 0, nonaktif: 0, ditolak: 0 }
         const pageSize = 200
         let pageNum = 1
         let pageGuard = 0
@@ -233,7 +275,13 @@ export function useKycOrganisasi(): KycOrganisasiState {
             const json = await res.json()
             const items = parseItems(json)
 
-            if (pageNum === 1) expectedTotal = parseTotalCount(json, items.length)
+            if (pageNum === 1) {
+                expectedTotal = parseTotalCount(json, items.length)
+                getDummyOrgs().forEach(d => {
+                    counts[statusToTabKey(d as any)] += 1
+                    counts.semua += 1
+                })
+            }
 
             items.forEach((org) => {
                 counts[statusToTabKey(org)] += 1
@@ -252,49 +300,10 @@ export function useKycOrganisasi(): KycOrganisasiState {
     // ── Fetch tab counts ───────────────────────────────────────────────────────
     const fetchTabCounts = useCallback(async () => {
         try {
-            const tabs: { key: TabKey; isVerified?: number }[] = [
-                { key: "menunggu", isVerified: 0 },
-                { key: "disetujui", isVerified: 1 },
-                { key: "ditolak", isVerified: 2 },
-                { key: "semua" },
-            ]
-            const results = await Promise.allSettled(
-                tabs.map(async (t) => {
-                    const params = new URLSearchParams({ PageSize: "1", Page: "1" })
-                    if (t.isVerified !== undefined) params.set("IsVerified", String(t.isVerified))
-                    const res = await fetch(
-                        `${API_BASE_URL}/api/v1/Organizations/search?${params}`,
-                        { headers: authHeaders() }
-                    )
-                    if (!res.ok) return { key: t.key, count: 0 }
-                    const json = await res.json()
-                    const items = parseItems(json)
-                    return { key: t.key, count: parseTotalCount(json, items.length) }
-                })
-            )
-            const counts: Record<TabKey, number> = { menunggu: 0, disetujui: 0, ditolak: 0, semua: 0 }
-            results.forEach((r) => {
-                if (r.status === "fulfilled") counts[r.value.key] = r.value.count
-            })
-
-            // Some API deployments return identical totalCount for each IsVerified query.
-            // If that happens, fallback to recounting from unfiltered items.
-            const suspiciousSameCount =
-                counts.semua > 0 &&
-                counts.menunggu === counts.semua &&
-                counts.disetujui === counts.semua &&
-                counts.ditolak === counts.semua
-
-            if (suspiciousSameCount) {
-                const recalculated = await fetchAllOrgsForCounts()
-                setTabCounts(recalculated)
-            } else {
-                setTabCounts(counts)
-            }
-        } catch {
-            // silently fail for counts
-        }
-    }, [authHeaders, fetchAllOrgsForCounts])
+            const counts = await fetchAllOrgsForCounts()
+            setTabCounts(counts)
+        } catch { }
+    }, [fetchAllOrgsForCounts])
 
     // ── Main fetch ─────────────────────────────────────────────────────────────
     const fetchOrgs = useCallback(async () => {
@@ -306,14 +315,22 @@ export function useKycOrganisasi(): KycOrganisasiState {
             params.set("Page", String(page))
             params.set("PageSize", String(perPage))
 
-            if (debouncedSearch.trim()) params.set("Name", debouncedSearch.trim())
+            if (search.trim()) params.set("Name", search.trim())
 
-            const isVerified = tabToIsVerified(activeTab)
-            if (isVerified !== undefined) params.set("IsVerified", String(isVerified))
+            // REMOVED IsActive param because the API currently returns 400 Bad Request for it.
+            // We rely purely on the local tabFilteredItems and strictFallback to handle IsActive and status.
+
+            // Add sorting parameters
+            if (sortOrder === "name_asc") {
+                params.set("SortBy", "NameAsc")
+            } else if (sortOrder === "newest") {
+                params.set("SortBy", "CreatedDateDesc")
+            } else if (sortOrder === "oldest") {
+                params.set("SortBy", "CreatedDateAsc")
+            }
 
             if (filter.type) params.set("Type", filter.type)
             if (filter.categoryId) params.set("CategoryId", filter.categoryId)
-            if (filter.isActive !== "") params.set("IsActive", filter.isActive)
             if (filter.dateFrom) params.set("DateFrom", filter.dateFrom)
             if (filter.dateTo) params.set("DateTo", filter.dateTo)
 
@@ -327,7 +344,18 @@ export function useKycOrganisasi(): KycOrganisasiState {
             }
 
             const json = await res.json()
-            const items = parseItems(json)
+            let items = parseItems(json)
+
+            // INJECT DUMMY DATA ONLY ON PAGE 1
+            if (page === 1) {
+                const searchLower = search.trim().toLowerCase();
+                const filteredDummy = getDummyOrgs().filter(d => {
+                    if (searchLower && !d.name.toLowerCase().includes(searchLower)) return false;
+                    return true;
+                })
+                items = [...filteredDummy as any, ...items]
+            }
+
             const total = parseTotalCount(json, items.length)
 
             const tabFilteredItems =
@@ -345,7 +373,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
 
             if (needStrictFallback) {
                 // Build a cache key to avoid re-fetching all rows on page/perPage change
-                const cacheKey = `${activeTab}|${debouncedSearch}|${filter.type}|${filter.categoryId}|${filter.isActive}|${filter.dateFrom}|${filter.dateTo}`
+                const cacheKey = `${activeTab}|${search}|${filter.type}|${filter.categoryId}|${filter.isActive}|${filter.dateFrom}|${filter.dateTo}`
 
                 let strictFiltered: ApiOrg[]
 
@@ -365,10 +393,10 @@ export function useKycOrganisasi(): KycOrganisasiState {
                         const p = new URLSearchParams()
                         p.set("Page", String(fallbackPage))
                         p.set("PageSize", String(pageSizeFallback))
-                        if (debouncedSearch.trim()) p.set("Name", debouncedSearch.trim())
+                        if (search.trim()) p.set("Name", search.trim())
                         if (filter.type) p.set("Type", filter.type)
                         if (filter.categoryId) p.set("CategoryId", filter.categoryId)
-                        if (filter.isActive !== "") p.set("IsActive", filter.isActive)
+                        // Do not append IsActive to fallback fetch to prevent 400 Bad Request
                         if (filter.dateFrom) p.set("DateFrom", filter.dateFrom)
                         if (filter.dateTo) p.set("DateTo", filter.dateTo)
 
@@ -388,15 +416,30 @@ export function useKycOrganisasi(): KycOrganisasiState {
                     }
 
                     strictFiltered = allRows.filter((org) => statusToTabKey(org) === activeTab)
+
+                    const searchLower = search.trim().toLowerCase();
+                    const filteredDummy = getDummyOrgs().filter(d => {
+                        if (searchLower && !d.name.toLowerCase().includes(searchLower)) return false;
+                        if (statusToTabKey(d as any) !== activeTab) return false;
+                        return true;
+                    });
+                    strictFiltered = [...filteredDummy as any, ...strictFiltered];
+
                     // Cache the filtered rows so page/perPage changes don't re-fetch
                     fallbackCacheRef.current = { key: cacheKey, rows: strictFiltered }
                 }
 
                 // Apply client-side sort
                 const sorted = [...strictFiltered].sort((a, b) => {
-                    if (sortOrder === "name_asc") return String(a.name || "").localeCompare(String(b.name || ""))
+                    if (sortOrder === "name_asc") {
+                        const cmp = String(a.name || "").localeCompare(String(b.name || ""))
+                        return cmp !== 0 ? cmp : (Number(b.id) - Number(a.id))
+                    }
                     const da = new Date(a.createdAt || 0).getTime()
                     const db = new Date(b.createdAt || 0).getTime()
+                    if (da === db) {
+                        return sortOrder === "newest" ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
+                    }
                     return sortOrder === "newest" ? db - da : da - db
                 })
 
@@ -409,9 +452,15 @@ export function useKycOrganisasi(): KycOrganisasiState {
             } else {
                 // Apply client-side sort for non-fallback mode too
                 const sorted = [...tabFilteredItems].sort((a, b) => {
-                    if (sortOrder === "name_asc") return String(a.name || "").localeCompare(String(b.name || ""))
+                    if (sortOrder === "name_asc") {
+                        const cmp = String(a.name || "").localeCompare(String(b.name || ""))
+                        return cmp !== 0 ? cmp : (Number(b.id) - Number(a.id))
+                    }
                     const da = new Date(a.createdAt || 0).getTime()
                     const db = new Date(b.createdAt || 0).getTime()
+                    if (da === db) {
+                        return sortOrder === "newest" ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
+                    }
                     return sortOrder === "newest" ? db - da : da - db
                 })
                 if (requestId !== fetchSeqRef.current) return
@@ -428,7 +477,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
             if (requestId !== fetchSeqRef.current) return
             setLoading(false)
         }
-    }, [page, perPage, debouncedSearch, activeTab, filter, sortOrder, authHeaders])
+    }, [page, perPage, search, activeTab, filter, sortOrder, authHeaders])
 
     useEffect(() => {
         fetchOrgs()
@@ -436,9 +485,17 @@ export function useKycOrganisasi(): KycOrganisasiState {
     }, [fetchOrgs, fetchTabCounts])
 
     // ── Detail ─────────────────────────────────────────────────────────────────
-    const fetchDetail = useCallback(async (id: number) => {
+    const fetchDetail = useCallback(async (id: number | string) => {
         setDetailLoading(true)
         setDetailOrg(null)
+
+        const dummyOrg = getDummyOrgs().find(d => String(d.id) === String(id));
+        if (dummyOrg) {
+            setDetailOrg(dummyOrg as unknown as ApiOrg);
+            setDetailLoading(false);
+            return;
+        }
+
         try {
             const res = await fetch(
                 `${API_BASE_URL}/api/v1/Organizations/${id}`,
@@ -455,9 +512,44 @@ export function useKycOrganisasi(): KycOrganisasiState {
         }
     }, [authHeaders, showToast])
 
+    // ── Members ────────────────────────────────────────────────────────────────
+    const fetchOrgMembers = useCallback(async (id: number | string) => {
+        setOrgMembersLoading(true)
+        setOrgMembers([])
+        try {
+            const params = new URLSearchParams({ page: "1", pageSize: "100" })
+            const res = await fetch(
+                `${API_BASE_URL}/api/v1/Organizations/${id}/members?${params}`,
+                { headers: authHeaders() }
+            )
+            if (!res.ok) throw new Error(`API error: ${res.status}`)
+            const json = await res.json()
+            const items = json?.data?.items ?? json?.data ?? []
+            setOrgMembers(Array.isArray(items) ? items : [])
+        } catch {
+            showToast("Gagal memuat daftar pengajar", "error")
+        } finally {
+            setOrgMembersLoading(false)
+        }
+    }, [authHeaders, showToast])
+
     // ── Verify / Approve ───────────────────────────────────────────────────────
-    const verifyOrg = useCallback(async (id: number) => {
+    const verifyOrg = useCallback(async (id: number | string) => {
         setActionLoading(true)
+
+        // --- DUMMY: persist to localStorage so refresh survives ---
+        const isDummy = getDummyOrgs().some(d => String(d.id) === String(id));
+        if (isDummy) {
+            setDummyOverride(id, { isVerified: 1, status: 'ACTIVE', isActive: true });
+            showToast("Organisasi berhasil diverifikasi", "success")
+            await fetchOrgs()
+            await fetchTabCounts()
+            await fetchDetail(id)
+            setActionLoading(false)
+            return;
+        }
+        // ----------------------------------------------------------
+
         try {
             const res = await fetch(
                 `${API_BASE_URL}/api/v1/Organizations/${id}/verify`,
@@ -473,16 +565,31 @@ export function useKycOrganisasi(): KycOrganisasiState {
             await fetchTabCounts()
             setSelectedOrg(null)
             setDetailOrg(null)
+            await fetchDetail(id)
         } catch {
             showToast("Gagal memverifikasi organisasi", "error")
         } finally {
             setActionLoading(false)
         }
-    }, [authHeaders, showToast, fetchOrgs, fetchTabCounts])
+    }, [authHeaders, showToast, fetchOrgs, fetchTabCounts, fetchDetail])
 
     // ── Reject ─────────────────────────────────────────────────────────────────
-    const rejectOrg = useCallback(async (id: number, reason: string) => {
+    const rejectOrg = useCallback(async (id: number | string, reason: string) => {
         setActionLoading(true)
+
+        // --- DUMMY: persist to localStorage so refresh survives ---
+        const isDummy = getDummyOrgs().some(d => String(d.id) === String(id));
+        if (isDummy) {
+            setDummyOverride(id, { isVerified: 2, status: 'REJECTED', isActive: false });
+            showToast("Organisasi berhasil ditolak", "error")
+            await fetchOrgs()
+            await fetchTabCounts()
+            await fetchDetail(id)
+            setActionLoading(false)
+            return;
+        }
+        // ----------------------------------------------------------
+
         try {
             const res = await fetch(
                 `${API_BASE_URL}/api/v1/Organizations/${id}/status`,
@@ -498,15 +605,16 @@ export function useKycOrganisasi(): KycOrganisasiState {
             await fetchTabCounts()
             setSelectedOrg(null)
             setDetailOrg(null)
+            await fetchDetail(id)
         } catch {
             showToast("Gagal menolak organisasi", "error")
         } finally {
             setActionLoading(false)
         }
-    }, [authHeaders, showToast, fetchOrgs, fetchTabCounts])
+    }, [authHeaders, showToast, fetchOrgs, fetchTabCounts, fetchDetail])
 
     // ── Edit ───────────────────────────────────────────────────────────────────
-    const editOrg = useCallback(async (id: number, body: Partial<ApiOrg>) => {
+    const editOrg = useCallback(async (id: number | string, body: Partial<ApiOrg>) => {
         setActionLoading(true)
         try {
             const res = await fetch(
@@ -529,7 +637,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
     }, [authHeaders, showToast, fetchOrgs])
 
     // ── Regenerate Invite ──────────────────────────────────────────────────────
-    const regenerateInvite = useCallback(async (id: number): Promise<string> => {
+    const regenerateInvite = useCallback(async (id: number | string): Promise<string> => {
         setActionLoading(true)
         try {
             const res = await fetch(
@@ -550,9 +658,27 @@ export function useKycOrganisasi(): KycOrganisasiState {
     }, [authHeaders, showToast])
 
     // ── Toggle Active ──────────────────────────────────────────────────────────
-    const toggleActive = useCallback(async (id: number, currentStatus: string) => {
+    const toggleActive = useCallback(async (id: number | string, currentStatus: string) => {
         const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE"
         setActionLoading(true)
+
+        // --- DUMMY: persist to localStorage so refresh survives ---
+        const dummyOrg = getDummyOrgs().find(d => String(d.id) === String(id));
+        if (dummyOrg) {
+            setDummyOverride(id, {
+                isVerified: dummyOrg.isVerified,
+                status: newStatus,
+                isActive: newStatus === "ACTIVE"
+            });
+            const label = newStatus === "ACTIVE" ? "diaktifkan" : "dinonaktifkan"
+            showToast(`Organisasi berhasil ${label}`, "success")
+            await fetchOrgs()
+            await fetchDetail(id)
+            setActionLoading(false)
+            return;
+        }
+        // ----------------------------------------------------------
+
         try {
             const res = await fetch(
                 `${API_BASE_URL}/api/v1/Organizations/${id}/status`,
@@ -571,7 +697,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
         } finally {
             setActionLoading(false)
         }
-    }, [authHeaders, showToast, fetchOrgs])
+    }, [authHeaders, showToast, fetchOrgs, fetchDetail])
 
     // ── Setters with page reset ────────────────────────────────────────────────
     const setPage = useCallback((p: number) => setPageRaw(p), [])
@@ -581,13 +707,15 @@ export function useKycOrganisasi(): KycOrganisasiState {
     const setFilter = useCallback((f: FilterState) => { setFilterRaw(f); setPageRaw(1); fallbackCacheRef.current = null }, [])
     const setSortOrder = useCallback((s: SortOrder) => { setSortOrderRaw(s); setPageRaw(1) }, [])
     const retry = useCallback(() => { retryRef.current += 1; fallbackCacheRef.current = null; fetchOrgs() }, [fetchOrgs])
+    const clearDetail = useCallback(() => { setDetailOrg(null); setSelectedOrg(null) }, [])
 
     return {
         orgs, loading, error, totalCount, page, perPage,
         tabCounts, activeTab, search, filter, sortOrder,
         selectedOrg, detailOrg, detailLoading, actionLoading, toasts,
+        orgMembers, orgMembersLoading,
         setPage, setPerPage, setActiveTab, setSearch, setFilter, setSortOrder,
-        setSelectedOrg, fetchDetail, verifyOrg, rejectOrg, editOrg,
-        regenerateInvite, toggleActive, removeToast, retry,
+        setSelectedOrg, fetchDetail, fetchOrgMembers, verifyOrg, rejectOrg, editOrg,
+        regenerateInvite, toggleActive, removeToast, retry, clearDetail,
     }
 }

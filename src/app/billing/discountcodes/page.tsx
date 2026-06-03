@@ -285,6 +285,7 @@ function BulkModal({ open, onClose, onGenerate }: { open: boolean; onClose: () =
 function DiscountCodesContent() {
     const [codes, setCodes] = useState<DiscountCode[]>(() => dummyData.discountCodes as DiscountCode[])
     const [search, setSearch] = useState("")
+    const [searchInput, setSearchInput] = useState("")
     const [statusFilter, setStatusFilter] = useState<FilterStatus>("all")
     const [typeFilter, setTypeFilter] = useState<FilterType>("all")
     const [sortField, setSortField] = useState<SortField>("code")
@@ -473,16 +474,28 @@ function DiscountCodesContent() {
 
                 {/* Search + Button Row */}
                 <div className="flex items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+                    <div className="flex items-center w-full md:max-w-md h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                        <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <input
+                            type="text"
                             placeholder="Cari kode atau nama promo..."
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                            value={searchInput}
+                            onChange={e => setSearchInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    setSearch(searchInput);
+                                    setPage(1);
+                                }
+                            }}
+                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
+                        />
+                        <button
+                            onClick={() => { setSearch(searchInput); setPage(1); }}
+                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
+                        >
+                            <Search className="w-4 h-4" /> Cari
+                        </button>
                     </div>
-                    <button onClick={() => setPage(1)}
-                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors shadow-sm whitespace-nowrap">
-                        <Search className="w-4 h-4" /> Cari
-                    </button>
                     <button onClick={() => { setEditItem(null); setFormOpen(true) }}
                         className="ml-auto flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors shadow-sm whitespace-nowrap">
                         <Plus className="w-4 h-4" /> Buat Promo
