@@ -126,10 +126,22 @@ function GuruContent() {
     }
 
     const [search, setSearch] = useState("")
+    const [searchInput, setSearchInput] = useState("")
     const [statusFilter, setStatus] = useState<GuruStatus>("all")
     const [sortField, setSortField] = useState<SortField>("name")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
     const [page, setPage] = useState(1)
+
+    const handleSearch = () => {
+        setSearch(searchInput)
+        setPage(1)
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSearch()
+        }
+    }
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase()
@@ -213,14 +225,23 @@ function GuruContent() {
 
                     {/* ── Search bar (kanan, sejajar tabs) ── */}
                     <div className="flex items-center gap-3">
-                        <div className="relative w-full lg:w-72">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                value={search}
-                                onChange={e => { setSearch(e.target.value); setPage(1) }}
-                                placeholder="Cari nama, email, atau spesialisasi..."
-                                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-                            />
+                        <div className="relative flex w-full lg:w-[22rem]">
+                            <div className="relative flex-grow">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Cari nama, email, atau spesialisasi..."
+                                    className="w-full pl-9 pr-4 py-2 text-sm rounded-l-lg border border-r-0 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                                />
+                            </div>
+                            <button
+                                onClick={handleSearch}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-r-lg border border-emerald-500 transition-colors flex items-center gap-2"
+                            >
+                                <Search className="w-4 h-4" /> Cari
+                            </button>
                         </div>
                     </div>
                 </div>

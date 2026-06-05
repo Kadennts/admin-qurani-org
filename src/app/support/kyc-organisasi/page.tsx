@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
@@ -93,7 +94,7 @@ function PerPageSelect({ value, onChange }: { value: number; onChange: (v: numbe
 }
 
 // ─── Dropdown Aksi ────────────────────────────────────────────────────────────
-function AksiDropdown({ org, onToggle, onVerify, onDetail }: { org: ApiOrg; onToggle: (id: number | string, currentStatus: string) => void; onVerify: (id: number | string) => void; onDetail: (id: number | string) => void }) {
+function AksiDropdown({ org, onToggle, onDetail }: { org: ApiOrg; onToggle: (id: number | string, currentStatus: string) => void; onDetail: (id: number | string) => void }) {
     const [open, setOpen] = useState(false)
     const buttonRef = useRef<HTMLButtonElement>(null)
     const [isBottom, setIsBottom] = useState(false)
@@ -129,16 +130,8 @@ function AksiDropdown({ org, onToggle, onVerify, onDetail }: { org: ApiOrg; onTo
                         onClick={() => { setOpen(false); onDetail(org.id) }}
                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800"
                     >
-                        Lihat Detail
+                        Lihat &amp; Verifikasi
                     </button>
-                    {org.isVerified !== 1 && (
-                        <button
-                            onClick={() => { setOpen(false); onVerify(org.id) }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors border-b border-gray-100 dark:border-gray-800 font-medium"
-                        >
-                            Verifikasi
-                        </button>
-                    )}
                     <button
                         onClick={() => { setOpen(false); onToggle(org.id, currentStatus) }}
                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -708,13 +701,9 @@ function KycOrganisasiContent() {
         toggleActive,
         toasts,
         removeToast,
-        orgMembers,
-        orgMembersLoading,
-        fetchOrgMembers,
-        detailOrg,
-        fetchDetail,
-        clearDetail,
     } = useKycOrganisasi()
+
+    const router = useRouter()
 
     const [showFilter, setShowFilter] = useState(false)
     const [searchInput, setSearchInput] = useState(search)
@@ -753,18 +742,7 @@ function KycOrganisasiContent() {
                 />
             )}
 
-            {/* Detail Modal */}
-            {detailOrg && (
-                <KycDetailModal
-                    org={detailOrg}
-                    onClose={clearDetail}
-                    onVerify={verifyOrg}
-                    onReject={rejectOrg}
-                    orgMembers={orgMembers}
-                    orgMembersLoading={orgMembersLoading}
-                    fetchOrgMembers={fetchOrgMembers}
-                />
-            )}
+
 
             <div className="max-w-[1600px] mx-auto">
 
@@ -892,7 +870,7 @@ function KycOrganisasiContent() {
                                     return (
                                         <tr
                                             key={org.id}
-                                            onClick={() => fetchDetail(org.id)}
+                                            onClick={() => router.push(`/support/kyc-organisasi/${org.id}`)}
                                             className="border-b border-gray-50 dark:border-gray-800 hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10 transition-colors cursor-pointer"
                                         >
                                             <td className="px-5 py-4">
@@ -948,7 +926,7 @@ function KycOrganisasiContent() {
 
                                             {/* Aksi */}
                                             <td className="px-4 py-4">
-                                                <AksiDropdown org={org} onToggle={toggleActive} onVerify={verifyOrg} onDetail={fetchDetail} />
+                                                <AksiDropdown org={org} onToggle={toggleActive} onDetail={(id) => router.push(`/support/kyc-organisasi/${id}`)} />
                                             </td>
                                         </tr>
                                     )
