@@ -72,6 +72,7 @@ type AdminCourse = {
     trainerId?: number | null
     trainerName: string
     trainerAvatar: string
+    trainerUsername?: string
     organizationId?: number | null
     organizationName?: string | null
     description?: string | null
@@ -118,12 +119,14 @@ type TrainerFilterItem = {
     name: string
     avatar: string
     totalCourses: number
+    username: string
 }
 
 type TrainerProfile = {
     id: number
     name: string
     avatar: string
+    username: string
 }
 
 type SortField = "title" | "trainerName" | "totalSessions" | "packagePrice" | "students" | "totalRevenue"
@@ -487,7 +490,19 @@ function normalizeName(value: unknown) {
 }
 
 function getFallbackAvatar(seed: unknown) {
-    return `https://i.pravatar.cc/150?img=${(toNumber(seed, 1) % 70) + 1}`
+    let numSeed = 1
+    if (typeof seed === "number" && Number.isFinite(seed)) {
+        numSeed = seed
+    } else if (typeof seed === "string" && seed.length > 0) {
+        let hash = 0
+        for (let i = 0; i < seed.length; i++) {
+            hash = seed.charCodeAt(i) + ((hash << 5) - hash)
+        }
+        numSeed = Math.abs(hash) || 1
+    } else {
+        numSeed = toNumber(seed, 1)
+    }
+    return `https://i.pravatar.cc/150?img=${(numSeed % 70) + 1}`
 }
 
 function unwrapList(payload: unknown): unknown[] {
@@ -516,6 +531,7 @@ function mapApiTrainer(raw: any): TrainerProfile | null {
         id: toNumber(raw.id),
         name,
         avatar: raw.userImage || raw.avatar || getFallbackAvatar(raw.id),
+        username,
     }
 }
 
@@ -549,6 +565,7 @@ function enrichCoursesWithTrainers(courses: AdminCourse[], trainerProfiles: Trai
             trainerId: trainer.id,
             trainerName: trainer.name,
             trainerAvatar: trainer.avatar,
+            trainerUsername: trainer.username,
         }
     })
 }
@@ -576,7 +593,8 @@ function mapApiCourse(raw: any): AdminCourse | null {
         categoryName: raw.categoryName || raw.category?.name || `Kategori ${raw.categoryId ?? "-"}`,
         trainerId,
         trainerName: raw.trainerName || raw.instructorName || raw.teacherName || raw.trainer?.userName || raw.trainer?.name || `Guru #${trainerId ?? "-"}`,
-        trainerAvatar: raw.trainerAvatar || raw.trainer?.userImage || raw.trainer?.avatar || `https://i.pravatar.cc/150?img=${(toNumber(trainerId, 1) % 70) + 1}`,
+        trainerAvatar: raw.trainerAvatar || raw.trainer?.userImage || raw.trainer?.avatar || getFallbackAvatar(trainerId ?? raw.trainerName ?? raw.id),
+        trainerUsername: raw.trainer?.username || raw.trainer?.userName || raw.trainerUsername || "",
         organizationId: raw.organizationId ?? raw.organization?.id ?? null,
         organizationName: raw.organizationName || raw.organization?.name || null,
         description: raw.description ?? null,
@@ -1025,7 +1043,7 @@ function TrainerFilterModal({
                                 <TrainerAvatar src={trainer.avatar} name={trainer.name} size={32} />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{trainer.name}</p>
-                                    <p className="text-[10px] text-gray-500">{t("billing.courses.filter.courseCount", "{{count}} courses", { count: trainer.totalCourses })}</p>
+                                    <p className="text-[10px] text-gray-500">@{trainer.username}</p>
                                 </div>
                                 <span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 dark:border-gray-600"}`}>
                                     {checked && <Check className="h-3.5 w-3.5" />}
@@ -1315,6 +1333,7 @@ function PaketContent() {
                 name: course.trainerName,
                 avatar: course.trainerAvatar,
                 totalCourses: 1,
+                username: String(course.trainerUsername || course.trainerName).toLowerCase().replace(/\s+/g, ''),
             })
         })
         return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))

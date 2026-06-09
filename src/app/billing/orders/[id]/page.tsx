@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import dummyData from "@/data/billing-dummy.json"
+import { fetchBookingById } from "@/lib/billing-bookings"
 import { getSimOrderById, type SimOrder } from "@/lib/sim-store"
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -573,6 +574,9 @@ function SimOrderDetail({ order }: { order: SimOrder }) {
 
 function BookingDetailContent({ id }: { id: number }) {
     const [simOrder, setSimOrder] = useState<SimOrder | null | undefined>(undefined)
+    const [apiDetail, setApiDetail] = useState<any | null>(null)
+    const [apiLoading, setApiLoading] = useState(false)
+    const [apiError, setApiError] = useState<string | null>(null)
     const [openFeedback, setOpenFeedback] = useState<Record<number, boolean>>({})
     const toggleFeedback = (no: number) => setOpenFeedback(prev => ({ ...prev, [no]: !prev[no] }))
 
@@ -584,18 +588,44 @@ function BookingDetailContent({ id }: { id: number }) {
         }
     }, [id])
 
+    useEffect(() => {
+        if (id >= 9001) return
+
+        setApiLoading(true)
+        setApiError(null)
+        fetchBookingById(id)
+            .then(data => setApiDetail(data))
+            .catch(err => {
+                console.error("Failed to fetch booking detail:", err)
+                setApiDetail(null)
+                setApiError("Detail dari API belum bisa dimuat, memakai data dummy jika tersedia.")
+            })
+            .finally(() => setApiLoading(false))
+    }, [id])
+
     if (simOrder === undefined) return null
     if (simOrder !== null) return <SimOrderDetail order={simOrder} />
 
-    const booking = id === 3010 ? ZULFA_BOOKING : id === 3098 ? FAUZIA_BOOKING : id === 3099 ? RAHMA_BOOKING : dummyData.bookings.find(b => b.id === id)
-    const detail  = id === 3010 ? ZULFA_DETAIL  : id === 3098 ? FAUZIA_DETAIL  : id === 3099 ? RAHMA_DETAIL  : dummyData.bookingDetails.find(d => d.bookingId === id)
+    const fallbackBooking = id === 3010 ? ZULFA_BOOKING : id === 3098 ? FAUZIA_BOOKING : id === 3099 ? RAHMA_BOOKING : dummyData.bookings.find(b => b.id === id)
+    const fallbackDetail  = id === 3010 ? ZULFA_DETAIL  : id === 3098 ? FAUZIA_DETAIL  : id === 3099 ? RAHMA_DETAIL  : dummyData.bookingDetails.find(d => d.bookingId === id)
+    const booking = apiDetail?.booking ?? fallbackBooking
+    const detail  = apiDetail?.detail ?? fallbackDetail
+
+    if (apiLoading && !booking && !detail) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 flex flex-col items-center justify-center gap-3">
+                <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Memuat detail pesanan...</p>
+                <Link href={BACK_URL} className="text-sm text-emerald-600 hover:text-emerald-700">Kembali ke Pesanan</Link>
+            </div>
+        )
+    }
 
     if (!booking || !detail) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 flex flex-col items-center justify-center gap-4">
                 <div className="text-6xl">🔍</div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Pesan tidak ditemukan</h2>
-                <p className="text-gray-500 text-sm">ID #{id} tidak ada dalam data.</p>
+                <p className="text-gray-500 text-sm">{apiError || `ID #${id} tidak ada dalam data.`}</p>
                 <Link href={BACK_URL}
                     className="text-sm px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center gap-2 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Kembali ke Pesanan
@@ -604,6 +634,13 @@ function BookingDetailContent({ id }: { id: number }) {
         )
     }
 
+    const sessions = detail.sessions as Array<{
+        no: number
+        date: string
+        time: string
+        status: keyof typeof SESSION_STATUS | "completed" | "scheduled" | "ongoing" | "cancelled"
+        feedback?: { rating: number; pesan: string }
+    }>
     const bStatus = BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS]
     const isBookingCancelled = booking.status === "cancelled"
     const isBookingActive = !isBookingCancelled && booking.status === "active" && booking.completedSessions > 0
@@ -618,8 +655,8 @@ function BookingDetailContent({ id }: { id: number }) {
                 ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
                 : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400")
             : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-    const sessCompleted = detail.sessions.filter(s => s.status === "completed").length
-    const pct = Math.round((sessCompleted / booking.totalSessions) * 100)
+    const sessCompleted = sessions.filter(s => s.status === "completed").length
+    const pct = Math.round((sessCompleted / Math.max(1, booking.totalSessions)) * 100)
     const isPaid = detail.payment.status === "paid"
 
     return (
@@ -670,11 +707,11 @@ function BookingDetailContent({ id }: { id: number }) {
                                     <Calendar className="w-4 h-4 text-emerald-500" /> Jadwal Pertemuan
                                 </div>
                                 <span className="text-[10px] font-bold text-gray-400 normal-case tracking-normal">
-                                    {detail.sessions.length} pertemuan terjadwal
+                                    {sessions.length} pertemuan terjadwal
                                 </span>
                             </div>
                             <div className="divide-y divide-gray-50 dark:divide-gray-800">
-                                {detail.sessions.map(s => {
+                                {sessions.map(s => {
                                     const sc = SESSION_STATUS[s.status as keyof typeof SESSION_STATUS]
                                     const Icon = sc?.icon ?? Clock
                                     const isDone = s.status === "completed"

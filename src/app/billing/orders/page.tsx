@@ -12,6 +12,11 @@ import {
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import {
+    bulkUpdateBookingStatus,
+    fetchAdminBookings,
+    type BillingPipelineStatus as PipelineStatus,
+} from "@/lib/billing-bookings"
+import {
     getSimOrders, addSimNotif,
     nextSimId, saveSimOrder, updateSimOrderPayment,
     type SimOrder,
@@ -19,7 +24,7 @@ import {
 import { SimToast, SimNotifBell } from "@/components/sim-notif"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type PipelineStatus = "baru" | "lunas" | "aktif" | "gagal" | "selesai" | "menunggu_guru"
+// PipelineStatus comes from the Qurani booking API normalizer.
 
 // ─── Filter Range Tanggal ─────────────────────────────────────────────────────────
 type FilterKey =
@@ -152,6 +157,8 @@ type PipelineOrder = {
     status: PipelineStatus
     isPendingPayment?: boolean
     isSim?: boolean
+    isApi?: boolean
+    apiStatus?: number | string | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -228,7 +235,7 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
 }
 
 // ─── Table Config ──────────────────────────────────────────────────────────────
-const PAGE_SIZE = 7
+const PAGE_SIZE = 10
 
 const STATUS_CONFIG: Record<PipelineStatus, { label: string; dotCls: string; badgeCls: string }> = {
     baru:         { label: "Menunggu Bayar",  dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
@@ -238,6 +245,15 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; dotCls: string; bad
     selesai:      { label: "Selesai",         dotCls: "bg-blue-500",    badgeCls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
     menunggu_guru:{ label: "Menunggu Guru",   dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
 }
+
+const STATUS_ACTIONS: { key: PipelineStatus; label: string; dot: string; text: string; hover: string; border: string }[] = [
+    { key: "baru",         label: "Menunggu Bayar",  dot: "bg-amber-400",   text: "text-amber-700 dark:text-amber-400",   hover: "hover:bg-amber-50 dark:hover:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800" },
+    { key: "menunggu_guru",label: "Menunggu Guru",   dot: "bg-orange-400",  text: "text-orange-700 dark:text-orange-400", hover: "hover:bg-orange-50 dark:hover:bg-orange-900/20", border: "border-orange-200 dark:border-orange-800" },
+    { key: "lunas",        label: "Lunas",           dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400",hover: "hover:bg-emerald-50 dark:hover:bg-emerald-900/20",border: "border-emerald-200 dark:border-emerald-800" },
+    { key: "aktif",        label: "Aktif",           dot: "bg-sky-500",     text: "text-sky-700 dark:text-sky-400",       hover: "hover:bg-sky-50 dark:hover:bg-sky-900/20",       border: "border-sky-200 dark:border-sky-800" },
+    { key: "selesai",      label: "Selesai",         dot: "bg-blue-500",    text: "text-blue-700 dark:text-blue-400",     hover: "hover:bg-blue-50 dark:hover:bg-blue-900/20",     border: "border-blue-200 dark:border-blue-800" },
+    { key: "gagal",        label: "Batal",           dot: "bg-rose-500",    text: "text-rose-700 dark:text-rose-400",     hover: "hover:bg-rose-50 dark:hover:bg-rose-900/20",     border: "border-rose-200 dark:border-rose-800" },
+]
 
 // ─── Simulasi Modal ────────────────────────────────────────────────────────────
 const SIM_MEMBERS = dummyData.bookingDetails.reduce((acc, d) => {
@@ -545,11 +561,35 @@ function PesananContent() {
     const [dateFilter, setDateFilter] = useState<FilterKey>("this_year")
     const [statusTab, setStatusTab] = useState<"all" | PipelineStatus>("all")
     const [simOrders, setSimOrders] = useState<SimOrder[]>([])
+    const [apiOrders, setApiOrders] = useState<PipelineOrder[]>([])
+    const [apiLoading, setApiLoading] = useState(true)
+    const [apiError, setApiError] = useState<string | null>(null)
     const [showSim, setShowSim] = useState(false)
     const [statusOverrides, setStatusOverrides] = useState<Record<string | number, PipelineStatus>>({})
+    const [selectedIds, setSelectedIds] = useState<Array<string | number>>([])
+    const [openActionId, setOpenActionId] = useState<string | number | null>(null)
+    const [bulkOpen, setBulkOpen] = useState(false)
+    const [updatingStatus, setUpdatingStatus] = useState(false)
     const [page, setPage] = useState(1)
 
     const refreshSim = useCallback(() => setSimOrders(getSimOrders()), [])
+
+    const refreshApi = useCallback(() => {
+        setApiLoading(true)
+        setApiError(null)
+        fetchAdminBookings({ page: 1, pageSize: 100 })
+            .then(rows => setApiOrders(rows))
+            .catch(err => {
+                console.error("Failed to fetch bookings:", err)
+                setApiOrders([])
+                setApiError("API booking belum bisa dimuat, menampilkan data dummy untuk testing.")
+            })
+            .finally(() => setApiLoading(false))
+    }, [])
+
+    useEffect(() => {
+        refreshApi()
+    }, [refreshApi])
 
     useEffect(() => {
         refreshSim()
@@ -557,13 +597,28 @@ function PesananContent() {
         return () => window.removeEventListener("sim-notif-update", refreshSim)
     }, [refreshSim])
 
-    function handleAdvance(id: string | number, next: PipelineStatus) {
-        const allOrders = [...simOrders.map(simOrderToPipeline), ...dummyData.bookings.map(bookingToPipeline)]
+    async function handleAdvance(id: string | number, next: PipelineStatus) {
+        const allOrders = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simOrders.map(simOrderToPipeline), ...dummyData.bookings.map(bookingToPipeline)]
         const order = allOrders.find(o => String(o.id) === String(id))
         if (!order) return
 
         const prev = statusOverrides[id] ?? order.status
-        setStatusOverrides(prev2 => ({ ...prev2, [id]: next }))
+        setUpdatingStatus(true)
+
+        try {
+            if (order.isApi) {
+                await bulkUpdateBookingStatus([id], next)
+                refreshApi()
+            }
+            setStatusOverrides(prev2 => ({ ...prev2, [id]: next }))
+        } catch (err) {
+            console.error("Failed to update booking status:", err)
+            setApiError("Gagal mengubah status di API. Status dummy/lokal tidak diubah.")
+            return
+        } finally {
+            setUpdatingStatus(false)
+            setOpenActionId(null)
+        }
 
         const numId = typeof id === "number" ? id : parseInt(String(id)) || 0
 
@@ -606,14 +661,49 @@ function PesananContent() {
         }
     }
 
+    async function handleBulkStatus(next: PipelineStatus) {
+        const selected = allOrders.filter(o => selectedIds.some(id => String(id) === String(o.id)))
+        if (selected.length === 0) return
+
+        const apiIds = selected.filter(o => o.isApi).map(o => o.id)
+        setUpdatingStatus(true)
+
+        try {
+            if (apiIds.length > 0) {
+                await bulkUpdateBookingStatus(apiIds, next)
+                refreshApi()
+            }
+            setStatusOverrides(prev => {
+                const updated = { ...prev }
+                selected.forEach(o => { updated[o.id] = next })
+                return updated
+            })
+            setSelectedIds([])
+            setBulkOpen(false)
+        } catch (err) {
+            console.error("Failed to bulk update booking status:", err)
+            setApiError("Bulk status gagal dikirim ke API.")
+        } finally {
+            setUpdatingStatus(false)
+        }
+    }
+
     const allOrders = useMemo<PipelineOrder[]>(() => {
         const simRows = simOrders.map(simOrderToPipeline)
         const staticRows = dummyData.bookings.map(bookingToPipeline)
-        const combined = [FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simRows, ...staticRows]
+        const combined = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simRows, ...staticRows]
+        const seen = new Set<string>()
         // Apply local overrides
-        return combined.map(o => statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o)
+        return combined
+            .filter(o => {
+                const key = String(o.id)
+                if (seen.has(key)) return false
+                seen.add(key)
+                return true
+            })
+            .map(o => statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o)
             .filter(o => o.member !== "Ahmad Fauzi")
-    }, [simOrders, statusOverrides])
+    }, [apiOrders, simOrders, statusOverrides])
 
     const filtered = useMemo(() => {
         const range = getDateRange(dateFilter)
@@ -665,6 +755,29 @@ function PesananContent() {
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
     const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    const pagedIds = paged.map(o => o.id)
+    const allPagedSelected = pagedIds.length > 0 && pagedIds.every(id => selectedIds.some(selected => String(selected) === String(id)))
+
+    function toggleSelected(id: string | number) {
+        setSelectedIds(prev => prev.some(selected => String(selected) === String(id))
+            ? prev.filter(selected => String(selected) !== String(id))
+            : [...prev, id]
+        )
+    }
+
+    function togglePagedSelected() {
+        if (allPagedSelected) {
+            setSelectedIds(prev => prev.filter(id => !pagedIds.some(pagedId => String(pagedId) === String(id))))
+            return
+        }
+        setSelectedIds(prev => {
+            const next = [...prev]
+            pagedIds.forEach(id => {
+                if (!next.some(selected => String(selected) === String(id))) next.push(id)
+            })
+            return next
+        })
+    }
 
     const stats = useMemo(() => ({
         total: allOrders.length,
@@ -709,6 +822,22 @@ function PesananContent() {
                             </button>
                         </div>
                         <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
+                        
+                        <button
+                            onClick={() => setBulkOpen(o => !o)}
+                            disabled={selectedIds.length === 0 || updatingStatus}
+                            className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all shadow-sm ${
+                                selectedIds.length > 0 
+                                ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-emerald-400 cursor-pointer" 
+                                : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
+                            }`}
+                        >
+                            Bulk Status
+                            {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] ml-1">{selectedIds.length}</span>}
+                            <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
                         <FilterDropdown value={dateFilter} onChange={k => { setDateFilter(k); setPage(1) }} />
                     </div>
 
@@ -722,13 +851,26 @@ function PesananContent() {
                         )}
                         <SimNotifBell />
                         <button onClick={() => setShowSim(true)}
+                            title="Simulasi pesanan untuk testing"
                             className="flex items-center justify-center w-[48px] h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none transition-all cursor-pointer group">
                             <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
                         </button>
                     </div>
                 </div>
 
-                {/* ── Status Filter Tabs ── */}
+                {(apiLoading || apiError) && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div className="text-xs font-medium">
+                            {apiLoading ? (
+                                <span className="text-gray-400">Memuat pesanan dari API Qurani...</span>
+                            ) : apiError ? (
+                                <span className="text-amber-600 dark:text-amber-400">{apiError}</span>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
+
+
                 <div className="flex items-center gap-6 border-b border-gray-100 dark:border-gray-800 mb-0">
                     {([
                         { key: "all",     label: "Semua",   count: dateFiltered.length,                                                                                          activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
@@ -755,12 +897,19 @@ function PesananContent() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700">
+                                    <th className="w-10 px-4 py-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={allPagedSelected}
+                                            onChange={togglePagedSelected}
+                                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                        />
+                                    </th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Member</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Guru</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Paket</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Tanggal</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Harga</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Payment</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Status</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Aksi</th>
                                 </tr>
@@ -776,40 +925,47 @@ function PesananContent() {
                                 ) : paged.map(order => {
                                     const colorIdx = Math.abs(order.member.charCodeAt(0) + (order.member.charCodeAt(1) || 0)) % AVATAR_COLORS.length
                                     const st = STATUS_CONFIG[order.status]
+                                    const isSelected = selectedIds.some(id => String(id) === String(order.id))
                                     return (
                                     <tr
                                         key={order.id}
                                         onClick={() => router.push(`/billing/orders/${order.id}`)}
-                                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group cursor-pointer"
+                                        className={`${isSelected ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group cursor-pointer`}
                                     >
+                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleSelected(order.id)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                            </td>
                                             {/* Member */}
                                             <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className={`w-7 h-7 rounded-full ${AVATAR_COLORS[colorIdx]} flex items-center justify-center flex-shrink-0`}>
-                                                        <span className="text-white text-[10px] font-bold">{order.memberAvatar}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[colorIdx]}`}>
+                                                        {order.memberAvatar || order.member.substring(0, 2).toUpperCase()}
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.member}</p>
-                                                        <p className="text-[10px] text-gray-400 truncate">@{order.username}</p>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.member}</p>
+                                                        <p className="text-[11px] text-gray-500">{order.username}</p>
                                                     </div>
                                                 </div>
                                             </td>
                                             {/* Guru */}
                                             <td className="px-4 py-3">
-                                                <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{order.guru}</p>
-                                                <p className="text-[10px] text-gray-400 truncate">{order.guruUsername}</p>
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
+                                                <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
                                             </td>
                                             {/* Paket */}
                                             <td className="px-4 py-3">
-                                                <p className="text-xs font-bold text-gray-900 dark:text-white">{order.paket}</p>
-                                                <p className="text-[10px] text-gray-400 mt-0.5">{order.sesi}x sesi</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">{order.paket}</p>
+                                                <p className="text-[11px] text-gray-500">{order.sesiSelesai}/{order.sesi} Sesi</p>
                                             </td>
                                             {/* Tanggal */}
                                             <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{order.tglPesan}</td>
                                             {/* Harga */}
                                             <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">{formatRupiah(order.harga)}</td>
-                                            {/* Payment */}
-                                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{order.payment}</td>
                                             {/* Status */}
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badgeCls}`}>
@@ -819,13 +975,43 @@ function PesananContent() {
 
                                             </td>
                                             {/* Aksi */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 relative">
                                                 <button
-                                                    onClick={e => e.stopPropagation()}
+                                                    onClick={e => {
+                                                        e.stopPropagation()
+                                                        setOpenActionId(openActionId === order.id ? null : order.id)
+                                                    }}
+                                                    disabled={updatingStatus}
                                                     className="flex items-center justify-center w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 transition-colors opacity-60 group-hover:opacity-100"
                                                 >
                                                     <MoreHorizontal className="w-3.5 h-3.5" />
                                                 </button>
+                                                {openActionId === order.id && (
+                                                    <div
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="absolute right-4 top-10 z-40 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl py-1.5 overflow-hidden"
+                                                    >
+                                                        <button
+                                                            onClick={() => router.push(`/billing/orders/${order.id}`)}
+                                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                                                        >
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                                                            Lihat Detail
+                                                        </button>
+                                                        <div className="my-1 h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+                                                        <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ubah Status</div>
+                                                        {STATUS_ACTIONS.map(action => (
+                                                            <button
+                                                                key={action.key}
+                                                                onClick={() => handleAdvance(order.id, action.key)}
+                                                                className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center gap-2 ${action.text} ${action.hover} transition-colors`}
+                                                            >
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${action.dot} flex-shrink-0`} />
+                                                                {action.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     )
@@ -860,6 +1046,53 @@ function PesananContent() {
             </div>
 
             {showSim && <SimModal onClose={() => setShowSim(false)} onOrderCreated={refreshSim} />}
+
+            {/* ── Bulk Status Modal ── */}
+            {bulkOpen && selectedIds.length > 0 && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                    onClick={() => setBulkOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                            <div>
+                                <p className="font-bold text-gray-900 dark:text-white text-sm">Ubah Status Massal</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{selectedIds.length} pesanan dipilih</p>
+                            </div>
+                            <button onClick={() => setBulkOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        {/* Status Options */}
+                        <div className="p-4 grid grid-cols-2 gap-2">
+                            {STATUS_ACTIONS.map(action => (
+                                <button
+                                    key={action.key}
+                                    onClick={() => handleBulkStatus(action.key)}
+                                    disabled={updatingStatus}
+                                    className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left text-sm font-semibold transition-all disabled:opacity-50 ${action.border} ${action.text} ${action.hover}`}
+                                >
+                                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${action.dot}`} />
+                                    {action.label}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Footer */}
+                        <div className="px-4 pb-4">
+                            <button
+                                onClick={() => { setSelectedIds([]); setBulkOpen(false) }}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-500 hover:text-rose-500 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                            >
+                                Batal &amp; Hapus Pilihan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -25,6 +25,23 @@ function getClientToken(): string | null {
     return localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? null
 }
 
+function getFallbackAvatar(seed: unknown) {
+    let numSeed = 1
+    if (typeof seed === "number" && Number.isFinite(seed)) {
+        numSeed = seed
+    } else if (typeof seed === "string" && seed.length > 0) {
+        let hash = 0
+        for (let i = 0; i < seed.length; i++) {
+            hash = seed.charCodeAt(i) + ((hash << 5) - hash)
+        }
+        numSeed = Math.abs(hash) || 1
+    } else {
+        const numberValue = Number(seed)
+        numSeed = Number.isFinite(numberValue) ? numberValue : 1
+    }
+    return `https://i.pravatar.cc/150?img=${(numSeed % 70) + 1}`
+}
+
 // ── status config ─────────────────────────────────────────────────────────────
 const STATUS_CFG = {
     verified: { label: "Terverifikasi", bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500", icon: BadgeCheck },
@@ -85,7 +102,7 @@ function GuruContent() {
                         email: d.email || "",
                         username: d.username || d.userUsername || name.toLowerCase().replace(/\s+/g, ""),
                         specialization: d.expertise?.join?.(", ") || d.headline || "Pengajar Al-Qur'an",
-                        avatar: d.userImage || d.avatar || `https://i.pravatar.cc/150?img=${(d.id % 70) + 1}`,
+                        avatar: d.userImage || d.avatar || getFallbackAvatar(d.id ?? name),
                         rating: d.averageRating || d.rating || 0,
                         status: validStatus,
                         teachingMethod: (Array.isArray(d.expertise) && d.expertise.length > 0) ? d.expertise[0] : (typeof d.expertise === "string" ? d.expertise : "Umum"),

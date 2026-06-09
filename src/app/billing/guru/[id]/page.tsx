@@ -562,6 +562,9 @@ function GuruDetailContent() {
         const headers: HeadersInit = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 
         setLoading(true)
+        setCoursesLoading(true)
+
+        // 1. Fetch Trainer Detail
         fetch(`${API_BASE_URL}/api/v1/Trainers/${id}`, { headers })
             .then(res => {
                 if (res.status === 401) throw new Error(`HTTP 401 Unauthorized`)
@@ -616,10 +619,59 @@ function GuruDetailContent() {
                 // Ensure dummy reviews are always populated
                 setReviews(prev => prev.length === 0 ? DUMMY_REVIEWS : prev)
                 setReviewsTotalCount(prev => prev === 0 ? DUMMY_REVIEWS.length : prev)
-                
-                // Set dummy courses
+            })
+
+        // 2. Fetch Courses for this Trainer
+        fetch(`${API_BASE_URL}/api/v1/Courses?Page=1&PageSize=100`, { headers })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                return res.json()
+            })
+            .then(json => {
+                const items = Array.isArray(json) ? json : json?.data ?? json?.items ?? json?.courses ?? []
+                const filteredAPI = items.filter((c: any) => {
+                    const tId = c.trainerId ?? c.instructorId ?? c.teacherId ?? c.createdByTrainerId
+                    return String(tId) === String(id)
+                }).map((p: any) => ({
+                    id: p.id,
+                    title: p.title || p.name,
+                    description: p.description || p.shortDescription,
+                    price: p.packagePrice ?? p.totalPrice ?? p.price ?? p.sessionPrice ?? p.hourlyRate ?? 0,
+                    currency: p.currency || "IDR",
+                    sessions: p.totalSessions ?? p.sessions ?? 1,
+                    level: p.level ?? 1,
+                    features: [],
+                    isPublished: (p.isPublished === true || String(p.status).toLowerCase() === "published" || String(p.status).toLowerCase() === "active"),
+                    totalStudents: p.students ?? p.totalStudents ?? p.totalOrders ?? p.enrolledCount ?? 0,
+                    averageRating: p.rating ?? p.averageRating ?? p.avgRating ?? 0
+                }))
+
+                if (filteredAPI.length > 0) {
+                    setCourses(filteredAPI)
+                } else {
+                    // Fallback to dummy
+                    const dummyCourses = dummyData.trainerPackages
+                        .filter((p: any) => String(p.trainerId) === String(id))
+                        .map((p: any) => ({
+                            id: p.id,
+                            title: p.name,
+                            description: p.description,
+                            price: p.totalPrice,
+                            currency: "IDR",
+                            sessions: p.sessions,
+                            level: p.category,
+                            features: [],
+                            isPublished: p.status === "active",
+                            totalStudents: p.totalOrders,
+                            averageRating: 0
+                        }))
+                    setCourses(dummyCourses)
+                }
+            })
+            .catch(() => {
+                // Fallback to dummy courses on error
                 const dummyCourses = dummyData.trainerPackages
-                    .filter((p: any) => p.trainerId === id)
+                    .filter((p: any) => String(p.trainerId) === String(id))
                     .map((p: any) => ({
                         id: p.id,
                         title: p.name,
@@ -634,6 +686,9 @@ function GuruDetailContent() {
                         averageRating: 0
                     }))
                 setCourses(dummyCourses)
+            })
+            .finally(() => {
+                setCoursesLoading(false)
             })
     }, [id])
 

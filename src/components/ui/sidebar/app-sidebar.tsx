@@ -181,6 +181,11 @@ const getSidebarData = (
           icon: Tags,
         },
         {
+          title: t("navigation.categories", "Categories"),
+          url: "/master/categories",
+          icon: Tag,
+        },
+        {
           title: "Tax Rates",
           url: "/billing/taxrates",
           icon: Receipt,
