@@ -134,7 +134,7 @@ export const NavMain = React.memo(function NavMain({
       if (item.items && item.items.length > 0) {
         // Check if current pathname matches any submenu item
         const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
-          (item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname.startsWith("/groups/detail/") || pathname.startsWith("/grup/detail/") || pathname.startsWith("/grup/kelola/"))
+          ((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false
         // Open only if has active sub item
         initialState[item.title] = hasActiveSubItem
       }
@@ -180,7 +180,7 @@ export const NavMain = React.memo(function NavMain({
               // Check if this menu is active in collapsed state
               const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
 
-                ((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname.startsWith("/groups/detail/") || pathname.startsWith("/grup/detail/") || pathname.startsWith("/grup/kelola/")))
+                (((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
 
               // Collapsed state: render as dropdown with tooltip
               return (
@@ -223,7 +223,7 @@ export const NavMain = React.memo(function NavMain({
                     >
                       {item.items.map((subItem) => {
                         const isCurrentPageSub = pathname === subItem.url ||
-                          ((subItem.url === "/grup" || subItem.url === "/groups") && (pathname.startsWith("/groups/detail/") || pathname.startsWith("/grup/detail/") || pathname.startsWith("/grup/kelola/")))
+                          (((subItem.url === "/grup" || subItem.url === "/groups") && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
                         return (
                           <button
                             key={subItem.title}
@@ -260,7 +260,7 @@ export const NavMain = React.memo(function NavMain({
               // Check if this menu is active (user is on one of its sub-pages)
               const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
 
-                ((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname.startsWith("/groups/detail/") || pathname.startsWith("/grup/detail/") || pathname.startsWith("/grup/kelola/")))
+                (((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
 
               // Menu tidak aktif atau aktif: selalu render sebagai collapsible biasa agar bisa ditutup
               return (
@@ -298,7 +298,7 @@ export const NavMain = React.memo(function NavMain({
                       <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-gray-200 dark:border-gray-700 px-2.5 py-0.5">
                         {item.items.map((subItem) => {
                           const isCurrentPageSub = pathname === subItem.url ||
-                            ((subItem.url === "/grup" || subItem.url === "/groups") && (pathname.startsWith("/groups/detail/") || pathname.startsWith("/grup/detail/") || pathname.startsWith("/grup/kelola/")))
+                            (((subItem.url === "/grup" || subItem.url === "/groups") && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
 
                           // Check if subItem has nested items (3rd level)
                           if (subItem.items && subItem.items.length > 0) {
@@ -393,7 +393,7 @@ export const NavMain = React.memo(function NavMain({
           }
 
           // If item has no submenu, render as direct link
-          const isCurrentPage = pathname.startsWith(item.url)
+          const isCurrentPage = pathname?.startsWith(item.url) || false
 
 
           return (

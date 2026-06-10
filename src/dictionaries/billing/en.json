@@ -204,6 +204,59 @@
         "syllabus": "Syllabus",
         "noSyllabus": "No syllabus yet."
       }
+    },
+    "payments": {
+      "title": "Payment",
+      "searchPlaceholder": "Search UserId, TrainerId, Status...",
+      "searchButton": "Search",
+      "summary": {
+        "total": "Total Payments",
+        "revenue": "Total Revenue",
+        "pendingRefunds": "Pending Refunds",
+        "pendingPayouts": "Pending Payouts"
+      },
+      "table": {
+        "id": "ID",
+        "user": "User",
+        "trainer": "Trainer",
+        "amount": "Amount",
+        "status": "Status",
+        "paymentMethod": "Method",
+        "date": "Date",
+        "actions": "Actions"
+      },
+      "status": {
+        "paid": "Paid",
+        "pending": "Pending",
+        "failed": "Failed",
+        "refunded": "Refunded",
+        "disputed": "Disputed"
+      },
+      "actions": {
+        "processRefund": "Process Refund",
+        "markPayout": "Mark Payout",
+        "updateStatus": "Update Status"
+      },
+      "modal": {
+        "processRefundTitle": "Process Refund",
+        "markPayoutTitle": "Mark Payout",
+        "updateStatusTitle": "Update Status",
+        "bulkPayoutTitle": "Bulk Payout",
+        "approve": "Approve",
+        "reject": "Reject",
+        "notes": "Notes",
+        "payoutReference": "Payout Reference",
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "failureReason": "Failure Reason"
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "actions": "Bulk Actions",
+        "markPayout": "Mark Payout (Bulk)"
+      },
+      "empty": "No payments found.",
+      "loading": "Loading payment data..."
     }
   }
 }

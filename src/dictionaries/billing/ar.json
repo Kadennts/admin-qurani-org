@@ -204,6 +204,59 @@
         "noSyllabus": "?? ???? ???? ???."
       },
       "searchButton": "???"
+    },
+    "payments": {
+      "title": "الدفع",
+      "searchPlaceholder": "البحث عن معرّف المستخدم، معرّف المعلم، الحالة...",
+      "searchButton": "بحث",
+      "summary": {
+        "total": "إجمالي المدفوعات",
+        "revenue": "إجمالي الإيرادات",
+        "pendingRefunds": "المبالغ المستردة المعلقة",
+        "pendingPayouts": "المدفوعات المعلقة"
+      },
+      "table": {
+        "id": "المعرف",
+        "user": "المستخدم",
+        "trainer": "المعلم",
+        "amount": "المبلغ",
+        "status": "الحالة",
+        "paymentMethod": "الطريقة",
+        "date": "التاريخ",
+        "actions": "الإجراءات"
+      },
+      "status": {
+        "paid": "مدفوع",
+        "pending": "قيد الانتظار",
+        "failed": "فشل",
+        "refunded": "مستردة",
+        "disputed": "متنازع عليها"
+      },
+      "actions": {
+        "processRefund": "معالجة الاسترداد",
+        "markPayout": "تحديد كمدفوع",
+        "updateStatus": "تحديث الحالة"
+      },
+      "modal": {
+        "processRefundTitle": "معالجة الاسترداد",
+        "markPayoutTitle": "تحديد كمدفوع",
+        "updateStatusTitle": "تحديث الحالة",
+        "bulkPayoutTitle": "دفع جماعي",
+        "approve": "موافقة",
+        "reject": "رفض",
+        "notes": "ملاحظات",
+        "payoutReference": "الرقم المرجعي للدفع",
+        "submit": "إرسال",
+        "cancel": "إلغاء",
+        "failureReason": "سبب الفشل"
+      },
+      "bulk": {
+        "selected": "{{count}} محدد",
+        "actions": "إجراءات جماعية",
+        "markPayout": "تحديد كمدفوع (جماعي)"
+      },
+      "empty": "لم يتم العثور على مدفوعات.",
+      "loading": "جاري تحميل بيانات الدفع..."
     }
   }
 }

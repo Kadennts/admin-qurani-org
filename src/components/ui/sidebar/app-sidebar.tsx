@@ -121,6 +121,11 @@ const getSidebarData = (
           url: "/billing/wallet",
           icon: Wallet,
         },
+        {
+          title: t("billing.payments.title", "Payment"),
+          url: "/billing/payments",
+          icon: Banknote,
+        },
       ],
     },
     {

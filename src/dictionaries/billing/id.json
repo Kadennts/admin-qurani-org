@@ -204,6 +204,59 @@
         "syllabus": "Syllabus",
         "noSyllabus": "Belum ada syllabus."
       }
+    },
+    "payments": {
+      "title": "Pembayaran",
+      "searchPlaceholder": "Cari UserId, TrainerId, Status...",
+      "searchButton": "Cari",
+      "summary": {
+        "total": "Total Pembayaran",
+        "revenue": "Total Pendapatan",
+        "pendingRefunds": "Pending Refunds",
+        "pendingPayouts": "Pending Payouts"
+      },
+      "table": {
+        "id": "ID",
+        "user": "User",
+        "trainer": "Trainer",
+        "amount": "Nominal",
+        "status": "Status",
+        "paymentMethod": "Metode",
+        "date": "Tanggal",
+        "actions": "Aksi"
+      },
+      "status": {
+        "paid": "Dibayar",
+        "pending": "Menunggu",
+        "failed": "Gagal",
+        "refunded": "Dikembalikan",
+        "disputed": "Bermasalah"
+      },
+      "actions": {
+        "processRefund": "Process Refund",
+        "markPayout": "Mark Payout",
+        "updateStatus": "Update Status"
+      },
+      "modal": {
+        "processRefundTitle": "Proses Refund",
+        "markPayoutTitle": "Tandai Payout",
+        "updateStatusTitle": "Update Status",
+        "bulkPayoutTitle": "Bulk Payout",
+        "approve": "Setujui",
+        "reject": "Tolak",
+        "notes": "Catatan",
+        "payoutReference": "Referensi Payout",
+        "submit": "Simpan",
+        "cancel": "Batal",
+        "failureReason": "Alasan Gagal"
+      },
+      "bulk": {
+        "selected": "{{count}} dipilih",
+        "actions": "Bulk Actions",
+        "markPayout": "Tandai Payout (Bulk)"
+      },
+      "empty": "Tidak ada pembayaran yang ditemukan.",
+      "loading": "Memuat data pembayaran..."
     }
   }
 }

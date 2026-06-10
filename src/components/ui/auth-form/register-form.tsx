@@ -44,7 +44,7 @@ export function RegisterForm({
     const { t } = useI18n();
 
     const [isClient, setIsClient] = useState(false);
-    const redirectPath = searchParams.get("redirect");
+    const redirectPath = searchParams?.get("redirect");
 
     const {
         countries,
@@ -99,7 +99,7 @@ export function RegisterForm({
     const debouncedUsername = useDebounce(data.username, 500);
 
     useEffect(() => {
-        const urlError = searchParams.get("error");
+        const urlError = searchParams?.get("error");
         if (urlError) setError(urlError);
     }, [searchParams]);
 

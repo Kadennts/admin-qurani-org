@@ -13,9 +13,9 @@ function OAuthCallbackContent() {
 
     useEffect(() => {
         async function processCallback() {
-            const code = searchParams.get("code");
-            const state = searchParams.get("state");
-            const errorParam = searchParams.get("error");
+            const code = searchParams?.get("code");
+            const state = searchParams?.get("state");
+            const errorParam = searchParams?.get("error");
 
             // Handle error from Google
             if (errorParam) {
