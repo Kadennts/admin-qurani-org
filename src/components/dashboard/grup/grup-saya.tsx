@@ -226,7 +226,7 @@ export function GrupSaya() {
     }
   };
 
-  const handleSendReport = async () => {
+  const handleSendReport = async (): Promise<void> => {
     const supabase = await createClient();
 
     setIsLoadingReport(true)
@@ -246,7 +246,8 @@ export function GrupSaya() {
 
         if (uploadError) {
           console.error("Upload failed:", uploadError.message);
-          return { success: false, message: "Gagal mengunggah bukti laporan" };
+          toast.error("Gagal mengunggah bukti laporan");
+          return;
         }
 
         // Dapatkan URL publik
