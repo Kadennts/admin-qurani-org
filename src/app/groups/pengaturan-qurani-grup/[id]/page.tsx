@@ -11,7 +11,7 @@ export default function QuraniSettingGroupPage() {
     const { t } = useI18n()
     const router = useRouter()
     const params = useParams()
-    const groupId = params.id as string
+    const groupId = params?.id as string
   
     const handleBack = () => {
       router.back()

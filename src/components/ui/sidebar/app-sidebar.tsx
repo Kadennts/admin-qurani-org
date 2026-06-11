@@ -121,6 +121,11 @@ const getSidebarData = (
           url: "/billing/wallet",
           icon: Wallet,
         },
+        {
+          title: t("billing.payments.title", "Payment"),
+          url: "/billing/payments",
+          icon: Banknote,
+        },
       ],
     },
     {
@@ -179,6 +184,11 @@ const getSidebarData = (
           title: t("navigation.manage_categories", "Group Categories"),
           url: "/groups/categories",
           icon: Tags,
+        },
+        {
+          title: t("navigation.categories", "Categories"),
+          url: "/master/categories",
+          icon: Tag,
         },
         {
           title: "Tax Rates",

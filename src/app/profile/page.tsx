@@ -131,7 +131,7 @@ function ProfilePageContent() {
   } = useLocationData()
 
   // Check if edit param is present
-  const isEditParam = searchParams.get('edit') === 'true'
+  const isEditParam = searchParams?.get('edit') === 'true'
 
   useEffect(() => {
     if (isEditParam) setIsEditing(true)
@@ -765,7 +765,7 @@ function ProfilePageContent() {
                       setSelectedCity({ id: 0, name: "", timezone: "" })
                       setSelectedCountry({ id: 0, name: "" })
                       try {
-                        const params = new URLSearchParams(Array.from(searchParams.entries()))
+                        const params = new URLSearchParams(Array.from(searchParams?.entries() ?? []))
                         params.delete('edit')
                         const query = params.toString()
                         router.replace(query ? `${pathname}?${query}` : `${pathname}`)

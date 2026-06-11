@@ -102,6 +102,161 @@
     "transactions": {
       "expert_year": "Expert 1 Year",
       "pro_monthly": "Pro Monthly"
+    },
+    "courses": {
+      "title": "Teacher Courses",
+      "free": "Free",
+      "close": "Close",
+      "cancel": "Cancel",
+      "reset": "Reset",
+      "updating": "Updating...",
+      "applyWithCount": "Apply ({{count}})",
+      "searchPlaceholder": "Search package name...",
+      "searchButton": "Search",
+      "loading": "Loading courses...",
+      "empty": "No courses match the filters.",
+      "certificate": "Certificate",
+      "teacherFallback": "Qurani Teacher",
+      "sessionsCount": "{{count}} sessions",
+      "minutesCount": "{{count}} min",
+      "studentsCount": "{{count}} students",
+      "summary": {
+        "total": "Total Course",
+        "published": "Published",
+        "verified": "Verified",
+        "featured": "Featured",
+        "revenue": "Revenue"
+      },
+      "filters": {
+        "all": "All",
+        "allVerification": "All Verification",
+        "verified": "Verified",
+        "unverified": "Unverified"
+      },
+      "filter": {
+        "button": "Teacher Filter",
+        "title": "Filter by Teacher",
+        "subtitle": "Choose one or more teachers",
+        "searchTeacher": "Search teacher name...",
+        "selectVisible": "Select all",
+        "clearVisible": "Clear selection",
+        "selected": "{{count}} selected",
+        "courseCount": "{{count}} courses"
+      },
+      "bulk": {
+        "title": "Bulk Actions",
+        "selected": "{{count}} selected",
+        "update": "Update",
+        "status": "Status",
+        "noChange": "No Change",
+        "chooseAction": "Choose action",
+        "apply": "Apply",
+        "publishDescription": "Make selected packages visible to users.",
+        "unpublishDescription": "Hide selected packages from users."
+      },
+      "table": {
+        "course": "Package",
+        "teacher": "Teacher",
+        "info": "Info",
+        "sessions": "Sessions",
+        "price": "Price",
+        "status": "Status",
+        "performance": "Performance",
+        "actions": "Actions"
+      },
+      "status": {
+        "published": "Published",
+        "unpublished": "Unpublished",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "mode": {
+        "1": "Online",
+        "2": "Offline",
+        "3": "Hybrid"
+      },
+      "actions": {
+        "open": "Open actions",
+        "detail": "Detail",
+        "publish": "Publish",
+        "unpublish": "Unpublish",
+        "verify": "Verify",
+        "unverify": "Unverify",
+        "feature": "Feature",
+        "unfeature": "Unfeature"
+      },
+      "pagination": {
+        "showing": "Showing {{from}}-{{to}} of {{total}} data",
+        "selected": "{{count}} selected"
+      },
+      "detail": {
+        "title": "Course Detail",
+        "durationLine": "{{sessions}} sessions - {{duration}} minutes/session",
+        "noDescription": "No description yet.",
+        "category": "Category",
+        "level": "Level",
+        "mode": "Mode",
+        "type": "Type",
+        "learningOutcomes": "Learning Outcomes",
+        "requirements": "Requirements",
+        "noOutcomes": "No outcomes yet.",
+        "noRequirements": "No special requirements.",
+        "syllabus": "Syllabus",
+        "noSyllabus": "No syllabus yet."
+      }
+    },
+    "payments": {
+      "title": "Payment",
+      "searchPlaceholder": "Search UserId, TrainerId, Status...",
+      "searchButton": "Search",
+      "summary": {
+        "total": "Total Payments",
+        "revenue": "Total Revenue",
+        "pendingRefunds": "Pending Refunds",
+        "pendingPayouts": "Pending Payouts"
+      },
+      "table": {
+        "id": "ID",
+        "user": "User",
+        "trainer": "Trainer",
+        "amount": "Amount",
+        "status": "Status",
+        "paymentMethod": "Method",
+        "date": "Date",
+        "actions": "Actions"
+      },
+      "status": {
+        "paid": "Paid",
+        "pending": "Pending",
+        "failed": "Failed",
+        "refunded": "Refunded",
+        "disputed": "Disputed"
+      },
+      "actions": {
+        "processRefund": "Process Refund",
+        "markPayout": "Mark Payout",
+        "updateStatus": "Update Status"
+      },
+      "modal": {
+        "processRefundTitle": "Process Refund",
+        "markPayoutTitle": "Mark Payout",
+        "updateStatusTitle": "Update Status",
+        "bulkPayoutTitle": "Bulk Payout",
+        "approve": "Approve",
+        "reject": "Reject",
+        "notes": "Notes",
+        "payoutReference": "Payout Reference",
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "failureReason": "Failure Reason"
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "actions": "Bulk Actions",
+        "markPayout": "Mark Payout (Bulk)"
+      },
+      "empty": "No payments found.",
+      "loading": "Loading payment data..."
     }
   }
 }

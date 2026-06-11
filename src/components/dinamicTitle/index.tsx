@@ -2,27 +2,60 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { useI18n } from "../providers/i18n-provider";
 
 export default function DynamicTitle() {
   const pathname = usePathname();
-  const { t } = useI18n()
 
   useEffect(() => {
-    let title = "Qurani - Modern Quran App";
+    const p = pathname ?? "/"
+    const APP = "Qurani"
 
-    if (pathname === "/") title = t('title_meta.default');
-    else if (pathname.startsWith("/dashboard")) title = t('title_meta.dashboard');
-    else if (pathname.startsWith("/grup")) title = t('title_meta.group');
-    else if (pathname.startsWith("/notifikasi")) title = t('title_meta.notification');
-    else if (pathname.startsWith("/peta-statistik")) title = t('title_meta.statistik');
-    else if (pathname.startsWith("/profile")) title = t('title_meta.profile');
+    const getTitle = () => {
+      const exactMap: Record<string, string> = {
+        "/": `Dashboard | ${APP}`,
+        "/dashboard": `Dashboard | ${APP}`,
+        "/grup": `Grup | ${APP}`,
+        "/notifikasi": `Notifikasi | ${APP}`,
+        "/peta-statistik": `Peta Statistik | ${APP}`,
+        "/profile": `Profil | ${APP}`,
+        "/teman": `Teman | ${APP}`,
+        "/tentang": `Tentang | ${APP}`,
+        "/billing": `Billing | ${APP}`,
+        "/billing/guru": `Guru | ${APP}`,
+        "/billing/paket": `Paket | ${APP}`,
+        "/billing/payout": `Payout | ${APP}`,
+        "/groups/categories": `Group Categories | ${APP}`,
+      }
 
-    else if (pathname.startsWith("/teman")) title = t('title_meta.friend');
-    else if (pathname.startsWith("/tentang")) title = t('title_meta.about');
+      if (exactMap[p]) return exactMap[p];
+      if (/^\/billing\/guru\/\d+/.test(p)) return `Profil Guru | ${APP}`;
+      if (/^\/support\/kyc-organisasi\/[^/]+/.test(p)) return `Detail Organisasi | ${APP}`;
+      if (p === "/support/kyc-organisasi") return `KYC Organisasi | ${APP}`;
 
-    document.title = title;
-  }, [pathname, t]);
+      const segments = p.split("/").filter(Boolean)
+      if (segments.length > 0) {
+        const readable = segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ")).join(" - ")
+        return `${readable} | ${APP}`
+      }
+      return `Modern Quran App | ${APP}`
+    }
+
+    const desiredTitle = getTitle();
+    document.title = desiredTitle;
+
+    const observer = new MutationObserver(() => {
+      if (document.title !== desiredTitle) {
+        document.title = desiredTitle;
+      }
+    });
+
+    const titleElement = document.querySelector("title");
+    if (titleElement) {
+      observer.observe(titleElement, { childList: true });
+    }
+
+    return () => observer.disconnect();
+  }, [pathname]);
 
   return null;
 }

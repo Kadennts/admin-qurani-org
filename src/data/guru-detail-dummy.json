@@ -1,0 +1,44 @@
+{
+  "reviews": [
+    { "id": 1, "reviewerName": "Ahmad Fauzi", "reviewerAvatar": "https://i.pravatar.cc/150?img=11", "rating": 5, "comment": "Guru yang sangat sabar dan telaten. Metode mengajarnya mudah dipahami, anak saya yang awalnya belum lancar Iqro' sekarang sudah bisa membaca Al-Qur'an dengan baik.", "tags": ["Sabar", "Profesional"], "createdAt": "2025-03-10T08:00:00Z" },
+    { "id": 2, "reviewerName": "Siti Rahmawati", "reviewerAvatar": "https://i.pravatar.cc/150?img=22", "rating": 5, "comment": "Alhamdulillah, sangat puas dengan hafalannya. Guru ini benar-benar hafidz sejati yang membimbing dengan penuh dedikasi.", "tags": ["Tahfidz", "Dedikasi"], "createdAt": "2025-03-20T09:30:00Z" },
+    { "id": 3, "reviewerName": "Budi Santoso", "reviewerAvatar": "https://i.pravatar.cc/150?img=33", "rating": 4, "comment": "Pengajaran tajwid sangat detail dan terstruktur. Saya banyak belajar tentang makhraj huruf yang benar. Waktu mengajar terkadang kurang tepat jadwal.", "tags": ["Tajwid", "Detail"], "createdAt": "2025-04-05T14:00:00Z" },
+    { "id": 4, "reviewerName": "Dewi Kartika", "reviewerAvatar": "https://i.pravatar.cc/150?img=44", "rating": 5, "comment": "Metode Ummi yang digunakan sangat cocok untuk anak-anak. Guru sangat kreatif dalam mengajar dan membuat anak tidak bosan.", "tags": ["Metode Ummi", "Kreatif"], "createdAt": "2025-04-15T10:00:00Z" },
+    { "id": 5, "reviewerName": "Rizki Maulana", "reviewerAvatar": "https://i.pravatar.cc/150?img=55", "rating": 4, "comment": "Sudah mengikuti kelas selama 3 bulan. Perkembangan bacaan saya sangat signifikan. Guru sangat responsif dan suka memberi feedback.", "tags": ["Responsif", "Terpercaya"], "createdAt": "2025-05-01T11:00:00Z" },
+    { "id": 6, "reviewerName": "Nurul Hidayah", "reviewerAvatar": "https://i.pravatar.cc/150?img=66", "rating": 5, "comment": "Sangat merekomendasikan guru ini! Tilawah-nya sangat indah dan mengajarkan dengan penuh semangat. Anak saya jadi lebih cinta Al-Qur'an.", "tags": ["Tilawah", "Inspiratif"], "createdAt": "2025-05-12T08:30:00Z" },
+    { "id": 7, "reviewerName": "Hendra Wijaya", "reviewerAvatar": "https://i.pravatar.cc/150?img=77", "rating": 3, "comment": "Ilmunya sangat bagus tetapi komunikasi bisa lebih ditingkatkan. Materi yang diajarkan sangat bermanfaat namun pacing-nya agak cepat.", "tags": ["Berilmu"], "createdAt": "2025-05-20T15:00:00Z" },
+    { "id": 8, "reviewerName": "Fatimah Az-Zahra", "reviewerAvatar": "https://i.pravatar.cc/150?img=88", "rating": 5, "comment": "MasyaAllah, guru terbaik yang pernah saya temui. Hafal 30 juz dan mengajarkan dengan sanad yang jelas. Sangat amanah dan bertanggung jawab.", "tags": ["Hafidz 30 Juz", "Sanad Jelas"], "createdAt": "2025-06-01T09:00:00Z" }
+  ],
+  "galleryUrls": [
+    "https://images.unsplash.com/photo-1585036156171-384164a8c675?w=600&q=80",
+    "https://images.unsplash.com/photo-1564121211835-e88c852648ab?w=600&q=80",
+    "https://images.unsplash.com/photo-1607344645866-009c320b63e0?w=600&q=80"
+  ],
+  "certs": [
+    { "name": "Syahadah Tahfidz Al-Qur'an 30 Juz", "issuer": "Lembaga Tahfidz Al-Azhar Indonesia", "issuedDate": "2022-06-01T00:00:00Z", "expiryDate": "", "url": "" },
+    { "name": "Ijazah Metode Ummi", "issuer": "Yayasan Ummi Foundation", "issuedDate": "2021-03-15T00:00:00Z", "expiryDate": "", "url": "" },
+    { "name": "Sertifikat Pengajar Tilawatil Qur'an", "issuer": "LPTQ Provinsi", "issuedDate": "2023-01-20T00:00:00Z", "expiryDate": "2026-01-20T00:00:00Z", "url": "" }
+  ],
+  "names": ["Ustadz Abdul Karim", "Ustadzah Siti Aminah", "Ustadz Muhammad Yusuf", "Ustadzah Khadijah", "Ustadz Ibrahim Al-Hafidz"],
+  "headlines": [
+    "Hafidz 30 Juz | Lulusan Universitas Islam Madinah",
+    "Pengajar Tajwid & Tilawah | 10 Tahun Pengalaman",
+    "Spesialis Tahfidz Anak | Metode Ummi Bersanad",
+    "Pengajar Tartil & Tafsir | Alumni Al-Azhar Kairo",
+    "Pembimbing Hafalan | Metode Yanbu'a & Qiroati"
+  ],
+  "bios": [
+    "Saya adalah seorang pengajar Al-Qur'an yang berpengalaman lebih dari 10 tahun. Metode pembelajaran yang saya gunakan menyesuaikan dengan kemampuan dan usia santri, mulai dari metode Iqro' untuk pemula hingga tahfidz untuk yang ingin menghafal Al-Qur'an. Saya percaya bahwa setiap santri memiliki potensi yang luar biasa dan tugas saya adalah membuka potensi tersebut.",
+    "Berpengalaman mengajar berbagai kalangan mulai dari anak-anak hingga dewasa. Saya menggunakan pendekatan yang ramah dan sabar serta selalu memotivasi santri untuk konsisten dalam belajar Al-Qur'an. Fokus utama saya adalah memastikan bacaan yang benar sesuai dengan ilmu tajwid.",
+    "Lulus dengan predikat mumtaz dari pesantren tahfidz ternama. Telah menghasilkan lebih dari 50 hafidz/hafidzah dari berbagai daerah. Metode pembelajaran saya menggabungkan talaqqi langsung, murajaah rutin, dan metode modern yang menyenangkan.",
+    "Alumni Al-Azhar Kairo, Mesir jurusan Tafsir & Ulum Al-Qur'an. Mengajar dengan pendekatan ilmiah namun tetap mudah dipahami. Spesialisasi dalam tafsir Al-Qur'an dan ilmu-ilmu terkait Al-Qur'an seperti asbabun nuzul dan nasikh-mansukh.",
+    "Pengajar bersertifikat dengan sanad keilmuan yang terjaga. Mengkhususkan diri dalam pembelajaran metode Yanbu'a dan Qiroati untuk anak-anak dan dewasa. Berpengalaman mengajar di TPQ, pesantren, dan secara privat."
+  ],
+  "expertiseList": [
+    ["Tahfidz", "Tajwid", "Tilawati"],
+    ["Tajwid", "Tartil", "Talaqqi"],
+    ["Tahfidz", "Ummi", "Iqro"],
+    ["Tafsir", "Tartil", "Tilawati"],
+    ["Yanbu'a", "Qiroati", "Tahfidz"]
+  ]
+}

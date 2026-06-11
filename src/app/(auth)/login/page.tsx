@@ -2,6 +2,12 @@ import { LoginForm } from "@/components/ui/auth-form/login-form"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Suspense } from 'react';
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: "Login - Qurani",
+    description: "Login to Qurani - Islamic Social Media"
+};
 
 export default function LoginPage() {
     return (

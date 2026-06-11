@@ -683,6 +683,7 @@ function KycMemberDetailModal({
 function KycMemberContent() {
     const [activeTab, setActiveTab] = useState<"menunggu" | "disetujui" | "ditolak" | "semua">("menunggu")
     const [search, setSearch] = useState("")
+    const [searchInput, setSearchInput] = useState("")
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     const [selectedMember, setSelectedMember] = useState<KycMember | null>(null)
@@ -788,19 +789,28 @@ function KycMemberContent() {
 
                 {/* ── Search + Filter Bar ── */}
                 <div className="flex items-center gap-2 mb-3">
-                    <div className="relative w-72">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <div className="flex items-center w-72 md:w-96 h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                        <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
                         <input
                             type="text"
                             placeholder="Cari nama member..."
-                            value={search}
-                            onChange={e => { setSearch(e.target.value); setPage(1) }}
-                            className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all"
+                            value={searchInput}
+                            onChange={e => setSearchInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    setSearch(searchInput);
+                                    setPage(1);
+                                }
+                            }}
+                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
                         />
+                        <button
+                            onClick={() => { setSearch(searchInput); setPage(1); }}
+                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
+                        >
+                            <Search className="w-4 h-4" /> Cari
+                        </button>
                     </div>
-                    <button className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors">
-                        <Search className="w-3.5 h-3.5" /> Cari
-                    </button>
                     <button
                         onClick={() => setShowFilter(true)}
                         className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${(appliedFilter.tipeDokumen.length + appliedFilter.riwayat.length) > 0

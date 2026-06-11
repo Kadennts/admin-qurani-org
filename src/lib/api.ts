@@ -1828,6 +1828,106 @@ export const masterdataApi = {
     },
 };
 
+// ============================================
+// Payments API
+// ============================================
 
+export interface PaymentSearchParams {
+    UserId?: number | string;
+    TrainerId?: number | string;
+    BookingId?: number | string;
+    Status?: string;
+    PaymentMethod?: string;
+    FromDate?: string;
+    ToDate?: string;
+    MinAmount?: number | string;
+    MaxAmount?: number | string;
+    RefundRequested?: number | string;
+    IsPaidOut?: number | string;
+    Page?: number | string;
+    PageSize?: number | string;
+}
+
+export const paymentsApi = {
+    // Search payments
+    search: (params: PaymentSearchParams = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                searchParams.append(key, String(value));
+            }
+        });
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get payment stats
+    getStats: (params: { fromDate?: string; toDate?: string } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.fromDate) searchParams.append('fromDate', params.fromDate);
+        if (params.toDate) searchParams.append('toDate', params.toDate);
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments/stats${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get revenue analytics
+    getRevenueAnalytics: (params: { fromDate?: string; toDate?: string } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.fromDate) searchParams.append('fromDate', params.fromDate);
+        if (params.toDate) searchParams.append('toDate', params.toDate);
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments/revenue-analytics${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get pending refunds
+    getPendingRefunds: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments/pending-refunds${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Process refund
+    processRefund: (id: number | string, data: { approved: number; notes?: string; amount?: number }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/${id}/process-refund`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
+
+    // Get pending payouts
+    getPendingPayouts: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments/pending-payouts${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Mark payment as paid out
+    markPayout: (id: number | string, data: { payoutReference: string; notes?: string }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/${id}/mark-payout`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
+
+    // Update payment status
+    updateStatus: (id: number | string, data: { status: string; failureReason?: string }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/${id}/status`, {
+            method: 'PUT',
+            body: data,
+            token
+        }),
+
+    // Bulk mark payouts
+    bulkPayout: (data: { paymentIds: Array<number | string>; payoutReference: string; notes?: string }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/bulk-payout`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
+};
 
 export { API_BASE };

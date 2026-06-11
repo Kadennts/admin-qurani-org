@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
@@ -8,57 +9,18 @@ import {
     ChevronLeft, ChevronRight, Clock, CheckCircle2, XCircle,
     Building2, Users, ChevronDown, Check,
     X, FileText, Mail, Phone, MapPin, Globe,
-    Building, AlertCircle, CheckCircle, Eye, RotateCcw
+    Building, AlertCircle, CheckCircle, Eye, RotateCcw,
+    ArrowDown, ArrowUp, ArrowUpDown
 } from "lucide-react"
-import rawData from "@/data/kyc-dummy.json"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type KycOrg = {
-    id: number
-    nama: string
-    singkatan?: string
-    avatar: string
-    avatarBg: string
-    gradientFrom: string
-    gradientTo: string
-    tipe: string[]
-    kategori: string
-    user: string
-    userUsername?: string
-    tglPengajuan: string
-    status: "menunggu" | "disetujui" | "ditolak"
-    namaResmi: string
-    email: string
-    telepon: string
-    alamat: string
-    website: string
-    deskripsi: string
-    lat: string
-    lng: string
-}
-
-const DATA: KycOrg[] = rawData.kyc_organisasi as KycOrg[]
+import { useKycOrganisasi, ApiOrg, FilterState, EMPTY_FILTER } from "@/hooks/use-kyc-organisasi"
 
 // ─── Tipe badge config ────────────────────────────────────────────────────────
-const TIPE_CONFIG: Record<string, { cls: string; icon: React.ReactNode }> = {
-    YAYASAN: { cls: "bg-orange-100 text-orange-700 border border-orange-200", icon: <Building2 className="w-3 h-3 mr-1 inline" /> },
-    PESANTREN: { cls: "bg-orange-100 text-orange-700 border border-orange-200", icon: <Building2 className="w-3 h-3 mr-1 inline" /> },
-    LEMBAGA: { cls: "bg-orange-100 text-orange-700 border border-orange-200", icon: <Building2 className="w-3 h-3 mr-1 inline" /> },
-    KOMUNITAS: { cls: "bg-orange-100 text-orange-700 border border-orange-200", icon: <Building2 className="w-3 h-3 mr-1 inline" /> },
-    MADRASAH: { cls: "bg-orange-100 text-orange-700 border border-orange-200", icon: <Building2 className="w-3 h-3 mr-1 inline" /> },
-    PENDIDIKAN: { cls: "bg-blue-100 text-blue-700 border border-blue-200", icon: <Users className="w-3 h-3 mr-1 inline" /> },
-}
-
-const STATUS_CONFIG = {
-    menunggu: { label: "Pending", cls: "bg-amber-50 text-amber-600 border border-amber-200", icon: Clock },
-    disetujui: { label: "Disetujui", cls: "bg-emerald-50 text-emerald-600 border border-emerald-200", icon: CheckCircle2 },
-    ditolak: { label: "Ditolak", cls: "bg-red-50 text-red-600 border border-red-200", icon: XCircle },
-}
-
-const STATUS_BADGE: Record<string, string> = {
-    menunggu: "bg-amber-100 text-amber-700 border border-amber-200",
-    disetujui: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    ditolak: "bg-red-100 text-red-600 border border-red-200",
+const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
+    semua: { label: "Semua", cls: "bg-gray-50 text-gray-600 border border-gray-200", icon: Building },
+    menunggu: { label: "Menunggu", cls: "bg-orange-50 text-orange-600 border border-orange-200", icon: Clock },
+    aktif: { label: "Aktif", cls: "bg-emerald-50 text-emerald-600 border border-emerald-200", icon: CheckCircle2 },
+    nonaktif: { label: "Nonaktif", cls: "bg-red-50 text-red-600 border border-red-200", icon: XCircle },
+    ditolak: { label: "Ditolak", cls: "bg-red-50 text-red-600 border border-red-200", icon: AlertCircle },
 }
 
 // ─── Toast Component ───────────────────────────────────────────────────────
@@ -132,32 +94,49 @@ function PerPageSelect({ value, onChange }: { value: number; onChange: (v: numbe
 }
 
 // ─── Dropdown Aksi ────────────────────────────────────────────────────────────
-function AksiDropdown({ id, onView }: { id: number; onView: () => void }) {
+function AksiDropdown({ org, onToggle, onDetail }: { org: ApiOrg; onToggle: (id: number | string, currentStatus: string) => void; onDetail: (id: number | string) => void }) {
     const [open, setOpen] = useState(false)
+    const buttonRef = useRef<HTMLButtonElement>(null)
+    const [isBottom, setIsBottom] = useState(false)
+    const statusStr = org.status ? org.status.toLowerCase() : "";
+    const isAktif = statusStr === "active" || statusStr === "aktif" || statusStr === "approved" || (!org.status && org.isVerified === 1 && org.isActive);
+
+    const currentStatus = isAktif ? "ACTIVE" : "INACTIVE"
+    const nextLabel = isAktif ? "Nonaktifkan" : "Aktifkan"
+
+    const toggleOpen = () => {
+        if (!open && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect()
+            setIsBottom(window.innerHeight - rect.bottom < 150)
+        }
+        setOpen(o => !o)
+    }
+
     return (
         <div className="relative" onClick={e => e.stopPropagation()}>
             <button
-                onClick={() => setOpen(o => !o)}
+                ref={buttonRef}
+                onClick={toggleOpen}
                 className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
                 <MoreHorizontal className="w-4 h-4" />
             </button>
             {open && (
                 <div
-                    className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                    className={`absolute right-0 ${isBottom ? 'bottom-full mb-1' : 'top-full mt-1'} w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden`}
                     onMouseLeave={() => setOpen(false)}
                 >
                     <button
-                        onClick={() => setOpen(false)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => { setOpen(false); onDetail(org.id) }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800"
                     >
-                        Setujui
+                        Lihat &amp; Verifikasi
                     </button>
                     <button
-                        onClick={() => setOpen(false)}
+                        onClick={() => { setOpen(false); onToggle(org.id, currentStatus) }}
                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                     >
-                        Tolak
+                        {nextLabel}
                     </button>
                 </div>
             )}
@@ -231,331 +210,362 @@ function DocCard({
 function KycDetailModal({
     org,
     onClose,
-    onUpdateStatus,
+    onVerify,
+    onReject,
+    orgMembers,
+    orgMembersLoading,
+    fetchOrgMembers,
 }: {
-    org: KycOrg
+    org: ApiOrg
     onClose: () => void
-    onUpdateStatus: (id: number, status: "disetujui" | "ditolak", rejectionReason?: string) => void
+    onVerify: (id: number | string) => Promise<void>
+    onReject: (id: number | string, reason: string) => Promise<void>
+    orgMembers: any[]
+    orgMembersLoading: boolean
+    fetchOrgMembers: (id: number | string) => Promise<void>
 }) {
-    const [showRejectModal, setShowRejectModal] = useState(false)
-    const [selectedReasons, setSelectedReasons] = useState<string[]>([])
-    const [additionalNote, setAdditionalNote] = useState("")
+    const [activeTab, setActiveTab] = useState<"profil" | "dokumen" | "guru" | "galeri">("profil")
+    const [verifying, setVerifying] = useState(false)
+    const [showReject, setShowReject] = useState(false)
+    const [rejectReason, setRejectReason] = useState("")
 
-    const REJECTION_REASONS = [
-        "Data Penanggung Jawab Tidak Lengkap",
-        "Surat Kuasa Tidak Ditandatangani",
-        "Kualitas Dokumen Buruk (Blur)",
-        "Indikasi Data Palsu",
-        "NIB Tidak Valid / Kadaluwarsa",
-        "NPWP Tidak Sesuai",
-        "SK Kemenkumham Tidak Ditemukan",
-        "Alamat Tidak Sesuai Akta",
-        "NPSN Tidak Terdaftar di Dapodik",
-        "Akreditasi Tidak Valid",
-        "Izin Operasional Kadaluwarsa",
-        "Bukan Institusi Pendidikan Resmi",
-    ]
+    useEffect(() => {
+        if (activeTab === "guru") {
+            fetchOrgMembers(org.id)
+        }
+    }, [activeTab, org.id, fetchOrgMembers])
 
-    const toggleReason = (reason: string) => {
-        setSelectedReasons(prev =>
-            prev.includes(reason) ? prev.filter(r => r !== reason) : [...prev, reason]
-        )
+    const handleVerify = async () => {
+        setVerifying(true)
+        await onVerify(org.id)
+        setVerifying(false)
     }
 
-    const handleConfirmReject = () => {
-        const fullReason = [...selectedReasons, ...(additionalNote.trim() ? [additionalNote] : [])].join(". ")
-        onUpdateStatus(org.id, "ditolak", fullReason)
-        setShowRejectModal(false)
-        onClose()
+    const handleReject = async () => {
+        if (!rejectReason.trim()) return;
+        setVerifying(true)
+        await onReject(org.id, rejectReason)
+        setVerifying(false)
+        setShowReject(false)
     }
 
-    const [docTab, setDocTab] = useState<"umum" | "industri" | "pendidikan">("umum")
-
-    const hasPendidikan = org.tipe.includes("PENDIDIKAN") || org.tipe.includes("MADRASAH")
-
-    const statusBadge = STATUS_BADGE[org.status]
-    const statusLabel = STATUS_CONFIG[org.status].label.toUpperCase()
-
-    // Dokumen per tab
-    const dokumenUmum = [
-        { nama: "KTP Penanggung Jawab", file: `KTP-${org.user.replace(" ", "")}.jpg`, warning: undefined, hasValidasi: false, noPreview: false },
-        { nama: "Foto Gedung / Kantor", file: `gedung-${org.singkatan?.toLowerCase() || org.id}.jpg`, warning: undefined, hasValidasi: false, noPreview: false },
-        { nama: "Surat Keabsahan Dokumen", file: `SK-Penunjukan-${org.singkatan || "ORG"}-...`, warning: undefined, hasValidasi: false, noPreview: false },
-    ]
-    const dokumenIndustri = [
-        { nama: "Nomor Induk Berusaha (NIB)", file: `91203${org.id}334444`, warning: org.status === "ditolak" ? "NIB TIDAK VALID" : undefined, hasValidasi: true, noPreview: false },
-        { nama: "NPWP Badan", file: `01.234.567.${org.id}-012.000`, warning: undefined, hasValidasi: false, noPreview: false },
-        { nama: "SK Kemenkumham", file: undefined, warning: undefined, hasValidasi: false, noPreview: false },
-    ]
-    const dokumenPendidikan = [
-        { nama: "NPSN (Nomor Pokok Sekolah Nasional)", file: `2021${org.id}345`, warning: "CEK DI DATA KEMDIKBUD", hasValidasi: true, noPreview: false },
-        { nama: "Izin Operasional Sekolah", file: undefined, warning: undefined, hasValidasi: false, noPreview: true },
-        { nama: "Bukti Akreditasi", file: undefined, warning: undefined, hasValidasi: false, noPreview: false },
-    ]
-
-    const currentDocs = docTab === "umum" ? dokumenUmum : docTab === "industri" ? dokumenIndustri : dokumenPendidikan
-
-    const infoAlert = docTab === "industri"
-        ? "Pastikan NIB terdaftar dan aktif di portal validasi OSS."
-        : docTab === "pendidikan"
-            ? "Verifikasi NPSN dan status akreditasi melalui PDDIKTI/Dapodik."
-            : null
+    const tglBerdiri = org.foundedDate ? new Date(org.foundedDate).getFullYear() : "-"
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
-            {/* Backdrop */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
-            {/* Modal Panel — hampir memenuhi layar seperti MagangHub */}
-            <div className="relative w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ maxWidth: "calc(100vw - 80px)", height: "96vh" }}>
-
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                            <Building className="w-5 h-5 text-orange-500" />
-                        </div>
-                        <div>
-                            <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">Verifikasi Organisasi</p>
+            
+            {/* Modal Tolak */}
+            {showReject && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Tolak Pendaftaran</h3>
+                        <p className="text-sm text-gray-500 mb-4">Silakan masukkan alasan penolakan. Alasan ini akan dikirimkan kepada pendaftar.</p>
+                        <textarea 
+                            className="w-full h-32 p-3 border border-gray-200 dark:border-gray-700 rounded-xl mb-4 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                            placeholder="Contoh: Dokumen legalitas tidak lengkap..."
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                        />
+                        <div className="flex items-center justify-end gap-3">
+                            <button onClick={() => setShowReject(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+                            <button onClick={handleReject} disabled={!rejectReason.trim() || verifying} className="px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50">Kirim Penolakan</button>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${statusBadge}`}>
-                            {statusLabel}
-                        </span>
-                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors">
-                            <X className="w-5 h-5" />
-                        </button>
+                </div>
+            )}
+
+            <div className="relative w-full h-full bg-gray-50 dark:bg-gray-950 flex flex-col overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
+
+                {/* BACK BUTTON */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white text-sm font-semibold rounded-full transition-colors"
+                >
+                    <ChevronLeft className="w-4 h-4" /> Kembali ke Daftar
+                </button>
+
+                {/* BANNER SECTION */}
+                <div className="relative w-full h-64 md:h-80 bg-emerald-900 overflow-hidden flex-shrink-0">
+                    {org.banner ? (
+                        <img src={org.banner} alt="Banner" className="w-full h-full object-cover opacity-60" />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-emerald-800 to-teal-900 opacity-90 flex items-center justify-center">
+                            <span className="text-white/20 text-6xl font-bold">QURANI</span>
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                </div>
+
+                {/* PROFILE HEADER & INFO */}
+                <div className="max-w-[1200px] w-full mx-auto px-6 relative -mt-20 z-10 flex-shrink-0">
+                    <div className="flex flex-col md:flex-row items-start md:items-end gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">
+                        {/* Logo */}
+                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl md:rounded-[32px] bg-white dark:bg-gray-900 border-4 border-white dark:border-gray-950 shadow-xl flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {org.logo ? (
+                                <img src={org.logo} alt={org.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-5xl font-black text-emerald-600">{String(org.name || "O").charAt(0).toUpperCase()}</span>
+                            )}
+                        </div>
+
+                        {/* Title Info */}
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white drop-shadow-sm">{org.name}</h1>
+                                {org.isVerified === 1 && (
+                                    <CheckCircle2 className="w-6 h-6 text-blue-500 fill-blue-100 dark:fill-blue-900" />
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300 font-medium mb-4">
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg text-xs font-bold uppercase tracking-wide">
+                                    {org.categoryName || org.category || org.type || "Organisasi"}
+                                </span>
+                                <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-gray-400" /> {org.city || "Kota Tidak Diketahui"}</span>
+                                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-gray-400" /> Berdiri {tglBerdiri}</span>
+                                <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-gray-400" /> {org.memberCount || 0} Anggota</span>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-3 mt-4 md:mt-0 w-full md:w-auto">
+                            {org.isVerified !== 1 && (
+                                <>
+                                    <button
+                                        onClick={() => setShowReject(true)}
+                                        disabled={verifying}
+                                        className="flex-1 md:flex-none px-6 py-2.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 border border-red-200 dark:border-red-800 disabled:opacity-50 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <XCircle className="w-4 h-4" /> Tolak
+                                    </button>
+                                    <button
+                                        onClick={handleVerify}
+                                        disabled={verifying}
+                                        className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" /> Setujui
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* ── Body (2 cols) ── */}
-                <div className="flex flex-1 overflow-hidden">
+                {/* NAVIGATION TABS */}
+                <div className="max-w-[1200px] w-full mx-auto px-6 mt-6 flex-shrink-0">
+                    <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-px overflow-x-auto">
+                        {[
+                            { id: "profil", label: "Profil & Legalitas", icon: Building },
+                            { id: "dokumen", label: "Dokumen", icon: FileText },
+                            { id: "guru", label: "Daftar Guru", icon: Users },
+                            { id: "galeri", label: "Galeri", icon: Globe },
+                        ].map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id as any)}
+                                className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-xl transition-all border-b-2 ${activeTab === t.id
+                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                    }`}
+                            >
+                                <t.icon className="w-4 h-4" /> {t.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                    {/* Left: Org Info — lebar dan no visible scrollbar */}
-                    <div
-                        className="w-[370px] flex-shrink-0 border-r border-gray-100 dark:border-gray-800 overflow-y-auto [&::-webkit-scrollbar]:hidden"
-                        style={{ scrollbarWidth: 'none' }}
-                    >
-                        <div className="p-9">
-                            {/* Avatar: bulat penuh */}
-                            <div
-                                className="w-[110px] h-[110px] rounded-full mx-auto mb-5 shadow-md"
-                                style={{ background: `linear-gradient(135deg, ${org.gradientFrom}, ${org.gradientTo})` }}
-                            />
+                {/* CONTENT AREA */}
+                <div className="max-w-[1200px] w-full mx-auto px-6 py-8 flex-1">
 
-                            {/* Name + badges */}
-                            <h2 className="text-center font-bold text-gray-900 dark:text-white text-base mb-2 leading-snug">{org.nama}</h2>
-                            <div className="flex flex-wrap justify-center gap-1 mb-3">
-                                {org.tipe.map(t => {
-                                    const conf = TIPE_CONFIG[t] ?? { cls: "bg-gray-100 text-gray-600 border border-gray-200", icon: null }
-                                    return (
-                                        <span key={t} className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded ${conf.cls}`}>
-                                            {conf.icon}{t}
-                                        </span>
-                                    )
-                                })}
+                    {/* TAB: PROFIL */}
+                    {activeTab === "profil" && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                            {/* Left Column */}
+                            <div className="lg:col-span-2 space-y-8">
+                                
+                                {/* Data Legalitas */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                                        <FileText className="w-4 h-4 text-purple-500" /> Data Registrasi & Legalitas
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Nama Legal Entitas</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{org.legalName || <span className="text-gray-400 italic">Belum diisi</span>}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Tipe Legal</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{org.legalType || <span className="text-gray-400 italic">Belum diisi</span>}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">No. Registrasi / NIB</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{org.registrationNumber || <span className="text-gray-400 italic">Belum diisi</span>}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">NPWP / Tax ID</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{org.taxId || <span className="text-gray-400 italic">Belum diisi</span>}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Deskripsi */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                                        <Building2 className="w-4 h-4 text-emerald-500" /> Tentang Organisasi
+                                    </h3>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                        {org.description || "Belum ada deskripsi yang ditambahkan untuk organisasi ini."}
+                                    </p>
+                                </div>
+
+                                {/* Visi & Misi */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+                                            <CheckCircle className="w-4 h-4 text-orange-500" /> Visi
+                                        </h3>
+                                        <p className="text-sm italic text-gray-700 dark:text-gray-300">
+                                            "Menghadirkan pesona Al-Qur'an di setiap keluarga Muslim Indonesia." (Contoh Visi)
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+                                            <CheckCircle className="w-4 h-4 text-blue-500" /> Misi
+                                        </h3>
+                                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700 dark:text-gray-300 list-disc list-inside">
+                                            <li>Mensosialisasikan pentingnya membaca Al-Qur'an.</li>
+                                            <li>Menyelenggarakan kelas tahsin dan tahfidz.</li>
+                                            <li>Membina komunitas pecinta Al-Qur'an.</li>
+                                            <li>Mengembangkan metode pembelajaran inovatif.</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Description — dark gray (bukan biru) */}
-                            {org.deskripsi && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 text-center leading-relaxed mb-4">{org.deskripsi}</p>
-                            )}
-
-                            {/* Contact section */}
-                            <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <AlertCircle className="w-3.5 h-3.5 text-gray-400" />
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Informasi Kontak &amp; Lokasi</span>
-                                </div>
-                                <div className="space-y-3">
-                                    {[
-                                        { icon: Building, label: "NAMA RESMI", value: org.namaResmi },
-                                        { icon: Mail, label: "EMAIL PERUSAHAAN", value: org.email },
-                                        { icon: Phone, label: "NOMOR TELEPON", value: org.telepon },
-                                        { icon: MapPin, label: "ALAMAT", value: org.alamat },
-                                    ].map(item => (
-                                        <div key={item.label} className="flex items-start gap-2.5">
-                                            <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <item.icon className="w-3.5 h-3.5 text-gray-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{item.label}</p>
-                                                <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">{item.value}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {org.website && (
-                                        <div className="flex items-start gap-2.5">
-                                            <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <Globe className="w-3.5 h-3.5 text-gray-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">WEBSITE</p>
-                                                <a href={org.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 block hover:underline">{org.website}</a>
-                                            </div>
-                                        </div>
-                                    )}
+                            {/* Right Column */}
+                            <div className="space-y-6">
+                                {/* Lokasi */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-2">
+                                        <MapPin className="w-4 h-4 text-red-500" /> Lokasi Organisasi
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mb-4">Kunjungi kami untuk informasi lebih lanjut.</p>
+                                    <div className="w-full h-40 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4 flex items-center justify-center border border-gray-200 dark:border-gray-700 overflow-hidden relative">
+                                        <div className="absolute inset-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=Bandung&zoom=13&size=400x200&sensor=false')] bg-cover bg-center opacity-50 grayscale" />
+                                        <MapPin className="w-8 h-8 text-red-500 relative z-10" />
+                                    </div>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{org.city || "Alamat Tidak Diketahui"}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">{org.address || "Belum ada detail alamat lengkap."}</p>
                                 </div>
 
-                                {/* Koordinat */}
-                                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl text-center">
-                                    <MapPin className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Peta Belum Tersedia</p>
-                                    <p className="text-[10px] text-gray-400">Integrasi Maps dinonaktifkan sementara.</p>
-                                    <div className="mt-2 px-3 py-1.5 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                                        <span className="text-[10px] text-gray-500">Koordinat: {org.lat}, {org.lng}</span>
+                                {/* Kontak */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">Informasi Kontak</h3>
+                                    <div className="space-y-4">
+                                        {org.email && (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center"><Mail className="w-4 h-4 text-blue-500" /></div>
+                                                <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{org.email}</span>
+                                            </div>
+                                        )}
+                                        {org.phone && (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center"><Phone className="w-4 h-4 text-emerald-500" /></div>
+                                                <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{org.phone}</span>
+                                            </div>
+                                        )}
+                                        {org.website && (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center"><Globe className="w-4 h-4 text-purple-500" /></div>
+                                                <a href={org.website.startsWith('http') ? org.website : `https://${org.website}`} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:underline font-medium">{org.website}</a>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Right: Dokumen Legalitas */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <div className="p-5 pb-3 flex-shrink-0">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Dokumen Legalitas</h3>
-                            <p className="text-sm text-gray-400 mb-4">Periksa keabsahan dokumen yang diunggah.</p>
-
-                            {/* Doc tabs */}
-                            <div className="flex gap-2">
-                                {(["umum", "industri", ...(hasPendidikan ? ["pendidikan"] : [])] as const).map(tab => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setDocTab(tab as typeof docTab)}
-                                        className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize border transition-colors ${docTab === tab
-                                            ? "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white shadow-sm"
-                                            : "border-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                            }`}
-                                    >
-                                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                    </button>
-                                ))}
+                    {/* TAB: DOKUMEN */}
+                    {activeTab === "dokumen" && (
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[400px]">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-6">Dokumen Pendukung</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {org.verificationDocs ? (
+                                    <DocCard nama="Dokumen Legalitas" file={org.verificationDocs} iconType="doc" />
+                                ) : (
+                                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
+                                        <FileText className="w-12 h-12 mb-3 text-gray-300" />
+                                        <p>Organisasi ini belum mengunggah dokumen apapun.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
+                    )}
 
-                        {/* Doc content */}
-                        <div className="flex-1 overflow-y-auto px-5 pb-5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
-                            {/* Info alert */}
-                            {infoAlert && (
-                                <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300 mb-4">
-                                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                    {infoAlert}
+                    {/* TAB: GURU */}
+                    {activeTab === "guru" && (
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[400px]">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-6">Daftar Pengajar</h3>
+                            {orgMembersLoading ? (
+                                <div className="flex justify-center py-20 text-emerald-500">Memuat data pengajar...</div>
+                            ) : orgMembers.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                                    <Users className="w-12 h-12 mb-3 text-gray-300" />
+                                    <p>Belum ada pengajar yang terdaftar.</p>
                                 </div>
-                            )}
-
-                            {/* Document grid */}
-                            <div className="grid grid-cols-2 gap-4">
-                                {currentDocs.map((doc, i) => (
-                                    <DocCard key={i} {...doc} />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Footer ── */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-white dark:bg-gray-900">
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-                        ID: #{org.id.toString().padStart(3, "0")}
-                    </span>
-                    <div className="flex items-center gap-3">
-                        {org.status !== "ditolak" && (
-                            <button
-                                onClick={() => { setSelectedReasons([]); setAdditionalNote(""); setShowRejectModal(true) }}
-                                className="flex items-center gap-2 px-5 py-2 border-2 border-red-300 dark:border-red-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold rounded-xl transition-colors"
-                            >
-                                <XCircle className="w-4 h-4" /> Tolak
-                            </button>
-                        )}
-                        {org.status !== "disetujui" && (
-                            <button
-                                onClick={() => { onUpdateStatus(org.id, "disetujui"); onClose() }}
-                                className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors"
-                            >
-                                <CheckCircle2 className="w-4 h-4" /> Setujui
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* ── Reject Reason Modal ── */}
-                {showRejectModal && (
-                    <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
-                        {/* Backdrop - NO BLUR */}
-                        <div className="absolute inset-0 bg-black/40" onClick={() => setShowRejectModal(false)} />
-                        
-                        <div className="relative bg-white dark:bg-gray-900 rounded-[28px] shadow-2xl p-8 w-[600px] max-w-full animate-in fade-in zoom-in duration-200">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Tolak Organisasi?</h3>
-                            <p className="text-[13px] text-gray-500 dark:text-gray-400 mb-6 font-medium leading-relaxed">
-                                Organisasi akan menerima notifikasi penolakan dan harus memperbaiki data.
-                            </p>
-
-                            <div className="space-y-3 mb-6">
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none pl-1">Pilih Alasan (Maks. 3)</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {REJECTION_REASONS.map((reason) => (
-                                        <button
-                                            key={reason}
-                                            onClick={() => toggleReason(reason)}
-                                            disabled={selectedReasons.length >= 3 && !selectedReasons.includes(reason)}
-                                            className={`px-3.5 py-2 rounded-full border text-[11px] font-bold transition-all ${
-                                                selectedReasons.includes(reason)
-                                                    ? "bg-[#FF7070] border-[#FF7070] text-white shadow-md shadow-red-500/10"
-                                                    : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-300 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                                            }`}
-                                        >
-                                            {reason}
-                                        </button>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {orgMembers.map(member => (
+                                        <div key={member.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
+                                            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex flex-shrink-0 items-center justify-center text-emerald-600 font-bold text-lg">
+                                                {member.userName?.charAt(0).toUpperCase() || "U"}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">{member.role || "Pengajar"}</p>
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{member.userName}</p>
+                                                <p className="text-xs text-gray-500 mt-1">Bergabung: {new Date(member.joinedAt).toLocaleDateString("id-ID")}</p>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
-                            </div>
+                            )}
+                        </div>
+                    )}
 
-                            <div className="space-y-2 mb-8">
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1 leading-none">Pesan Tambahan</span>
-                                <textarea
-                                    rows={3}
-                                    value={additionalNote}
-                                    onChange={setAdditionalNote ? e => setAdditionalNote(e.target.value) : undefined}
-                                    placeholder="Contoh: Dokumen NIB buram, mohon upload ulang..."
-                                    className="w-full px-4 py-3.5 text-[13px] border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/50 transition-all resize-none placeholder:text-gray-400"
-                                />
-                            </div>
-
-                            <div className="flex gap-3 justify-end items-center">
-                                <button
-                                    onClick={() => setShowRejectModal(false)}
-                                    className="px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors border border-gray-100 dark:border-gray-800"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    disabled={selectedReasons.length === 0 && !additionalNote.trim()}
-                                    onClick={handleConfirmReject}
-                                    className="px-8 py-2.5 bg-[#FF7070] hover:bg-[#FF5C5C] disabled:opacity-40 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-[0.98]"
-                                >
-                                    Konfirmasi Penolakan
-                                </button>
+                    {/* TAB: GALERI */}
+                    {activeTab === "galeri" && (
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-6">Galeri Aktivitas</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <div key={i} className="aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xs border border-gray-200 dark:border-gray-700">
+                                        Foto/Media {i}
+                                    </div>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                </div>
             </div>
         </div>
     )
 }
 
 // ─── Filter Constants ─────────────────────────────────────────────────────────
-const TIPE_OPTIONS = ["Industri", "Pendidikan"] as const
-const KATEGORI_PENDIDIKAN = ["Kursus", "Lembaga Pelatihan", "Perguruan Tinggi", "Pesantren", "SMA", "SMK", "Yayasan Pendidikan"] as const
-const KATEGORI_PERUSAHAAN = ["Finansial", "Kesehatan", "Konstruksi", "Kreatif", "Logistik", "Manufaktur", "Pertambangan", "Teknologi"] as const
+const TIPE_OPTIONS = ["public", "private"] as const
+const KATEGORI_OPTIONS = [
+    { id: "Pendidikan", label: "Pendidikan" },
+    { id: "Pesantren", label: "Pesantren" },
+    { id: "Company", label: "Company" },
+    { id: "Yayasan", label: "Yayasan" },
+    { id: "Komunitas", label: "Komunitas" },
+    { id: "Masjid", label: "Masjid" },
+    { id: "Umum", label: "Umum" }
+]
 
-type FilterState = {
-    tipe: string[]
-    kategoriPendidikan: string[]
-    kategoriPerusahaan: string[]
-}
-const EMPTY_FILTER: FilterState = { tipe: [], kategoriPendidikan: [], kategoriPerusahaan: [] }
 
 // ─── FilterModal Component ────────────────────────────────────────────────────
 function FilterModal({
@@ -567,19 +577,10 @@ function FilterModal({
     onApply: (f: FilterState) => void
     onClose: () => void
 }) {
-    const [draft, setDraft] = useState<FilterState>({
-        tipe: [...initial.tipe],
-        kategoriPendidikan: [...initial.kategoriPendidikan],
-        kategoriPerusahaan: [...initial.kategoriPerusahaan],
-    })
+    const [draft, setDraft] = useState<FilterState>(initial)
 
-    const toggle = (key: keyof FilterState, val: string) => {
-        setDraft(prev => ({
-            ...prev,
-            [key]: prev[key].includes(val)
-                ? prev[key].filter(v => v !== val)
-                : [...prev[key], val],
-        }))
+    const setVal = (key: keyof FilterState, val: string) => {
+        setDraft(prev => ({ ...prev, [key]: val }))
     }
 
     const ChipBtn = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
@@ -623,53 +624,33 @@ function FilterModal({
                             <Building2 className="w-4 h-4 text-gray-500" />
                             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Tipe Organisasi</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            {TIPE_OPTIONS.map(t => (
-                                <button
-                                    key={t}
-                                    onClick={() => toggle("tipe", t)}
-                                    className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${draft.tipe.includes(t)
-                                        ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 dark:hover:border-emerald-700 bg-white dark:bg-gray-800"
-                                        }`}
-                                >
-                                    {t}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* ── Kategori Pendidikan ── */}
-                    <div className="mb-5">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Building className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Kategori Pendidikan</span>
-                        </div>
                         <div className="flex flex-wrap gap-2">
-                            {KATEGORI_PENDIDIKAN.map(k => (
+                            <ChipBtn label="Semua" active={!draft.type} onClick={() => setVal("type", "")} />
+                            {TIPE_OPTIONS.map(t => (
                                 <ChipBtn
-                                    key={k}
-                                    label={k}
-                                    active={draft.kategoriPendidikan.includes(k)}
-                                    onClick={() => toggle("kategoriPendidikan", k)}
+                                    key={t}
+                                    label={t}
+                                    active={draft.type === t}
+                                    onClick={() => setVal("type", t)}
                                 />
                             ))}
                         </div>
                     </div>
 
-                    {/* ── Kategori Perusahaan ── */}
-                    <div className="mb-6">
+                    {/* ── Kategori Organisasi ── */}
+                    <div className="mb-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <Building2 className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Kategori Perusahaan</span>
+                            <Building className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Kategori Organisasi</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {KATEGORI_PERUSAHAAN.map(k => (
+                            <ChipBtn label="Semua" active={!draft.categoryId} onClick={() => setVal("categoryId", "")} />
+                            {KATEGORI_OPTIONS.map(k => (
                                 <ChipBtn
-                                    key={k}
-                                    label={k}
-                                    active={draft.kategoriPerusahaan.includes(k)}
-                                    onClick={() => toggle("kategoriPerusahaan", k)}
+                                    key={k.id}
+                                    label={k.label}
+                                    active={draft.categoryId === k.id}
+                                    onClick={() => setVal("categoryId", k.id)}
                                 />
                             ))}
                         </div>
@@ -698,95 +679,59 @@ function FilterModal({
 
 // ─── Main Content ─────────────────────────────────────────────────────────────
 function KycOrganisasiContent() {
-    const [activeTab, setActiveTab] = useState<"menunggu" | "disetujui" | "ditolak" | "semua">("menunggu")
-    const [search, setSearch] = useState("")
-    const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(10)
-    const [selectedOrg, setSelectedOrg] = useState<KycOrg | null>(null)
+    const {
+        orgs: filteredData,
+        loading,
+        totalCount,
+        page,
+        perPage,
+        tabCounts,
+        activeTab,
+        search,
+        filter: appliedFilter,
+        setPage,
+        setPerPage,
+        setActiveTab,
+        setSearch,
+        setFilter: setAppliedFilter,
+        sortOrder,
+        setSortOrder,
+        verifyOrg,
+        rejectOrg,
+        toggleActive,
+        toasts,
+        removeToast,
+    } = useKycOrganisasi()
+
+    const router = useRouter()
+
     const [showFilter, setShowFilter] = useState(false)
-    const [appliedFilter, setAppliedFilter] = useState<FilterState>(EMPTY_FILTER)
-    const [orgs, setOrgs] = useState<KycOrg[]>(DATA)
+    const [searchInput, setSearchInput] = useState(search)
 
-    // Toast state
-    const [toasts, setToasts] = useState<ToastData[]>([])
-    const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id))
-    const showToast = (message: string, type: "success" | "error") => {
-        const id = Date.now()
-        setToasts(prev => [...prev, { id, message, type }])
-        setTimeout(() => removeToast(id), 3500)
-    }
+    const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
 
-    const handleUpdateStatus = (id: number, status: "disetujui" | "ditolak", rejectionReason?: string) => {
-        const org = orgs.find(o => o.id === id)
-        setOrgs(prev => prev.map(o =>
-            o.id === id
-                ? {
-                    ...o,
-                    status,
-                    ...(rejectionReason ? { rejectionReason } : {}),
-                }
-                : o
-        ))
-        setSelectedOrg(null)
-        if (status === "disetujui") {
-            showToast(`✓ KYC ${org?.nama ?? "Organisasi"} berhasil disetujui`, "success")
-        } else {
-            showToast(`✗ KYC ${org?.nama ?? "Organisasi"} telah ditolak`, "error")
-        }
-    }
+    const activeFiltersCount = (appliedFilter.type ? 1 : 0) + (appliedFilter.isActive ? 1 : 0) + (appliedFilter.categoryId ? 1 : 0) + (appliedFilter.dateFrom ? 1 : 0) + (appliedFilter.dateTo ? 1 : 0)
 
-    const filteredData = useMemo(() => {
-        let data = orgs
-        if (activeTab !== "semua") data = data.filter(d => d.status === activeTab)
-        if (search.trim()) data = data.filter(d =>
-            d.nama.toLowerCase().includes(search.toLowerCase()) ||
-            d.user.toLowerCase().includes(search.toLowerCase())
-        )
-        // Tipe filter: Industri = non-PENDIDIKAN primary, Pendidikan = has PENDIDIKAN
-        if (appliedFilter.tipe.length > 0) {
-            data = data.filter(org =>
-                appliedFilter.tipe.some(t =>
-                    t === "Pendidikan" ? org.tipe.includes("PENDIDIKAN")
-                        : t === "Industri" ? org.tipe.some(tp => tp !== "PENDIDIKAN")
-                            : false
-                )
-            )
-        }
-        // Kategori filter: union of both sections
-        const allKat = [...appliedFilter.kategoriPendidikan, ...appliedFilter.kategoriPerusahaan]
-        if (allKat.length > 0) {
-            data = data.filter(org =>
-                allKat.some(k => org.kategori.toLowerCase() === k.toLowerCase())
-            )
-        }
-        return data
-    }, [activeTab, search, appliedFilter])
 
-    const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage))
-    const paginatedData = filteredData.slice((page - 1) * perPage, page * perPage)
-
-    const tabCounts = {
-        menunggu: orgs.filter(d => d.status === "menunggu").length,
-        disetujui: orgs.filter(d => d.status === "disetujui").length,
-        ditolak: orgs.filter(d => d.status === "ditolak").length,
-        semua: orgs.length,
-    }
 
     const tabs: { key: typeof activeTab; label: string }[] = [
-        { key: "menunggu", label: "Menunggu" },
-        { key: "disetujui", label: "Disetujui" },
-        { key: "ditolak", label: "Ditolak" },
         { key: "semua", label: "Semua" },
+        { key: "menunggu", label: "Menunggu" },
+        { key: "aktif", label: "Aktif" },
+        { key: "nonaktif", label: "Nonaktif" },
+        { key: "ditolak", label: "Ditolak" },
     ]
+
+    const getVisiblePages = () => {
+        if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        if (page <= 3) return [1, 2, 3, 4, 5];
+        if (page >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        return [page - 2, page - 1, page, page + 1, page + 2];
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
-            {/* Toast Notifications */}
             <Toast toasts={toasts} onRemove={removeToast} />
-            {/* Detail Modal */}
-            {selectedOrg && (
-                <KycDetailModal org={selectedOrg} onClose={() => setSelectedOrg(null)} onUpdateStatus={handleUpdateStatus} />
-            )}
 
             {/* Filter Modal */}
             {showFilter && (
@@ -797,34 +742,47 @@ function KycOrganisasiContent() {
                 />
             )}
 
+
+
             <div className="max-w-[1600px] mx-auto">
 
                 {/* ── Search + Filter Bar ── */}
                 <div className="flex items-center gap-2 mb-3">
-                    <div className="relative w-72">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Cari nama organisasi..."
-                            value={search}
-                            onChange={e => { setSearch(e.target.value); setPage(1) }}
-                            className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all"
-                        />
+                    <div className="flex items-center w-[360px] h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                        <div className="relative flex-1 h-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Cari nama organisasi"
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === "Enter") {
+                                        setSearch(searchInput)
+                                        setPage(1)
+                                    }
+                                }}
+                                className="w-full h-full pl-9 pr-4 text-sm focus:outline-none bg-transparent text-gray-900 dark:text-white placeholder:text-gray-400 border-none"
+                            />
+                        </div>
+                        <button
+                            onClick={() => { setSearch(searchInput); setPage(1) }}
+                            className="h-full px-5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                        >
+                            <Search className="w-3.5 h-3.5" /> Cari
+                        </button>
                     </div>
-                    <button className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors">
-                        <Search className="w-3.5 h-3.5" /> Cari
-                    </button>
                     <button
                         onClick={() => setShowFilter(true)}
-                        className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${(appliedFilter.tipe.length + appliedFilter.kategoriPendidikan.length + appliedFilter.kategoriPerusahaan.length) > 0
+                        className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${activeFiltersCount > 0
                             ? "border-emerald-400 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
                             : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                             }`}
                     >
                         <Filter className="w-4 h-4" /> Filter
-                        {(appliedFilter.tipe.length + appliedFilter.kategoriPendidikan.length + appliedFilter.kategoriPerusahaan.length) > 0 && (
+                        {activeFiltersCount > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">
-                                {appliedFilter.tipe.length + appliedFilter.kategoriPendidikan.length + appliedFilter.kategoriPerusahaan.length}
+                                {activeFiltersCount}
                             </span>
                         )}
                     </button>
@@ -844,7 +802,7 @@ function KycOrganisasiContent() {
                             {tab.label}
                             {activeTab === tab.key && tabCounts[tab.key] > 0 && (
                                 <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold rounded-full bg-emerald-500 text-white">
-                                    {tabCounts[tab.key]}
+                                    {tabCounts[tab.key] > 99 ? "99+" : tabCounts[tab.key]}
                                 </span>
                             )}
                         </button>
@@ -857,67 +815,96 @@ function KycOrganisasiContent() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-5 py-3 w-[33%]">Organisasi</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[18%]">Tipe &amp; Kategori</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-5 py-3 w-[28%]">Organisasi</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[10%]">Tipe</th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">Kategori</th>
                                     <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">User</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%]">Tgl Pengajuan</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[12%]">Status</th>
+                                    <th
+                                        className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[15%] cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 group transition-colors select-none"
+                                        onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            Tgl Pengajuan
+                                            {sortOrder === "newest" ? (
+                                                <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
+                                            ) : sortOrder === "oldest" ? (
+                                                <ArrowUp className="w-3.5 h-3.5 text-emerald-500" />
+                                            ) : (
+                                                <ArrowUpDown className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[10%]">Status</th>
                                     <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-4 py-3 w-[7%]">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedData.length === 0 ? (
+                                {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-20 text-gray-400 text-sm">
+                                        <td colSpan={7} className="text-center py-20 text-gray-400 text-sm">
+                                            Memuat data organisasi...
+                                        </td>
+                                    </tr>
+                                ) : filteredData.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="text-center py-20 text-gray-400 text-sm">
                                             Tidak ada data organisasi ditemukan
                                         </td>
                                     </tr>
-                                ) : paginatedData.map(org => {
-                                    const status = STATUS_CONFIG[org.status]
+                                ) : filteredData.map(org => {
+                                    let orgStatus = "nonaktif";
+                                    const statusStr = org.status ? org.status.toLowerCase() : "";
+                                    if (statusStr === "pending") orgStatus = "menunggu";
+                                    else if (statusStr === "active" || statusStr === "aktif" || statusStr === "approved") orgStatus = "aktif";
+                                    else if (statusStr === "inactive" || statusStr === "nonaktif") orgStatus = "nonaktif";
+                                    else if (statusStr === "rejected" || statusStr === "ditolak") orgStatus = "ditolak";
+                                    else if (org.isVerified === 0) orgStatus = "menunggu";
+                                    else if (org.isVerified === 2) orgStatus = "ditolak";
+                                    else if (org.isActive) orgStatus = "aktif";
+
+                                    const status = STATUS_CONFIG[orgStatus]
                                     const StatusIcon = status.icon
+                                    const tglPengajuan = new Date(org.createdAt || Date.now()).toLocaleDateString("id-ID", {
+                                        day: "numeric", month: "short", year: "numeric"
+                                    })
                                     return (
                                         <tr
                                             key={org.id}
-                                            onClick={() => setSelectedOrg(org)}
+                                            onClick={() => router.push(`/support/kyc-organisasi/${org.id}`)}
                                             className="border-b border-gray-50 dark:border-gray-800 hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10 transition-colors cursor-pointer"
                                         >
-                                            {/* Organisasi */}
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full ${org.avatarBg} flex items-center justify-center flex-shrink-0`}>
-                                                        <span className="text-white text-xs font-bold">{org.avatar}</span>
+                                                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                                        <span className="text-emerald-700 text-xs font-bold">
+                                                            {String(org.name || "O").charAt(0).toUpperCase()}
+                                                        </span>
                                                     </div>
                                                     <div>
-                                                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{org.nama}</p>
-                                                        {org.singkatan && (
-                                                            <p className="text-gray-400 text-xs mt-0.5">{org.singkatan}</p>
-                                                        )}
+                                                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{org.name}</p>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            {/* Tipe & Kategori */}
+                                            {/* Tipe */}
                                             <td className="px-4 py-4">
-                                                <div className="flex flex-wrap gap-1 mb-1.5">
-                                                    {org.tipe.map(t => {
-                                                        const conf = TIPE_CONFIG[t] ?? { cls: "bg-gray-100 text-gray-600 border border-gray-200", icon: null }
-                                                        return (
-                                                            <span key={t} className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded ${conf.cls}`}>
-                                                                {conf.icon}{t}
-                                                            </span>
-                                                        )
-                                                    })}
+                                                <div className="flex flex-wrap gap-1">
+                                                    <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                                        {org.type || "Organisasi"}
+                                                    </span>
                                                 </div>
-                                                <p className="text-xs text-gray-400">{org.kategori}</p>
+                                            </td>
+
+                                            {/* Kategori */}
+                                            <td className="px-4 py-4">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{org.categoryName || org.category || "Umum"}</p>
                                             </td>
 
                                             {/* User */}
                                             <td className="px-4 py-4">
                                                 <div className="flex flex-col">
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300">{org.user}</p>
-                                                    {org.userUsername && (
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{org.userUsername}</p>
-                                                    )}
+                                                    <p className="text-sm text-gray-700 dark:text-gray-300">{org.ownerName || (org as any).user || org.ownerUsername || "-"}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{org.ownerUsername || (org as any).userUsername || "-"}</p>
                                                 </div>
                                             </td>
 
@@ -925,7 +912,7 @@ function KycOrganisasiContent() {
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                                     <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                                    {org.tglPengajuan}
+                                                    {tglPengajuan}
                                                 </div>
                                             </td>
 
@@ -939,7 +926,7 @@ function KycOrganisasiContent() {
 
                                             {/* Aksi */}
                                             <td className="px-4 py-4">
-                                                <AksiDropdown id={org.id} onView={() => setSelectedOrg(org)} />
+                                                <AksiDropdown org={org} onToggle={toggleActive} onDetail={(id) => router.push(`/support/kyc-organisasi/${id}`)} />
                                             </td>
                                         </tr>
                                     )
@@ -954,22 +941,22 @@ function KycOrganisasiContent() {
                     <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center flex-wrap gap-1">
                         Menampilkan{" "}
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                            {filteredData.length === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, filteredData.length)}
+                            {totalCount === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, totalCount)}
                         </span>{" "}
-                        dari <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredData.length}</span> data
+                        dari <span className="font-semibold text-gray-700 dark:text-gray-300">{totalCount}</span> data
                         &nbsp;
                         <span className="text-gray-400">Baris:</span>
                         <PerPageSelect value={perPage} onChange={v => { setPerPage(v); setPage(1) }} />
                     </div>
                     <div className="flex items-center gap-1">
                         <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            onClick={() => setPage(Math.max(1, page - 1))}
                             disabled={page === 1}
                             className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        {getVisiblePages().map(p => (
                             <button
                                 key={p}
                                 onClick={() => setPage(p)}
@@ -982,7 +969,7 @@ function KycOrganisasiContent() {
                             </button>
                         ))}
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            onClick={() => setPage(Math.min(totalPages, page + 1))}
                             disabled={page === totalPages}
                             className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >

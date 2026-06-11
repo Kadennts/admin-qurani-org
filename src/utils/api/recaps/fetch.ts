@@ -578,7 +578,12 @@ export const getRecapAllAdmin = async (
       setoranData = rawResult.data.data;
       totalCount = rawResult.data.totalCount || rawResult.data.total || setoranData.length;
     }
-    // Format 3: { items: [...], totalCount: N }
+    // Format 3: { data: { items: [...], totalCount: N } } (from API docs)
+    else if (rawResult.data?.items && Array.isArray(rawResult.data.items)) {
+      setoranData = rawResult.data.items;
+      totalCount = rawResult.data.totalCount || rawResult.data.total || setoranData.length;
+    }
+    // Format 4: { items: [...], totalCount: N }
     else if (rawResult.items && Array.isArray(rawResult.items)) {
       setoranData = rawResult.items;
       totalCount = rawResult.totalCount || rawResult.total || setoranData.length;

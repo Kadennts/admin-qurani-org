@@ -29,7 +29,7 @@ export function LoginForm({
   const { t } = useI18n();
   const [isClient, setIsClient] = useState(false);
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect");
+  const redirectPath = searchParams?.get("redirect");
   const { data, handleChange } = useForm({
     username: "",
     password: "",

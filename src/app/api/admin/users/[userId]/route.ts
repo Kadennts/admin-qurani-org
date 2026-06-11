@@ -27,7 +27,7 @@ const toNullableNumber = (value: unknown): number | null | undefined => {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const cookieStore = await cookies()
@@ -42,7 +42,7 @@ export async function PUT(
       return NextResponse.json({ success: false, message: "Invalid auth context" }, { status: 401 })
     }
 
-    const { userId } = params
+    const { userId } = await params
     const targetUserId = String(userId || "").trim()
 
     if (!targetUserId) {

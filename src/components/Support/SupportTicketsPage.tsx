@@ -245,7 +245,7 @@ export default function SupportTicketsPage() {
           // Check for items array (MyQurani API format), then data array, then direct array
           let tickets = responseData?.items || responseData?.data || (Array.isArray(responseData) ? responseData : []);
           let total = responseData?.totalCount || tickets.length;
-          
+
           // If no tickets from admin endpoint, try /api/v1/tickets/my (user's own tickets)
           if (tickets.length === 0 && (!signal || !signal.aborted)) {
             try {
@@ -341,27 +341,27 @@ export default function SupportTicketsPage() {
         headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' }
       });
       if (!res.ok) return;
-      
+
       const json = await res.json();
       const statusData = json?.data || json || [];
-      
+
       let totalAll = 0;
       const stats = { all: 0, open: 0, in_progress: 0, answered: 0, on_hold: 0, closed: 0 };
-      
+
       if (Array.isArray(statusData)) {
-          statusData.forEach((s: any) => {
-              const name = (s.name || '').toLowerCase();
-              const count = s.count || s.total || s.totalCount || s.ticketCount || 0;
-              totalAll += count;
-              if (name === 'open') stats.open = count;
-              else if (name === 'in progress') stats.in_progress = count;
-              else if (name === 'answered') stats.answered = count;
-              else if (name === 'on hold') stats.on_hold = count;
-              else if (name === 'closed') stats.closed = count;
-          });
-          stats.all = totalAll;
+        statusData.forEach((s: any) => {
+          const name = (s.name || '').toLowerCase();
+          const count = s.count || s.total || s.totalCount || s.ticketCount || 0;
+          totalAll += count;
+          if (name === 'open') stats.open = count;
+          else if (name === 'in progress') stats.in_progress = count;
+          else if (name === 'answered') stats.answered = count;
+          else if (name === 'on hold') stats.on_hold = count;
+          else if (name === 'closed') stats.closed = count;
+        });
+        stats.all = totalAll;
       }
-      
+
       console.log('[Tickets] Stats (client):', stats);
       setStatusCounts(stats);
     } catch (e) {
