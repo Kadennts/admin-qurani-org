@@ -502,8 +502,11 @@ function SimOrderDetail({ order }: { order: SimOrder }) {
                                     <img src={order.trainer.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(order.trainer.name)}&background=10b981&color=fff`} alt={order.trainer.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
-                                    <p className="font-black text-gray-950 dark:text-white text-base">{order.trainer.name}</p>
-                                    <p className="text-[11px] text-emerald-600 font-semibold">@{order.trainer.email.split("@")[0]}</p>
+                                    <p className="font-black text-gray-950 dark:text-white text-base">{order.trainer.name || "—"}</p>
+                                    {order.trainer.email
+                                        ? <p className="text-[11px] text-emerald-600 font-semibold">@{order.trainer.email.split("@")[0]}</p>
+                                        : <p className="text-[11px] text-gray-400">—</p>
+                                    }
                                 </div>
                             </div>
                             <div className="space-y-2 text-xs">
@@ -594,11 +597,11 @@ function BookingDetailContent({ id }: { id: number }) {
         setApiLoading(true)
         setApiError(null)
         fetchBookingById(id)
-            .then(data => setApiDetail(data))
+            .then(data => setApiDetail(data))  // data bisa null jika 404/401
             .catch(err => {
                 console.error("Failed to fetch booking detail:", err)
                 setApiDetail(null)
-                setApiError("Detail dari API belum bisa dimuat, memakai data dummy jika tersedia.")
+                setApiError("Gagal memuat dari API.")
             })
             .finally(() => setApiLoading(false))
     }, [id])
@@ -659,16 +662,25 @@ function BookingDetailContent({ id }: { id: number }) {
     const pct = Math.round((sessCompleted / Math.max(1, booking.totalSessions)) * 100)
     const isPaid = detail.payment.status === "paid"
 
+    const isFromApi = !!apiDetail
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4">
             <div className="max-w-[1200px] mx-auto space-y-4">
 
-                {/* ── Back ── */}
-                <div className="flex items-center gap-3">
+                {/* ── Back + sumber data ── */}
+                <div className="flex items-center justify-between gap-3">
                     <Link href={BACK_URL}
                         className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-emerald-600 hover:border-emerald-400 transition-all">
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                        isFromApi
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                    }`}>
+                        {isFromApi ? "✓ Data API" : "◷ Data Lokal"}
+                    </span>
                 </div>
 
                 {/* ── Main grid ── */}
@@ -878,21 +890,27 @@ function BookingDetailContent({ id }: { id: number }) {
                             <div className="flex items-center gap-3">
                                 <div className="w-14 h-14 rounded-full border-2 border-emerald-100 p-0.5 flex-shrink-0">
                                     <div className="w-full h-full rounded-full overflow-hidden">
-                                        <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(detail.member.name)}&background=10b981&color=fff`} alt={detail.member.name} className="w-full h-full object-cover" />
+                                        <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(detail.member.name || "M")}&background=10b981&color=fff`} alt={detail.member.name} className="w-full h-full object-cover" />
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="font-black text-gray-950 dark:text-white text-base leading-tight">{detail.member.name}</p>
-                                    <p className="text-[11px] text-emerald-600 font-semibold">@{detail.member.email.split("@")[0]}</p>
+                                    <p className="font-black text-gray-950 dark:text-white text-base leading-tight">{detail.member.name || "—"}</p>
+                                    {detail.member.email
+                                        ? <p className="text-[11px] text-emerald-600 font-semibold">@{detail.member.email.split("@")[0]}</p>
+                                        : <p className="text-[11px] text-gray-400">—</p>
+                                    }
                                 </div>
                             </div>
                             <div className="space-y-2.5 text-xs">
-                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><Mail className="w-3.5 h-3.5 text-emerald-500" />{detail.member.email}</div>
-                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><Phone className="w-3.5 h-3.5 text-emerald-500" />{detail.member.phone}</div>
-                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><MapPin className="w-3.5 h-3.5 text-emerald-500" />{detail.member.location}</div>
+                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><Mail className="w-3.5 h-3.5 text-emerald-500" />{detail.member.email || "—"}</div>
+                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><Phone className="w-3.5 h-3.5 text-emerald-500" />{detail.member.phone || "—"}</div>
+                                <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400"><MapPin className="w-3.5 h-3.5 text-emerald-500" />{detail.member.location || "—"}</div>
                                 <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-400">
                                     <Calendar className="w-3.5 h-3.5 text-emerald-500" />
-                                    Bergabung {new Date(detail.member.joinDate).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+                                    {detail.member.joinDate
+                                        ? <>Bergabung {new Date(detail.member.joinDate).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</>
+                                        : "—"
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -908,16 +926,26 @@ function BookingDetailContent({ id }: { id: number }) {
                                     />
                                 </div>
                                 <div>
-                                    <p className="font-black text-gray-950 dark:text-white text-base leading-tight">{detail.trainer.name}</p>
-                                    <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">@{detail.trainer.email.split("@")[0]}</p>
+                                    <p className="font-black text-gray-950 dark:text-white text-base leading-tight">{detail.trainer.name || "—"}</p>
+                                    {detail.trainer.email
+                                        ? <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">@{detail.trainer.email.split("@")[0]}</p>
+                                        : <p className="text-[11px] text-gray-400 font-medium mt-0.5">—</p>
+                                    }
                                 </div>
                             </div>
                             <div className="space-y-2.5 text-xs">
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-0.5 rounded text-amber-600 font-bold text-[10px]">
-                                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />{detail.trainer.rating}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400 tracking-tight">{detail.trainer.totalStudents} Murid</span>
+                                    {detail.trainer.rating > 0 ? (
+                                        <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-0.5 rounded text-amber-600 font-bold text-[10px]">
+                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />{detail.trainer.rating}
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-gray-400 font-medium">Rating —</span>
+                                    )}
+                                    {detail.trainer.totalStudents > 0
+                                        ? <span className="text-[10px] font-bold text-gray-400 tracking-tight">{detail.trainer.totalStudents} Murid</span>
+                                        : <span className="text-[10px] text-gray-400">— Murid</span>
+                                    }
                                 </div>
                                 {(detail.trainer as any).location && (
                                     <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
@@ -933,7 +961,7 @@ function BookingDetailContent({ id }: { id: number }) {
                                 )}
                                 <div className="flex items-start gap-2.5 text-gray-700 dark:text-gray-400 font-bold">
                                     <BookOpen className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                                    <span>{detail.trainer.specialization}</span>
+                                    <span>{detail.trainer.specialization || "—"}</span>
                                 </div>
                                 {(detail.trainer as any).subjects?.length > 0 && (
                                     <div className="flex flex-wrap gap-1 pt-0.5">

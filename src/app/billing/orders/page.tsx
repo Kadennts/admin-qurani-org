@@ -9,6 +9,7 @@ import {
     TrendingUp, MoreHorizontal, ChevronLeft,
     ChevronRight, Trash2,
     ChevronDown, Check, Timer, BarChart2, History, Calendar,
+    Loader2, AlertCircle,
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import {
@@ -858,15 +859,37 @@ function PesananContent() {
                     </div>
                 </div>
 
+                {/* ── API Loading / Error Toast (pojok kanan bawah) ── */}
                 {(apiLoading || apiError) && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <div className="text-xs font-medium">
-                            {apiLoading ? (
-                                <span className="text-gray-400">Memuat pesanan dari API Qurani...</span>
-                            ) : apiError ? (
-                                <span className="text-amber-600 dark:text-amber-400">{apiError}</span>
-                            ) : null}
-                        </div>
+                    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+                        {apiLoading && (
+                            <div className="pointer-events-auto flex items-center gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-xl shadow-black/10 animate-in slide-in-from-bottom-3 fade-in duration-300">
+                                <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                                    <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-800 dark:text-white">Memuat pesanan...</p>
+                                    <p className="text-[10px] text-gray-400 font-medium">Mengambil data dari API Qurani</p>
+                                </div>
+                            </div>
+                        )}
+                        {!apiLoading && apiError && (
+                            <div className="pointer-events-auto flex items-center gap-3 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-2xl px-4 py-3 shadow-xl shadow-black/10 animate-in slide-in-from-bottom-3 fade-in duration-300">
+                                <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">API tidak tersedia</p>
+                                    <p className="text-[10px] text-gray-400 font-medium">Menampilkan data lokal</p>
+                                </div>
+                                <button
+                                    onClick={() => setApiError(null)}
+                                    className="w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 

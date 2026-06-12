@@ -303,8 +303,15 @@ export async function fetchAdminBookings(params?: { page?: number; pageSize?: nu
 }
 
 export async function fetchBookingById(id: string | number) {
-    const payload = await apiJson(`/api/v1/Bookings/${id}`)
-    return apiBookingToDetail(payload)
+    try {
+        const payload = await apiJson(`/api/v1/Bookings/${id}`)
+        if (!payload) return null
+        return apiBookingToDetail(payload)
+    } catch (err: any) {
+        // 404 = ID tidak ada di server, 401 = belum login → kembalikan null agar UI pakai data dummy
+        if (err?.message && /40[14]/.test(err.message)) return null
+        throw err
+    }
 }
 
 export async function bulkUpdateBookingStatus(bookingIds: Array<string | number>, status: BillingPipelineStatus) {

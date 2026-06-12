@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 import { paymentsApi, type PaymentSearchParams } from "@/lib/api"
-import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, FileText, MoreHorizontal, CheckCircle2, AlertCircle, ChevronDown } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, FileText, MoreHorizontal, CheckCircle2, AlertCircle, ChevronDown, MessageSquare } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import DisputesTab from "./DisputesTab"
 
 interface PaymentData {
     id: number | string;
@@ -109,6 +110,9 @@ function PaymentsContent() {
     const [error, setError] = useState<string | null>(null)
     const [page, setPage] = useState(1)
     const [totalItems, setTotalItems] = useState(0)
+    
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'payments' | 'disputes'>('payments')
 
     // Search state
     const [searchInput, setSearchInput] = useState("")
@@ -356,9 +360,34 @@ function PaymentsContent() {
                             </h1>
                         </div>
                     </div>
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200 dark:border-gray-800 mt-4">
+                        <button
+                            onClick={() => setActiveTab('payments')}
+                            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                                activeTab === 'payments'
+                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                            }`}
+                        >
+                            Daftar Pembayaran
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('disputes')}
+                            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                                activeTab === 'disputes'
+                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                            }`}
+                        >
+                            Sengketa (Disputes)
+                        </button>
+                    </div>
                 </div>
             </div>
 
+            {/* Payments Tab Content */}
+            {activeTab === 'payments' && (
             <div className="px-4 sm:px-6 lg:px-8 mt-6">
                 {/* Stats Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -583,6 +612,14 @@ function PaymentsContent() {
                     )}
                 </div>
             </div>
+            )}
+
+            {/* Disputes Tab Content */}
+            {activeTab === 'disputes' && (
+                <div className="px-4 sm:px-6 lg:px-8 mt-6">
+                    <DisputesTab />
+                </div>
+            )}
 
             {/* Refund Modal */}
             {processRefundModal && (
@@ -829,7 +866,7 @@ function PaymentsContent() {
 
 export default function PaymentsPage() {
     return (
-        <I18nProvider>
+        <I18nProvider namespaces={['common', 'billing', 'navigation']}>
             <DashboardLayout>
                 <PaymentsContent />
             </DashboardLayout>

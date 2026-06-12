@@ -1928,6 +1928,35 @@ export const paymentsApi = {
             body: data,
             token
         }),
+
+    // Get all disputes (Admin)
+    getDisputes: (params: { page?: number | string; pageSize?: number | string; status?: string; type?: string; priority?: string } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                searchParams.append(key, String(value));
+            }
+        });
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Payments/disputes${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Respond to dispute (Admin)
+    respondDispute: (id: number | string, data: { response: string; merchantEvidence?: string }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/disputes/${id}/respond`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
+
+    // Resolve dispute (Admin)
+    resolveDispute: (id: number | string, data: { resolution: string; resolutionNotes?: string; refundAmount?: number; autoProcessRefund?: number | boolean }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/disputes/${id}/resolve`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
+        
 };
 
 export { API_BASE };

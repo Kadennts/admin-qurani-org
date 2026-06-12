@@ -33,6 +33,23 @@ function getMyQuraniUser(request: NextRequest): MyQuraniUser | null {
   }
 }
 
+/**
+ * Build a redirect URL that works correctly behind a reverse proxy.
+ * Di production, request.nextUrl.origin bisa menunjuk ke http://localhost:3000
+ * karena Nginx meneruskan request ke internal Next.js server.
+ * Kita gunakan NEXT_PUBLIC_BASE_URL sebagai base URL yang benar.
+ */
+function buildRedirectUrl(request: NextRequest, pathname: string): URL {
+  const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  if (publicBaseUrl) {
+    return new URL(pathname, publicBaseUrl);
+  }
+  // Fallback: gunakan request URL (benar untuk local dev tanpa reverse proxy)
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  return url;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -67,9 +84,7 @@ export async function updateSession(request: NextRequest) {
 
     // Redirect authenticated user away from login/register pages
     if (isLoginPage || isRegisterPage || isHomePage) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildRedirectUrl(request, "/dashboard"));
     }
 
     // Allow access to protected routes
@@ -118,9 +133,7 @@ export async function updateSession(request: NextRequest) {
 
       // Check if user is blocked
       if (isBlocked && !isBlockedPage) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/blocked";
-        return NextResponse.redirect(url);
+        return NextResponse.redirect(buildRedirectUrl(request, "/blocked"));
       }
     }
   } catch (error) {
@@ -134,18 +147,15 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && (isLoginPage || isRegisterPage || isHomePage)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(buildRedirectUrl(request, "/dashboard"));
   }
 
   // Redirect unauthenticated users to login
   if (!isAuthenticated && !isAuthCallback && !isLoginPage && !isRegisterPage && !isHomePage && isProtectedRoute) {
     console.log("[Middleware] No auth found, redirecting to login");
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(buildRedirectUrl(request, "/login"));
   }
 
   return response;
 }
+

@@ -85,12 +85,12 @@ const getSidebarData = (
           icon: BookOpen,
         },
         {
-          title: "KYC Member",
+          title: t("navigation.kyc_member", "KYC Member"),
           url: "/support/kyc-member",
           icon: UserCheck,
         },
         {
-          title: "KYC Organisasi",
+          title: t("navigation.kyc_organization", "KYC Organisasi"),
           url: "/support/kyc-organisasi",
           icon: GraduationCap,
         },
@@ -107,17 +107,17 @@ const getSidebarData = (
           icon: RxDashboard,
         },
         {
-          title: "Pesanan",
+          title: t("navigation.orders", "Pesanan"),
           url: "/billing/orders",
           icon: Receipt,
         },
         {
-          title: "Promo & Kupon",
+          title: t("navigation.promo_coupons", "Promo & Kupon"),
           url: "/billing/discountcodes",
           icon: Tag,
         },
         {
-          title: "Wallet",
+          title: t("navigation.wallet", "Wallet"),
           url: "/billing/wallet",
           icon: Wallet,
         },
@@ -191,27 +191,27 @@ const getSidebarData = (
           icon: Tag,
         },
         {
-          title: "Tax Rates",
+          title: t("navigation.tax_rates", "Tax Rates"),
           url: "/billing/taxrates",
           icon: Receipt,
         },
         {
-          title: "Pesanan",
+          title: t("navigation.member_subscription", "Member Subscription"),
           url: "/billing/member-subscription",
           icon: UserCheck,
         },
         {
-          title: "Guru",
+          title: t("navigation.trainers", "Guru"),
           url: "/billing/guru",
           icon: GraduationCap,
         },
         {
-          title: "Paket",
+          title: t("navigation.packages", "Paket"),
           url: "/billing/paket",
           icon: Package,
         },
         {
-          title: "Payout Guru",
+          title: t("navigation.trainer_payout", "Payout Guru"),
           url: "/billing/payout",
           icon: Banknote,
         },

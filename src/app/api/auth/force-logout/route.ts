@@ -11,7 +11,10 @@ export async function GET(request: Request) {
     console.log('[Force Logout] Clearing all cookies:', allCookies.map(c => c.name));
 
     // Create redirect response
-    const baseUrl = new URL(request.url).origin;
+    // Di production di balik reverse proxy, request.url = http://localhost:3000/...
+    // sehingga harus pakai NEXT_PUBLIC_BASE_URL agar redirect ke domain publik yang benar
+    const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    const baseUrl = publicBaseUrl || new URL(request.url).origin;
     const response = NextResponse.redirect(new URL('/login', baseUrl));
 
     // Delete all myqurani related cookies (including httpOnly)

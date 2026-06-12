@@ -87,6 +87,28 @@ export function LoginForm({
 
         const res = await loginWithToast(formData);
         if (res?.success) {
+          // Server action berhasil tapi hanya set cookie (httpOnly).
+          // Kita HARUS juga set localStorage agar AuthProvider tidak
+          // mendeteksi "stale cookie" dan memicu force-logout ke localhost.
+          try {
+            const { authApi } = await import('@/lib/api');
+            await authApi.login(data.username, data.password);
+          } catch {
+            // Jika client-side login juga gagal, 
+            // cookie dari server action sudah cukup untuk middleware,
+            // tapi kita perlu set localStorage manual dari data yang ada.
+            const { setStoredAuth } = await import('@/lib/api');
+            setStoredAuth({
+              userId: res.user?.id || 0,
+              email: res.user?.email || data.username,
+              username: data.username,
+              name: res.user?.name || data.username,
+              accessToken: '', // akan di-refresh oleh AuthProvider
+              refreshToken: '',
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              roles: [res.user?.role || 'member'],
+            });
+          }
           const destination = redirectPath || "/dashboard";
           router.replace(destination);
         }
