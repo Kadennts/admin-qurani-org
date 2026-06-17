@@ -1,0 +1,89 @@
+{
+  "statistics": {
+    "totalWallets": 1500,
+    "activeWallets": 1450,
+    "totalBalance": 15000000,
+    "totalPendingTopups": 25,
+    "totalPendingWithdraws": 12,
+    "volumeToday": 25000000,
+    "volumeThisMonth": 450000000
+  },
+  "pendingTopups": [
+    {
+      "id": 101,
+      "userId": 501,
+      "user": {
+        "id": 501,
+        "name": "Ahmad Fulan",
+        "email": "ahmad@example.com"
+      },
+      "amount": 500000,
+      "status": "PENDING",
+      "paymentMethod": "BCA Virtual Account",
+      "createdAt": "2026-06-15T08:00:00Z",
+      "externalReference": null
+    },
+    {
+      "id": 102,
+      "userId": 502,
+      "user": {
+        "id": 502,
+        "name": "Budi Santoso",
+        "email": "budi@example.com"
+      },
+      "amount": 1000000,
+      "status": "PENDING",
+      "paymentMethod": "GoPay",
+      "createdAt": "2026-06-14T14:30:00Z",
+      "externalReference": null
+    },
+    {
+      "id": 103,
+      "userId": 503,
+      "user": {
+        "id": 503,
+        "name": "Siti Aminah",
+        "email": "siti@example.com"
+      },
+      "amount": 250000,
+      "status": "PENDING",
+      "paymentMethod": "OVO",
+      "createdAt": "2026-06-14T09:15:00Z",
+      "externalReference": null
+    }
+  ],
+  "pendingWithdraws": [
+    {
+      "id": 201,
+      "userId": 601,
+      "user": {
+        "id": 601,
+        "name": "Ust. Rahmat Hidayat",
+        "email": "rahmat@example.com"
+      },
+      "amount": 2000000,
+      "status": "PENDING",
+      "bankName": "Bank Mandiri",
+      "accountNumber": "1234567890",
+      "accountName": "Rahmat Hidayat",
+      "createdAt": "2026-06-15T07:45:00Z",
+      "reason": null
+    },
+    {
+      "id": 202,
+      "userId": 602,
+      "user": {
+        "id": 602,
+        "name": "Ustzh. Aisyah",
+        "email": "aisyah@example.com"
+      },
+      "amount": 1500000,
+      "status": "PENDING",
+      "bankName": "BSI",
+      "accountNumber": "0987654321",
+      "accountName": "Aisyah",
+      "createdAt": "2026-06-13T10:20:00Z",
+      "reason": null
+    }
+  ]
+}

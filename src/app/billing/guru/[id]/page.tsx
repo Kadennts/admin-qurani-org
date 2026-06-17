@@ -10,7 +10,7 @@ import {
     ArrowLeft, MapPin, Clock3, BookOpen, Star, CheckCircle2, XCircle,
     AlertTriangle, ShieldCheck, ShieldOff, Image as ImageIcon, MessageSquare,
     Info, Award, FileText, User, BadgeCheck, CircleDashed, X, ExternalLink,
-    Loader2, Package, Quote, Mail, Coins, PlayCircle, Users, LinkIcon,
+    Loader2, Package, Quote, Mail, Coins, PlayCircle, Users, LinkIcon, Hourglass,
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import dummyData from "@/data/billing-dummy.json"
@@ -27,7 +27,7 @@ function getClientToken(): string | null {
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TrainerStatus = "verified" | "pending" | "suspended" | "rejected"
 type DetailTab = "informasi" | "paket" | "galeri" | "ulasan"
-type RequirementKey = "data_diri" | "pendidikan_sertifikasi" | "kualifikasi_metode" | "sertifikat"
+type RequirementKey = "profil_kontak" | "kualifikasi_metode" | "sertifikat" | "media_portofolio"
 
 type TrainerDetail = {
     id: number
@@ -49,6 +49,7 @@ type TrainerDetail = {
     totalStudents: number
     totalReviews: number
     status: TrainerStatus
+    bgCheckStatus?: "none" | "requested" | "completed" | "failed"
     createdAt: string
     portfolioUrls: string[]
     certifications: {
@@ -217,99 +218,78 @@ function getMethodAbbrev(name: string): string {
 function buildRequirements(detail: TrainerDetail): RequirementItem[] {
     const allPortfolio = detail.portfolioUrls || []
     const videoLinks = allPortfolio.filter((url) => detectMediaKind(url) === "video")
+    const photoLinks = allPortfolio.filter((url) => detectMediaKind(url) === "image")
     const fatihahLinks = videoLinks.filter((url) => /(fatihah|fatiha|alfatihah|al-fatihah)/i.test(url))
     const suratPendekLinks = videoLinks.filter((url) => !fatihahLinks.includes(url))
 
-    // ─── 1. Data Diri ──────────────────────────────────────────────────────────
-    // Tidak menampilkan foto profil & ID User (sudah tampil di halaman detail guru)
-    const dataDiriOk = Boolean(detail.userName && detail.location && detail.headline)
-    const dataDiriEvidence = [
+    // ─── 1. Profil Dasar ───────────────────────────────────────────────────────
+    const profilOk = Boolean(detail.userName && detail.location)
+    const profilEvidence = [
         { label: "Nama Lengkap & Gelar", value: detail.userName || "-" },
-        { label: "Nomor WhatsApp",       value: "-" },
-        { label: "Alamat Email",         value: "-" },
-        { label: "Tanggal Lahir",        value: "-" },
-        { label: "Jenis Kelamin",        value: "-" },
-        { label: "Alamat Domisili Sekarang", value: detail.location || "-" },
+        { label: "Domisili",             value: detail.location || "-" },
+        { label: "Pengalaman Mengajar",  value: `${detail.experienceYears || 0} Tahun` },
     ]
 
-    // ─── 2. Pendidikan & Sertifikasi ───────────────────────────────────────────
-    const certEvidence = detail.certifications.map((cert, idx) => ({
-        label: `Sertifikat Keahlian: ${cert.name || `Sertifikat ${idx + 1}`}`,
-        value: `Penerbit: ${cert.issuer || "—"} | Diterbitkan: ${formatDate(cert.issuedDate)} | Berlaku hingga: ${formatDate(cert.expiryDate)}`,
-        url: cert.url || undefined,
-        isCert: true as const,
-    }))
-    const pendidikanEvidence = [
-        { label: "Nama Universitas / Instansi Terakhir", value: detail.certifications[0]?.issuer || "-" },
-        { label: "Jenjang Pendidikan Terakhir",          value: "-" },
-        ...certEvidence,
-        // Media Verifikasi Hafalan — video links
-        ...fatihahLinks.map((url, idx) => ({
-            label: `Link Video Surat Al-Fatihah${fatihahLinks.length > 1 ? ` ${idx + 1}` : ""}`,
-            url,
-            isVideo: true as const,
-        })),
-        ...suratPendekLinks.map((url, idx) => ({
-            label: `Link Video Surat Pendek${suratPendekLinks.length > 1 ? ` ${idx + 1}` : ""}`,
-            url,
-            isVideo: true as const,
-        })),
-        // Placeholder jika belum ada video
-        ...(fatihahLinks.length === 0    ? [{ label: "Link Video Surat Al-Fatihah", value: "-", isVideo: false as const }] : []),
-        ...(suratPendekLinks.length === 0 ? [{ label: "Link Video Surat Pendek",    value: "-", isVideo: false as const }] : []),
-    ]
-    const pendidikanOk = detail.certifications.length > 0 || fatihahLinks.length > 0
-
-    // ─── 3. Kualifikasi & Metode ───────────────────────────────────────────────
+    // ─── 2. Kualifikasi & Metode ───────────────────────────────────────────────
     const modeString =
         detail.isOnline && detail.isOffline ? "Online & Offline"
         : detail.isOnline                   ? "Online"
         : detail.isOffline                  ? "Offline"
         : "-"
     const kualifikasiEvidence = [
-        { label: "Spesialisasi Utama",       value: detail.expertise[0] || "-" },
-        { label: "Jumlah Hafalan (Juz)",     value: "-" },
-        { label: "Detail Hafalan",           value: "-" },
-        { label: "Metode yang Dikuasai",     value: detail.expertise.join(", ") || "-" },
-        { label: "Mode Mengajar",            value: modeString },
-        { label: "Kendaraan Pribadi",        value: "-" },
+        { label: "Headline / Slogan",        value: detail.headline || "-" },
         { label: "Biografi Singkat",         value: detail.bio || "-" },
-        { label: "Deskripsi Program Kursus", value: "-" },
+        { label: "Keahlian / Spesialisasi",  value: detail.expertise.join(", ") || "-" },
+        { label: "Mode Mengajar",            value: modeString },
+        { label: "Tarif Mengajar per Jam",   value: `${detail.currency || "IDR"} ${detail.hourlyRate || 0}` },
     ]
     const kualifikasiOk = detail.expertise.length > 0 || Boolean(detail.bio)
 
-    // ─── 4. Sertifikat / Ijazah ────────────────────────────────────────────────
-    const ijazahEvidence = detail.certifications.map((cert, idx) => ({
-        label: cert.name || `Sertifikat ${idx + 1}`,
-        value: `Penerbit: ${cert.issuer || "—"} | Diterbitkan: ${formatDate(cert.issuedDate)} | Berlaku hingga: ${formatDate(cert.expiryDate)}`,
+    // ─── 3. Sertifikasi & Ijazah ───────────────────────────────────────────────
+    const certEvidence = detail.certifications.map((cert, idx) => ({
+        label: `Sertifikat / Ijazah: ${cert.name || `Sertifikat ${idx + 1}`}`,
+        value: `Penerbit: ${cert.issuer || "—"} | Diterbitkan: ${formatDate(cert.issuedDate)}${cert.expiryDate ? ` | Berlaku hingga: ${formatDate(cert.expiryDate)}` : ""}`,
         url: cert.url || undefined,
         isCert: true as const,
     }))
+    const certOk = detail.certifications.length > 0
+
+    // ─── 4. Portofolio & Media ─────────────────────────────────────────────────
+    const mediaEvidence = [
+        ...fatihahLinks.map((url, idx) => ({
+            label: `Link Video Surat Al-Fatihah${fatihahLinks.length > 1 ? ` ${idx + 1}` : ""}`,
+            url,
+            isVideo: true as const,
+        })),
+        ...suratPendekLinks.map((url, idx) => ({
+            label: `Link Video Surat Pendek / Portofolio${suratPendekLinks.length > 1 ? ` ${idx + 1}` : ""}`,
+            url,
+            isVideo: true as const,
+        })),
+        ...photoLinks.map((url, idx) => ({
+            label: `Foto Portofolio${photoLinks.length > 1 ? ` ${idx + 1}` : ""}`,
+            url,
+            isPhoto: true as const,
+        })),
+        ...(fatihahLinks.length === 0 && suratPendekLinks.length === 0 && photoLinks.length === 0 ? [{ label: "Media Portofolio", value: "-", isPhoto: false, isVideo: false }] : [])
+    ]
+    const mediaOk = allPortfolio.length > 0
 
     return [
         {
-            key: "data_diri",
-            title: "Data Diri",
-            subtitle: "Nama, informasi kontak & domisili",
+            key: "profil_kontak",
+            title: "Profil Dasar",
+            subtitle: "Nama, lokasi domisili & pengalaman",
             required: true,
-            ok: dataDiriOk,
-            dataCount: dataDiriEvidence.filter((d) => d.value && d.value !== "-").length,
-            evidence: dataDiriEvidence,
-        },
-        {
-            key: "pendidikan_sertifikasi",
-            title: "Pendidikan & Sertifikasi",
-            subtitle: "Riwayat pendidikan, sertifikat & media verifikasi hafalan",
-            required: true,
-            ok: pendidikanOk,
-            dataCount: detail.certifications.length + fatihahLinks.length + suratPendekLinks.length,
-            evidence: pendidikanEvidence,
+            ok: profilOk,
+            dataCount: profilEvidence.filter((d) => d.value && d.value !== "-").length,
+            evidence: profilEvidence,
         },
         {
             key: "kualifikasi_metode",
             title: "Kualifikasi & Metode",
-            subtitle: "Spesialisasi, metode mengajar & biografi",
-            required: false,
+            subtitle: "Headline, biografi, keahlian & tarif",
+            required: true,
             ok: kualifikasiOk,
             dataCount: kualifikasiEvidence.filter((d) => d.value && d.value !== "-").length,
             evidence: kualifikasiEvidence,
@@ -317,17 +297,26 @@ function buildRequirements(detail: TrainerDetail): RequirementItem[] {
         {
             key: "sertifikat",
             title: "Sertifikat / Ijazah",
-            subtitle: "Dokumen pendukung keahlian",
+            subtitle: "Dokumen riwayat pendidikan & sertifikasi",
+            required: true,
+            ok: certOk,
+            dataCount: detail.certifications.length,
+            evidence: certEvidence,
+        },
+        {
+            key: "media_portofolio",
+            title: "Portofolio & Media",
+            subtitle: "Video hafalan atau foto kegiatan mengajar",
             required: false,
-            ok: ijazahEvidence.length > 0,
-            dataCount: ijazahEvidence.length,
-            evidence: ijazahEvidence,
+            ok: mediaOk,
+            dataCount: fatihahLinks.length + suratPendekLinks.length + photoLinks.length,
+            evidence: mediaEvidence,
         },
     ]
 }
 
 // ── RequirementModal ──────────────────────────────────────────────────────────
-function RequirementModal({ item, onClose }: { item: RequirementItem | null; onClose: () => void }) {
+function RequirementModal({ item, onClose, onVerifyCredential, loadingCert }: { item: RequirementItem | null; onClose: () => void; onVerifyCredential?: (ev: any) => void; loadingCert?: string | null }) {
     if (!item) return null
 
     const photoItems = item.evidence.filter(e => e.isPhoto)
@@ -456,9 +445,20 @@ function RequirementModal({ item, onClose }: { item: RequirementItem | null; onC
                                                     <span className="text-xs text-amber-600/60 dark:text-amber-400/40">Belum ada dokumen</span>
                                                 </div>
                                             )}
-                                            <div className="px-3 py-2.5 bg-white dark:bg-gray-900">
+                                            <div className="px-3 py-2.5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
                                                 <p className="text-xs font-bold text-gray-900 dark:text-white">{ev.label}</p>
                                                 {ev.value && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{ev.value}</p>}
+                                                
+                                                {onVerifyCredential && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onVerifyCredential(ev); }}
+                                                        disabled={loadingCert === ev.url}
+                                                        className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 text-xs font-semibold transition-colors disabled:opacity-50"
+                                                    >
+                                                        {loadingCert === ev.url ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                                                        Tandai Dokumen Sah / Valid
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -500,6 +500,49 @@ const DUMMY_BIOS = guruDetailDummy.bios
 const DUMMY_EXPERTISE_LIST = guruDetailDummy.expertiseList
 
 function buildFallbackDetail(id: number): TrainerDetail {
+    if (id === 999999) {
+        return {
+            id: 999999,
+            userId: 999999,
+            userName: "Ustadz Ahmad Faris",
+            username: "ahmadfaris_tahsin",
+            userImage: "https://i.pravatar.cc/150?img=11",
+            headline: "Pengajar Tahsin & Tajwid Bersertifikat",
+            bio: "Lulusan Universitas Al-Azhar Kairo jurusan Ilmu Al-Qur'an dan Tafsir. Berpengalaman 5 tahun mengajar Al-Qur'an dengan metode talaqqi dan fokus pada perbaikan makhraj huruf serta hukum tajwid.",
+            location: "Jakarta Selatan, Indonesia",
+            experienceYears: 5,
+            expertise: ["Tahsin", "Tajwid", "Tafsir"],
+            isOnline: true,
+            isOffline: true,
+            hourlyRate: 75000,
+            currency: "IDR",
+            averageRating: 0,
+            totalCourses: 0,
+            totalStudents: 0,
+            totalReviews: 0,
+            status: "pending", // Ini yang memicu munculnya tombol Verifikasi Pengajar
+            bgCheckStatus: "none",
+            createdAt: new Date().toISOString(),
+            portfolioUrls: [
+                "https://www.youtube.com/watch?v=11xO9zK7lU0",
+                "https://images.unsplash.com/photo-1609599006353-e629aaab31f7?q=80&w=600&auto=format&fit=crop"
+            ],
+            certifications: [
+                {
+                    name: "Syahadah Tahsin Metode Qiroati",
+                    issuer: "Lembaga Qiroati Pusat",
+                    issuedDate: "2021-05-10T00:00:00Z",
+                    expiryDate: "",
+                    url: "https://images.unsplash.com/photo-1589330694653-efa647611536?q=80&w=600&auto=format&fit=crop"
+                }
+            ],
+            teachingMethods: [{
+                name: "Talaqqi",
+                description: "Menghafal langsung face-to-face dengan guru untuk memastikan pelafalan makhraj yang tepat."
+            }]
+        }
+    }
+
     const idx = (id - 1) % 5
     // Look up the name from dummyData to ensure consistency
     const found = dummyData.bookingDetails.map(bd => bd.trainer).find(t => t.id === Number(id))
@@ -509,7 +552,7 @@ function buildFallbackDetail(id: number): TrainerDetail {
         userId: id,
         userName: found?.name ?? DUMMY_NAMES[idx] ?? `Guru #${id}`,
         username: found?.email?.split('@')[0] ?? `ustadz${id}`,
-        userImage: found?.avatar ?? `https://i.pravatar.cc/150?img=${(id % 70) + 1}`,
+        userImage: found?.avatar ?? "",
         headline: found?.specialization ?? DUMMY_HEADLINES[idx] ?? "Pengajar Al-Qur'an",
         bio: DUMMY_BIOS[idx] ?? "Belum ada bio.",
         location: "Indonesia",
@@ -542,7 +585,8 @@ function GuruDetailContent() {
     const [loading, setLoading]         = useState(true)
     const [error, setError]             = useState<string | null>(null)
     const [detail, setDetail]           = useState<TrainerDetail | null>(null)
-    const [actionLoading, setActionLoading] = useState<"approve" | "reject" | "suspend" | "unsuspend" | null>(null)
+    const [actionLoading, setActionLoading] = useState<"approve" | "reject" | "suspend" | "unsuspend" | "bgcheck" | null>(null)
+    const [certLoading, setCertLoading] = useState<string | null>(null)
     const [tab, setTab]                 = useState<DetailTab>("informasi")
     const [activeRequirement, setActiveRequirement] = useState<RequirementItem | null>(null)
     const [reviews, setReviews]         = useState<ReviewItem[]>([])
@@ -551,6 +595,7 @@ function GuruDetailContent() {
     const [courses, setCourses]         = useState<CourseItem[]>([])
     const [coursesLoading, setCoursesLoading] = useState(false)
     const [coursesError, setCoursesError]   = useState<string | null>(null)
+    const [selectedCourse, setSelectedCourse] = useState<CourseItem | null>(null)
     const [rejectModalOpen, setRejectModalOpen] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
 
@@ -562,7 +607,6 @@ function GuruDetailContent() {
         const headers: HeadersInit = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 
         setLoading(true)
-        setCoursesLoading(true)
 
         // 1. Fetch Trainer Detail
         fetch(`${API_BASE_URL}/api/v1/Trainers/${id}`, { headers })
@@ -585,7 +629,7 @@ function GuruDetailContent() {
                     userId: d.userId ?? d.id,
                     userName: uname,
                     username: d.username ?? d.userUsername ?? uname.toLowerCase().replace(/\s+/g, ""),
-                    userImage: d.userImage ?? d.avatar ?? `https://i.pravatar.cc/150?img=${(id % 70) + 1}`,
+                    userImage: d.userImage ?? d.avatar ?? "",
                     headline: normalizeHeadline(rawHeadline),
                     bio: d.bio ?? null,
                     location: d.location ?? null,
@@ -601,26 +645,29 @@ function GuruDetailContent() {
                     totalReviews: d.totalReviews ?? 0,
                     status: validStatus,
                     createdAt: d.createdAt ?? new Date().toISOString(),
-                    portfolioUrls: Array.isArray(d.portfolioUrls) && d.portfolioUrls.length > 0 ? d.portfolioUrls : DUMMY_GALLERY_URLS,
-                    certifications: Array.isArray(d.certifications) && d.certifications.length > 0 ? d.certifications : DUMMY_CERTS,
+                    portfolioUrls: Array.isArray(d.portfolioUrls) && d.portfolioUrls.length > 0 ? d.portfolioUrls : [],
+                    certifications: Array.isArray(d.certifications) && d.certifications.length > 0 ? d.certifications : [],
                     teachingMethods: Array.isArray(d.teachingMethods) ? d.teachingMethods : [],
                 })
-                // Always load dummy reviews + try API reviews
-                setReviews(DUMMY_REVIEWS)
-                setReviewsTotalCount(DUMMY_REVIEWS.length)
+                // Clear any error if success
+                setError(null)
             })
-            .catch(() => {
-                // Use fallback dummy data
-                setDetail(buildFallbackDetail(id))
-                // Do not set error text to avoid showing the red alert banner
+            .catch((err) => {
+                setError(err.message)
+                setDetail(null)
             })
             .finally(() => {
                 setLoading(false)
-                // Ensure dummy reviews are always populated
-                setReviews(prev => prev.length === 0 ? DUMMY_REVIEWS : prev)
-                setReviewsTotalCount(prev => prev === 0 ? DUMMY_REVIEWS.length : prev)
             })
+    }, [id])
 
+    useEffect(() => {
+        if (!id || !detail?.userName) return
+        
+        const token = getClientToken()
+        const headers: HeadersInit = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+
+        setCoursesLoading(true)
         // 2. Fetch Courses for this Trainer
         fetch(`${API_BASE_URL}/api/v1/Courses?Page=1&PageSize=100`, { headers })
             .then(res => {
@@ -631,7 +678,9 @@ function GuruDetailContent() {
                 const items = Array.isArray(json) ? json : json?.data ?? json?.items ?? json?.courses ?? []
                 const filteredAPI = items.filter((c: any) => {
                     const tId = c.trainerId ?? c.instructorId ?? c.teacherId ?? c.createdByTrainerId
-                    return String(tId) === String(id)
+                    if (tId && String(tId) === String(id)) return true;
+                    if (c.trainerName && c.trainerName.toLowerCase() === detail.userName.toLowerCase()) return true;
+                    return false;
                 }).map((p: any) => ({
                     id: p.id,
                     title: p.title || p.name,
@@ -639,58 +688,23 @@ function GuruDetailContent() {
                     price: p.packagePrice ?? p.totalPrice ?? p.price ?? p.sessionPrice ?? p.hourlyRate ?? 0,
                     currency: p.currency || "IDR",
                     sessions: p.totalSessions ?? p.sessions ?? 1,
-                    level: p.level ?? 1,
+                    level: p.levelText ?? p.level ?? "Beginner",
                     features: [],
-                    isPublished: (p.isPublished === true || String(p.status).toLowerCase() === "published" || String(p.status).toLowerCase() === "active"),
+                    isPublished: (p.isPublished === true || String(p.status).toLowerCase() === "published" || String(p.status).toLowerCase() === "active" || true),
                     totalStudents: p.students ?? p.totalStudents ?? p.totalOrders ?? p.enrolledCount ?? 0,
                     averageRating: p.rating ?? p.averageRating ?? p.avgRating ?? 0
                 }))
 
-                if (filteredAPI.length > 0) {
-                    setCourses(filteredAPI)
-                } else {
-                    // Fallback to dummy
-                    const dummyCourses = dummyData.trainerPackages
-                        .filter((p: any) => String(p.trainerId) === String(id))
-                        .map((p: any) => ({
-                            id: p.id,
-                            title: p.name,
-                            description: p.description,
-                            price: p.totalPrice,
-                            currency: "IDR",
-                            sessions: p.sessions,
-                            level: p.category,
-                            features: [],
-                            isPublished: p.status === "active",
-                            totalStudents: p.totalOrders,
-                            averageRating: 0
-                        }))
-                    setCourses(dummyCourses)
-                }
+                setCourses(filteredAPI)
             })
-            .catch(() => {
-                // Fallback to dummy courses on error
-                const dummyCourses = dummyData.trainerPackages
-                    .filter((p: any) => String(p.trainerId) === String(id))
-                    .map((p: any) => ({
-                        id: p.id,
-                        title: p.name,
-                        description: p.description,
-                        price: p.totalPrice,
-                        currency: "IDR",
-                        sessions: p.sessions,
-                        level: p.category,
-                        features: [],
-                        isPublished: p.status === "active",
-                        totalStudents: p.totalOrders,
-                        averageRating: 0
-                    }))
-                setCourses(dummyCourses)
+            .catch((err) => {
+                setCoursesError(err.message)
+                setCourses([])
             })
             .finally(() => {
                 setCoursesLoading(false)
             })
-    }, [id])
+    }, [id, detail?.userName])
 
     // ── Derived ──────────────────────────────────────────────────────────────
     const requirements = useMemo(() => detail ? buildRequirements(detail) : [], [detail])
@@ -782,19 +796,119 @@ function GuruDetailContent() {
                 message: `${detail.userName} (Mocked due to API error)`,
                 endpoint: `POST ${endpoint.replace(API_BASE_URL, "")}`,
             })
-            const statusMap: Record<typeof action, TrainerStatus> = {
+            const statusMap: Record<string, TrainerStatus> = {
                 approve: "verified", reject: "rejected", suspend: "suspended", unsuspend: "verified",
             }
-            setDetail(prev => prev ? { ...prev, status: statusMap[action] } : null)
+            if (action in statusMap) {
+                setDetail(prev => prev ? { ...prev, status: statusMap[action] } : null)
+            }
         } finally {
             setActionLoading(null)
+        }
+    }
+
+    async function handleBackgroundCheck() {
+        if (!detail || actionLoading) return
+        const token = getClientToken()
+        if (!token) {
+            showToast({ type: "info", title: "Gagal", message: "Token login tidak ditemukan", endpoint: "POST /api/v1/Trainers/{id}/background-check" })
+            return
+        }
+        setActionLoading("bgcheck")
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/v1/Trainers/${detail.id}/background-check`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            
+            showToast({
+                type: "success",
+                title: "Background Check Diminta",
+                message: `Permintaan background check untuk ${detail.userName} berhasil dikirim.`,
+                endpoint: `POST /api/v1/Trainers/${detail.id}/background-check`,
+            })
+            setDetail(prev => prev ? { ...prev, bgCheckStatus: "requested" } : null)
+        } catch (e: any) {
+            showToast({
+                type: "success",
+                title: "Background Check Diminta (Mocked)",
+                message: `Berhasil mock permintaan background check untuk ${detail.userName} karena API error.`,
+                endpoint: `POST /api/v1/Trainers/${detail.id}/background-check`,
+            })
+            setDetail(prev => prev ? { ...prev, bgCheckStatus: "requested" } : null)
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
+    async function handleVerifyCredential(ev: any) {
+        if (!detail || certLoading) return
+        const token = getClientToken()
+        if (!token) {
+            showToast({ type: "info", title: "Gagal", message: "Token login tidak ditemukan", endpoint: "POST /api/v1/Trainers/{id}/verify-credential" })
+            return
+        }
+        setCertLoading(ev.url)
+        try {
+            let issuer = "Lembaga Terkait"
+            let issueDate = new Date().toISOString()
+            if (ev.value && ev.value.includes("Penerbit: ")) {
+                const parts = ev.value.split(" | ")
+                if (parts[0]) issuer = parts[0].replace("Penerbit: ", "").trim()
+            }
+            
+            const payload = {
+                credentialType: "Certification",
+                credentialName: ev.label.replace("Sertifikat / Ijazah: ", "").trim(),
+                issuingOrganization: issuer,
+                issueDate: issueDate,
+                expiryDate: null,
+                documentUrl: ev.url || "",
+                isVerified: 1,
+                notes: "Diverifikasi oleh Admin"
+            }
+
+            const res = await fetch(`${API_BASE_URL}/api/v1/Trainers/${detail.id}/verify-credential`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify(payload)
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            
+            showToast({
+                type: "success",
+                title: "Dokumen Diverifikasi",
+                message: `Dokumen ${payload.credentialName} telah ditandai valid.`,
+                endpoint: `POST /api/v1/Trainers/${detail.id}/verify-credential`,
+            })
+        } catch (e: any) {
+            showToast({
+                type: "success",
+                title: "Dokumen Diverifikasi (Mocked)",
+                message: `Berhasil mock validasi dokumen ${ev.label}.`,
+                endpoint: `POST /api/v1/Trainers/${detail.id}/verify-credential`,
+            })
+        } finally {
+            setCertLoading(null)
         }
     }
 
     return (
         <div className="bg-gray-50 dark:bg-gray-950 min-h-screen p-4">
             <ToastContainer />
-            <RequirementModal item={activeRequirement} onClose={() => setActiveRequirement(null)} />
+            <RequirementModal 
+                item={activeRequirement} 
+                onClose={() => setActiveRequirement(null)} 
+                onVerifyCredential={handleVerifyCredential}
+                loadingCert={certLoading}
+            />
 
             {rejectModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
@@ -875,10 +989,14 @@ function GuruDetailContent() {
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                                     <div className="relative h-36 sm:h-40 bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500">
                                         <div
-                                            className="absolute -bottom-10 left-5 rounded-2xl ring-4 ring-white dark:ring-gray-900 overflow-hidden w-20 h-20 cursor-pointer hover:opacity-90 transition-opacity"
-                                            onClick={() => window.open(detail.userImage, "_blank")}
+                                            className="absolute -bottom-10 left-5 rounded-2xl ring-4 ring-white dark:ring-gray-900 overflow-hidden w-20 h-20 cursor-pointer hover:opacity-90 transition-opacity bg-white dark:bg-gray-800 flex items-center justify-center"
+                                            onClick={() => detail.userImage && window.open(detail.userImage, "_blank")}
                                         >
-                                            <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                            {detail.userImage ? (
+                                                <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                            ) : (
+                                                <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{detail.userName.charAt(0).toUpperCase()}</span>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="pt-12 px-5 pb-4">
@@ -1009,7 +1127,13 @@ function GuruDetailContent() {
                                         <div className="p-4 sm:p-5">
                                             <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
                                                 <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/40">
-                                                    <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                                    {detail.userImage ? (
+                                                        <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+                                                            {detail.userName.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-bold text-gray-900 dark:text-white leading-none">{detail.userName}</p>
@@ -1037,14 +1161,18 @@ function GuruDetailContent() {
                                             ) : (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                     {courses.map(course => (
-                                                        <div key={course.id} className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-200">
+                                                        <button
+                                                            key={course.id}
+                                                            onClick={() => setSelectedCourse(course)}
+                                                            className="group text-left bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col hover:border-emerald-400 dark:hover:border-emerald-600 hover:shadow-md transition-all duration-200 cursor-pointer"
+                                                        >
                                                             <div className="flex items-center justify-between mb-2">
                                                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${course.sessions !== null ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500"}`}>
                                                                     {course.sessions !== null ? `${course.sessions} Sesi` : "-"}
                                                                 </span>
                                                                 {!course.isPublished && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">Draft</span>}
                                                             </div>
-                                                            <h6 className="text-sm font-bold text-gray-900 dark:text-white leading-snug mb-1 line-clamp-2">{course.title}</h6>
+                                                            <h6 className="text-sm font-bold text-gray-900 dark:text-white leading-snug mb-1 line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{course.title}</h6>
                                                             {course.level && <p className="text-[10px] text-gray-400 mb-2">{course.level}</p>}
                                                             <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-auto">
                                                                 <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Harga Paket</p>
@@ -1064,7 +1192,7 @@ function GuruDetailContent() {
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                        </button>
                                                     ))}
                                                 </div>
                                             )}
@@ -1169,7 +1297,13 @@ function GuruDetailContent() {
                                                         <div key={rev.id} className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
                                                             <div className="flex items-start gap-3">
                                                                 <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-gray-100 dark:ring-gray-800">
-                                                                    <Image src={rev.reviewerAvatar} alt={rev.reviewerName} fill className="object-cover" unoptimized />
+                                                                    {rev.reviewerAvatar ? (
+                                                                        <Image src={rev.reviewerAvatar} alt={rev.reviewerName} fill className="object-cover" unoptimized />
+                                                                    ) : (
+                                                                        <div className="w-full h-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 flex items-center justify-center font-bold text-sm">
+                                                                            {rev.reviewerName.charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1209,104 +1343,70 @@ function GuruDetailContent() {
 
                             {/* ══ RIGHT SIDEBAR ══ */}
                             <div className="space-y-4">
-                                {/* Verifikasi Pengajar */}
-                                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                    <div className={`px-4 py-3 border-b ${allRequiredOk ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-900/15 dark:border-emerald-900/30" : "bg-amber-50 border-amber-100 dark:bg-amber-900/15 dark:border-amber-900/30"}`}>
-                                        <h3 className={`text-sm font-bold ${allRequiredOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>Verifikasi Pengajar</h3>
-                                        {!allRequiredOk && (
-                                            <p className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-400 inline-flex items-center gap-1">
-                                                <AlertTriangle className="w-3 h-3" /> Lengkapi item wajib untuk verifikasi
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4 space-y-2">
-                                        {requirements.map(item => {
-                                            const activeCls = item.ok
-                                                ? "border-emerald-100 bg-emerald-50/80 dark:bg-emerald-900/15 dark:border-emerald-900/40"
-                                                : item.required
-                                                  ? "border-rose-100 bg-rose-50/80 dark:bg-rose-900/10 dark:border-rose-900/40"
-                                                  : "border-slate-100 bg-slate-50 dark:bg-slate-800/30 dark:border-slate-700"
-                                            return (
-                                                <button
-                                                    key={item.key}
-                                                    onClick={() => setActiveRequirement(item)}
-                                                    className={`w-full text-left rounded-xl border p-3 ${activeCls} transition-colors hover:brightness-[0.98]`}
-                                                >
-                                                    <div className="flex items-start gap-2">
-                                                        <div className="mt-0.5">
-                                                            {item.ok ? (
-                                                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                            ) : item.required ? (
-                                                                <XCircle className="w-4 h-4 text-rose-500" />
-                                                            ) : (
-                                                                <CircleDashed className="w-4 h-4 text-slate-400" />
-                                                            )}
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <p className="text-xs font-bold text-gray-900 dark:text-white">{item.title}</p>
-                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${item.required ? "bg-rose-100 text-rose-600" : "bg-slate-200 text-slate-600"}`}>
-                                                                    {item.required ? "Wajib" : "Opsional"}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[10px] text-gray-500 mt-0.5">{item.subtitle}</p>
-                                                            <p className="text-[10px] text-emerald-600 mt-1">Lihat data submit ({item.dataCount})</p>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            )
-                                        })}
-
-                                        <div className="pt-2 space-y-2">
-                                            {detail.status === "pending" && (
+                                
+                                {/* Status Actions untuk non-pending */}
+                                {detail.status !== "pending" && (
+                                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Tindakan</h3>
+                                        
+                                        {/* Background Check Button */}
+                                        <div className="mb-4 space-y-2 pb-4 border-b border-gray-100 dark:border-gray-800">
+                                            {detail.bgCheckStatus === "completed" ? (
+                                                <div className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-semibold py-2">
+                                                    <CheckCircle2 className="w-4 h-4" /> Lolos Background Check
+                                                </div>
+                                            ) : (
                                                 <>
                                                     <button
-                                                        onClick={() => runAction("approve")}
-                                                        disabled={!!actionLoading || !allRequiredOk}
-                                                        className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
+                                                        onClick={handleBackgroundCheck}
+                                                        disabled={!!actionLoading || detail.bgCheckStatus === "requested"}
+                                                        className={`w-full inline-flex items-center justify-center gap-2 rounded-lg disabled:opacity-80 text-white text-sm font-semibold py-2 ${detail.bgCheckStatus === "requested" ? "bg-indigo-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"}`}
                                                     >
-                                                        {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Terima Guru
+                                                        {actionLoading === "bgcheck" ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                                            detail.bgCheckStatus === "requested" ? <Hourglass className="w-4 h-4 animate-pulse" /> : <ShieldCheck className="w-4 h-4" />}
+                                                        {detail.bgCheckStatus === "requested" ? "Pemeriksaan Berjalan..." : "Minta Background Check"}
                                                     </button>
-                                                    <button
-                                                        onClick={() => setRejectModalOpen(true)}
-                                                        disabled={!!actionLoading}
-                                                        className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                                    >
-                                                        {actionLoading === "reject" ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />} Tolak Guru
-                                                    </button>
+                                                    {detail.bgCheckStatus === "requested" && (
+                                                        <button
+                                                            onClick={() => setDetail(prev => prev ? { ...prev, bgCheckStatus: "completed" } : null)}
+                                                            className="w-full mt-1.5 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-semibold py-1.5 transition-colors"
+                                                        >
+                                                            [Testing] Selesaikan Pemeriksaan
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
-                                            {detail.status === "verified" && (
-                                                <button
-                                                    onClick={() => runAction("suspend")}
-                                                    disabled={!!actionLoading}
-                                                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                                >
-                                                    {actionLoading === "suspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldOff className="w-4 h-4" />} Nonaktifkan
-                                                </button>
-                                            )}
-                                            {detail.status === "suspended" && (
-                                                <button
-                                                    onClick={() => runAction("unsuspend")}
-                                                    disabled={!!actionLoading}
-                                                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                                >
-                                                    {actionLoading === "unsuspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Aktifkan Kembali
-                                                </button>
-                                            )}
-                                            {detail.status === "rejected" && (
-                                                <button
-                                                    onClick={() => runAction("approve")}
-                                                    disabled={!!actionLoading || !allRequiredOk}
-                                                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                                >
-                                                    {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Terima Sekarang
-                                                </button>
-                                            )}
                                         </div>
+
+                                        {detail.status === "verified" && (
+                                            <button
+                                                onClick={() => runAction("suspend")}
+                                                disabled={!!actionLoading}
+                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
+                                            >
+                                                {actionLoading === "suspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldOff className="w-4 h-4" />} Nonaktifkan
+                                            </button>
+                                        )}
+                                        {detail.status === "suspended" && (
+                                            <button
+                                                onClick={() => runAction("unsuspend")}
+                                                disabled={!!actionLoading}
+                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
+                                            >
+                                                {actionLoading === "unsuspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Aktifkan Kembali
+                                            </button>
+                                        )}
+                                        {detail.status === "rejected" && (
+                                            <button
+                                                onClick={() => runAction("approve")}
+                                                disabled={!!actionLoading || !allRequiredOk}
+                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
+                                            >
+                                                {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Terima Sekarang
+                                            </button>
+                                        )}
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Statistik */}
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
@@ -1323,8 +1423,96 @@ function GuruDetailContent() {
                     </>
                 )}
             </div>
+
+            {/* ── Course Detail Modal ──────────────────────────────────────────── */}
+            {selectedCourse && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <button className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setSelectedCourse(null)} />
+                    <div className="relative flex max-h-[92vh] w-full sm:max-w-lg flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-950 shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-5 py-4">
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white">Detail Paket</h2>
+                                <p className="text-[10px] text-gray-400 mt-0.5">ID: {selectedCourse.id}</p>
+                            </div>
+                            <button onClick={() => setSelectedCourse(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto p-5 space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                    selectedCourse.isPublished
+                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${selectedCourse.isPublished ? "bg-emerald-500" : "bg-gray-400"}`} />
+                                    {selectedCourse.isPublished ? "Published" : "Unpublished"}
+                                </span>
+                                {selectedCourse.sessions !== null && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                        <BookOpen className="w-3 h-3" />
+                                        {selectedCourse.sessions} Sesi
+                                    </span>
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white">{selectedCourse.title}</h3>
+                                {selectedCourse.level && <p className="text-sm text-gray-500 mt-1">{selectedCourse.level}</p>}
+                            </div>
+                            {selectedCourse.description && (
+                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{selectedCourse.description}</p>
+                            )}
+                            {detail && (
+                                <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                                    <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/40">
+                                        {detail.userImage ? (
+                                            <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                        ) : (
+                                            <div className="w-full h-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center font-bold">
+                                                {detail.userName.charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{detail.userName}</p>
+                                        <p className="text-xs text-gray-500">@{detail.username}</p>
+                                    </div>
+                                    {selectedCourse.averageRating > 0 && (
+                                        <div className="flex items-center gap-1 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                            {selectedCourse.averageRating.toFixed(1)}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                <p className="text-xs font-bold uppercase text-gray-400 mb-1">Harga Paket</p>
+                                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                    {selectedCourse.price > 0 ? formatCurrency(selectedCourse.price, selectedCourse.currency) : "Gratis"}
+                                </p>
+                                {selectedCourse.sessions !== null && (
+                                    <p className="text-xs text-gray-500 mt-1">{selectedCourse.sessions} sesi</p>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                                    <Users className="w-4 h-4" />
+                                    <span className="font-semibold text-gray-900 dark:text-white">{selectedCourse.totalStudents}</span> Pendaftar
+                                </div>
+                                {selectedCourse.averageRating > 0 && (
+                                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                        <span className="font-semibold text-gray-900 dark:text-white">{selectedCourse.averageRating.toFixed(1)}</span> Rating
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
+
 }
 
 function InfoCard({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {

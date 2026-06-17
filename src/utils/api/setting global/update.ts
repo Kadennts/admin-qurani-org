@@ -1,53 +1,71 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { fetchWithAutoRefresh } from "@/utils/api/token-refresh";
 import { EditLabelData } from "@/types/setting global";
-import { invalidateSettingGlobalCache } from "./fetch";
+import { fetchSettingGlobal } from "./fetch";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
 
 export async function updateSettingGlobal(id: number, data: EditLabelData) {
   try {
-    const supabase = await createClient();
+    let code = data.key;
 
-    const { data: updatedData, error } = await supabase
-      .from("setting_global")
-      .update({
-        value: data.value,
-        color: data.color,
-        status: data.status,
+    // Fallback: If key/code is missing, fetch it first
+    if (!code) {
+      const result = await fetchSettingGlobal();
+      if (result.status === "success" && result.data) {
+        const existing = result.data.find(s => s.id === id);
+        if (existing) {
+          code = existing.key;
+        }
+      }
+    }
+
+    if (!code) {
+      return { 
+        status: "error", 
+        message: "Data setting global tidak ditemukan (key/code kosong)" 
+      };
+    }
+
+    const response = await fetchWithAutoRefresh(`${API_BASE_URL}/api/v1/qurani/settings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        code: code,
+        name: data.value,
+        color: data.color && data.color !== "NULL" ? data.color : null,
+        isActive: data.status,
       })
-      .eq("id", id)
-      .select();
+    });
 
-    if (error) {
-      console.error("Error updating setting global:", error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[updateSettingGlobal] API Error:", response.status, errorText);
       return { 
         status: "error", 
-        message: "Gagal mengupdate setting global",
-        error: error.message 
+        message: "Gagal mengupdate setting global di server",
       };
     }
 
-    if (!updatedData || updatedData.length === 0) {
-      return { 
-        status: "error", 
-        message: "Data setting global tidak ditemukan" 
-      };
-    }
-
-    // Invalidate cache after successful update
-    await invalidateSettingGlobalCache();
+    const result = await response.json();
+    const updatedData = result.data || result;
 
     return {
       status: "success",
       message: "Setting global berhasil diupdate",
-      data: updatedData[0],
+      data: {
+        id: updatedData.id,
+        key: updatedData.code,
+        value: updatedData.name,
+        color: updatedData.color,
+        status: updatedData.isActive !== undefined ? updatedData.isActive : data.status,
+      },
     };
   } catch (error) {
     console.error("Unexpected error:", error);
     return { 
       status: "error", 
       message: "Terjadi kesalahan tidak terduga",
-      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
@@ -55,44 +73,35 @@ export async function updateSettingGlobal(id: number, data: EditLabelData) {
 // Fungsi untuk update status saja (enable/disable)
 export async function updateSettingGlobalStatus(id: number, status: number) {
   try {
-    const supabase = await createClient();
-
-    const { data: updatedData, error } = await supabase
-      .from("setting_global")
-      .update({ status })
-      .eq("id", id)
-      .select();
-
-    if (error) {
-      console.error("Error updating setting global status:", error);
-      return { 
+    // We need the full data to update via API because PUT requires code and name.
+    // Fetch existing setting first
+    const result = await fetchSettingGlobal();
+    if (result.status !== "success" || !result.data) {
+       return { 
         status: "error", 
-        message: "Gagal mengupdate status setting global",
-        error: error.message 
+        message: "Gagal mengambil data setting untuk update status" 
       };
     }
 
-    if (!updatedData || updatedData.length === 0) {
+    const existing = result.data.find(s => s.id === id);
+    if (!existing) {
       return { 
         status: "error", 
         message: "Data setting global tidak ditemukan" 
       };
     }
 
-    // Invalidate cache after successful update
-    await invalidateSettingGlobalCache();
-
-    return {
-      status: "success",
-      message: "Status setting global berhasil diupdate",
-      data: updatedData[0],
-    };
+    return await updateSettingGlobal(id, {
+      key: existing.key,
+      value: existing.value,
+      color: existing.color || "",
+      status: status
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
     return { 
       status: "error", 
       message: "Terjadi kesalahan tidak terduga",
-      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }

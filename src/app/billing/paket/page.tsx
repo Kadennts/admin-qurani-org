@@ -175,7 +175,7 @@ const DUMMY_COURSES: AdminCourse[] = [
         categoryName: "Tahsin",
         trainerId: 301,
         trainerName: "Hasyim Asy'ari, Lc",
-        trainerAvatar: "https://i.pravatar.cc/150?img=57",
+        trainerAvatar: "",
         organizationId: null,
         organizationName: null,
         description: "Sesi pembuka untuk mengecek bacaan, makharijul huruf, dan rencana belajar personal.",
@@ -231,7 +231,7 @@ const DUMMY_COURSES: AdminCourse[] = [
         categoryName: "Tahfidz",
         trainerId: 302,
         trainerName: "Indi Fitriani",
-        trainerAvatar: "https://c.superprof.com/i/m/22913978/600/20241221202313/22913978.webp",
+        trainerAvatar: "",
         organizationId: null,
         organizationName: null,
         description: "Program hafalan juz 30 dengan murajaah, target mingguan, dan evaluasi bacaan.",
@@ -297,7 +297,7 @@ const DUMMY_COURSES: AdminCourse[] = [
         categoryName: "Qiroati",
         trainerId: 303,
         trainerName: "Ustadz Iwan",
-        trainerAvatar: "https://i.pravatar.cc/150?img=52",
+        trainerAvatar: "",
         organizationId: 12,
         organizationName: "Rumah Qurani Depok",
         description: "Kelas anak dengan pendekatan fonik, latihan baca bertahap, dan laporan perkembangan.",
@@ -353,7 +353,7 @@ const DUMMY_COURSES: AdminCourse[] = [
         categoryName: "Trial",
         trainerId: 304,
         trainerName: "Nanda",
-        trainerAvatar: "https://i.pravatar.cc/150?img=45",
+        trainerAvatar: "",
         organizationId: null,
         organizationName: null,
         description: "Sesi percobaan singkat untuk mengenal guru, metode belajar, dan target pribadi.",
@@ -409,7 +409,7 @@ const DUMMY_COURSES: AdminCourse[] = [
         categoryName: "Tajwid",
         trainerId: 305,
         trainerName: "Zain",
-        trainerAvatar: "https://i.pravatar.cc/150?img=33",
+        trainerAvatar: "",
         organizationId: null,
         organizationName: null,
         description: "Pendalaman makhraj, sifat huruf, dan latihan koreksi bacaan untuk level menengah.",
@@ -489,20 +489,8 @@ function normalizeName(value: unknown) {
     return String(value || "").trim().toLowerCase()
 }
 
-function getFallbackAvatar(seed: unknown) {
-    let numSeed = 1
-    if (typeof seed === "number" && Number.isFinite(seed)) {
-        numSeed = seed
-    } else if (typeof seed === "string" && seed.length > 0) {
-        let hash = 0
-        for (let i = 0; i < seed.length; i++) {
-            hash = seed.charCodeAt(i) + ((hash << 5) - hash)
-        }
-        numSeed = Math.abs(hash) || 1
-    } else {
-        numSeed = toNumber(seed, 1)
-    }
-    return `https://i.pravatar.cc/150?img=${(numSeed % 70) + 1}`
+function getFallbackAvatar(_seed?: unknown): string {
+    return ""
 }
 
 function unwrapList(payload: unknown): unknown[] {

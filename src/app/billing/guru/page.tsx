@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import Link from "next/link"
@@ -10,6 +11,7 @@ import {
     ChevronsUpDown, Sparkles, BadgeCheck, ShieldOff, ShieldCheck,
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
+import pendingDummy from "@/data/pending-trainer-dummy.json"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -22,7 +24,16 @@ function formatRupiah(n: number) {
 
 function getClientToken(): string | null {
     if (typeof window === "undefined") return null
-    return localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? null
+    try {
+        const stored = localStorage.getItem("myqurani_auth")
+        if (stored) {
+            const auth = JSON.parse(stored)
+            return auth.accessToken || null
+        }
+    } catch {
+        return null
+    }
+    return null
 }
 
 function getFallbackAvatar(seed: unknown) {
@@ -54,91 +65,175 @@ type GuruStatus = "all" | "verified" | "pending" | "suspended" | "rejected"
 
 // ── API Only ─────────────────────────────────────────────────────────────
 
-type SortField = "name" | "rating" | "totalStudents" | "totalRevenue"
+type SortField = "name" | "rating" | "totalStudents" | "totalRevenue" | "joinDate"
 const PAGE_SIZE = 10
 
 function GuruContent() {
+    const searchParams = useSearchParams()
+    const initialTab = searchParams?.get("tab") === "pendaftar" ? "pendaftar" : "aktif"
+    
     const [apiGurus, setApiGurus] = useState<any[]>([])
+    const [pendingGurus, setPendingGurus] = useState<any[]>([])
     const [guruStatuses, setGuruStatuses] = useState<Record<number, "verified" | "pending" | "suspended" | "rejected">>({})
+    const [mainTab, setMainTab] = useState<"aktif" | "pendaftar">(initialTab)
 
     useEffect(() => {
         const token = getClientToken()
         const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
-        fetch(`${API_BASE_URL}/api/v1/Trainers`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-        })
-            .then(res => {
-                if (res.status === 401) {
-                    console.warn("API returned 401 Unauthorized. Using dummy data instead.")
-                    return []
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+        const formatDateTime = (isoString?: string) => {
+            if (!isoString) return "-";
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return isoString.substring(0, 10);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${day}-${month}-${year} ${hours}:${minutes}`;
+        }
+
+        const mapData = (d: any, forceStatus?: string) => {
+            const rawStatus = forceStatus || String(d.status || "verified").toLowerCase()
+            const validStatus = (rawStatus === "active" || rawStatus === "verified") ? "verified" : rawStatus === "suspended" ? "suspended" : rawStatus === "rejected" ? "rejected" : rawStatus === "pending" ? "pending" : "verified"
+            const name = d.userName || d.name || `Guru #${d.id}`
+            return {
+                id: d.id,
+                name: name,
+                email: d.email || "",
+                username: d.username || d.userUsername || name.toLowerCase().replace(/\s+/g, ""),
+                specialization: d.expertise?.join?.(", ") || d.headline || "Pengajar Al-Qur'an",
+                avatar: d.userImage || d.avatar || "",
+                rating: d.averageRating || d.rating || 0,
+                status: validStatus,
+                teachingMethod: (Array.isArray(d.expertise) && d.expertise.length > 0) ? d.expertise.join(", ") : (typeof d.expertise === "string" ? d.expertise : "Umum"),
+                joinDate: d.createdAt ? formatDateTime(d.createdAt) : "01-01-2025 00:00",
+                stats: {
+                    totalStudents: d.totalStudents || 0,
+                    totalSessions: d.totalCourses || 0,
+                    totalRevenue: d.totalRevenue || 0,
+                    activeBookings: 0
                 }
-                if (!res.ok) throw new Error(`HTTP Error ${res.status}`)
-                return res.json()
-            })
+            }
+        }
+
+        // Fetch Aktif
+        fetch(`${API_BASE_URL}/api/v1/Trainers`, { headers })
+            .then(res => res.ok ? res.json() : [])
             .then(data => {
-                const trainers = data.data || data
-                if (!Array.isArray(trainers)) return
-                // Filter: only include trainers with a real username (not auto-generated "guru{id}@...")
+                const trainers = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
                 const realTrainers = trainers.filter((d: any) => {
                     const uname = d.username || d.userName || ""
-                    // Exclude generic/auto-generated usernames
-                    if (/^guru\d+$/.test(uname)) return false
                     if (!uname || uname.trim() === "") return false
-                    // Filter out generic names like "Guru -"
-                    if (uname.includes("Guru -") || (d.name && d.name.includes("Guru -"))) return false
-                    if (d.userName && d.userName.includes("Guru -")) return false
                     return true
                 })
-                const mappedReal = realTrainers.map((d: any) => {
-                    const rawStatus = String(d.status || "verified").toLowerCase()
-                    const validStatus = (rawStatus === "active" || rawStatus === "verified") ? "verified" : rawStatus === "suspended" ? "suspended" : rawStatus === "rejected" ? "rejected" : rawStatus === "pending" ? "pending" : "verified"
-                    
-                    const name = d.userName || d.name || `Guru #${d.id}`
-                    
-                    return {
-                        id: d.id,
-                        name: name,
-                        // Show username below name (not email)
-                        email: d.email || "",
-                        username: d.username || d.userUsername || name.toLowerCase().replace(/\s+/g, ""),
-                        specialization: d.expertise?.join?.(", ") || d.headline || "Pengajar Al-Qur'an",
-                        avatar: d.userImage || d.avatar || getFallbackAvatar(d.id ?? name),
-                        rating: d.averageRating || d.rating || 0,
-                        status: validStatus,
-                        teachingMethod: (Array.isArray(d.expertise) && d.expertise.length > 0) ? d.expertise[0] : (typeof d.expertise === "string" ? d.expertise : "Umum"),
-                    joinDate: d.createdAt ? d.createdAt.substring(0, 10) : "2025-01-01",
-                    stats: {
-                        totalStudents: d.totalStudents || 0,
-                        totalSessions: d.totalCourses || 0,
-                        totalRevenue: d.totalRevenue || 0,
-                        activeBookings: 0
-                    }
-                }})
-                setApiGurus(mappedReal)
-            })
-            .catch(err => {
-                console.error("Failed to fetch trainers:", err)
-                setApiGurus([])
-            })
+                setApiGurus(realTrainers.map((d: any) => mapData(d)))
+            }).catch(console.error)
+
+        // Fetch Pendaftar (Pending)
+        fetch(`${API_BASE_URL}/api/v1/Trainers/pending`, { headers })
+            .then(res => res.ok ? res.json() : [])
+            .then(data => {
+                const trainers = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
+                const realTrainers = trainers.filter((d: any) => {
+                    const uname = d.username || d.userName || ""
+                    if (!uname || uname.trim() === "") return false
+                    return true
+                })
+                const mappedPending = realTrainers.map((d: any) => mapData(d, "pending"))
+                
+                // INJECT DUMMY PENDING FROM JSON
+                mappedPending.unshift({
+                    id: pendingDummy.id,
+                    name: pendingDummy.userName,
+                    email: pendingDummy.email,
+                    username: pendingDummy.username,
+                    specialization: pendingDummy.headline,
+                    avatar: "", // No avatar for pending dummy
+                    rating: 0,
+                    status: "pending",
+                    teachingMethod: pendingDummy.isOnline && pendingDummy.isOffline ? "Online / Offline" : pendingDummy.isOnline ? "Online" : "Offline",
+                    joinDate: pendingDummy.createdAt ? formatDateTime(pendingDummy.createdAt) : "01-01-2025 00:00",
+                    stats: { totalStudents: 0, totalSessions: 0, totalRevenue: 0, activeBookings: 0 }
+                })
+                
+                setPendingGurus(mappedPending)
+            }).catch(console.error)
     }, [])
 
-    const guruList = useMemo(() => {
-        return apiGurus.map(g => ({
-            ...g,
-            status: guruStatuses[g.id] ?? g.status,
-        }))
-    }, [apiGurus, guruStatuses])
+    const effectivePendingGurus = useMemo(() => {
+        return pendingGurus.map(g => ({ ...g, status: guruStatuses[g.id] ?? g.status })).filter(g => g.status === "pending")
+    }, [pendingGurus, guruStatuses])
 
-    function handleGuruAction(guruId: number, guruName: string, currentStatus: "verified" | "pending" | "suspended") {
+    const effectiveApiGurus = useMemo(() => {
+        const approvedFromPending = pendingGurus.map(g => ({ ...g, status: guruStatuses[g.id] ?? g.status })).filter(g => g.status !== "pending")
+        const mappedApi = apiGurus.map(g => ({ ...g, status: guruStatuses[g.id] ?? g.status }))
+        const combined = [...mappedApi, ...approvedFromPending]
+        const unique = combined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+        return unique.filter(g => g.status !== "pending")
+    }, [apiGurus, pendingGurus, guruStatuses])
+
+    useEffect(() => {
+        try {
+            const stored = sessionStorage.getItem("guruStatuses")
+            if (stored) setGuruStatuses(JSON.parse(stored))
+        } catch {}
+
+        // Reset data dummy ke pending jika user melakukan hard refresh (F5)
+        const handleBeforeUnload = () => {
+            sessionStorage.removeItem("guruStatuses")
+        }
+        window.addEventListener("beforeunload", handleBeforeUnload)
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+    }, [])
+
+    async function handleGuruAction(guruId: number, guruName: string, currentStatus: "verified" | "pending" | "suspended") {
+        const token = getClientToken()
+        const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
+        const headers: HeadersInit = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        }
+
+        let endpoint = ""
+        let method = "POST"
+        let body: any = undefined
+
         if (currentStatus === "pending") {
-            setGuruStatuses(prev => ({ ...prev, [guruId]: "verified" }))
-            showToast({ type: "success", title: `${guruName} berhasil diverifikasi`, message: "Guru sekarang dapat menerima murid.", endpoint: `PUT / api / v1 / Trainers / ${guruId}/verify` })
+            endpoint = `${API_BASE_URL}/api/v1/Trainers/${guruId}/review`
+            body = { approve: 1, rejectionReason: null }
         } else if (currentStatus === "verified") {
-            setGuruStatuses(prev => ({ ...prev, [guruId]: "suspended" }))
-            showToast({ type: "info", title: `${guruName} dinonaktifkan`, message: "Guru tidak dapat menerima pesanan baru.", endpoint: `PUT /api/v1/Trainers/${guruId}/suspend` })
-        } else { // currentStatus === "suspended"
-            setGuruStatuses(prev => ({ ...prev, [guruId]: "verified" }))
-            showToast({ type: "info", title: `${guruName} diaktifkan kembali`, message: "Status guru dikembalikan menjadi Terverifikasi.", endpoint: `PUT /api/v1/Trainers/${guruId}/unsuspend` })
+            endpoint = `${API_BASE_URL}/api/v1/Trainers/${guruId}/suspend`
+            method = "PUT"
+        } else {
+            endpoint = `${API_BASE_URL}/api/v1/Trainers/${guruId}/unsuspend`
+            method = "PUT"
+        }
+
+        try {
+            const res = await fetch(endpoint, { method, headers, body: body ? JSON.stringify(body) : undefined })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        } catch (e) {
+            // fallback mock
+        } finally {
+            const nextStatus: "verified" | "pending" | "suspended" | "rejected" = currentStatus === "pending" ? "verified" : currentStatus === "verified" ? "suspended" : "verified"
+            
+            setGuruStatuses(prev => {
+                const updated: Record<number, "verified" | "pending" | "suspended" | "rejected"> = { ...prev, [guruId]: nextStatus }
+                try {
+                    sessionStorage.setItem("guruStatuses", JSON.stringify(updated))
+                } catch {}
+                return updated
+            })
+
+            if (currentStatus === "pending") {
+                showToast({ type: "success", title: `${guruName} berhasil diverifikasi`, message: "Pendaftaran guru diterima.", endpoint: `POST /api/v1/Trainers/${guruId}/review` })
+            } else if (currentStatus === "verified") {
+                showToast({ type: "info", title: `${guruName} dinonaktifkan`, message: "Guru tidak dapat menerima pesanan baru.", endpoint: `PUT /api/v1/Trainers/${guruId}/suspend` })
+            } else {
+                showToast({ type: "info", title: `${guruName} diaktifkan kembali`, message: "Status guru dikembalikan menjadi Terverifikasi.", endpoint: `PUT /api/v1/Trainers/${guruId}/unsuspend` })
+            }
         }
     }
 
@@ -160,9 +255,17 @@ function GuruContent() {
         }
     }
 
+    const handleMainTabSwitch = (tab: "aktif" | "pendaftar") => {
+        setMainTab(tab)
+        setStatus("all")
+        setPage(1)
+    }
+
+    const currentBaseList = mainTab === "aktif" ? effectiveApiGurus : effectivePendingGurus
+
     const filtered = useMemo(() => {
         const q = search.toLowerCase()
-        return guruList
+        return currentBaseList
             .filter(g => {
                 const matchSearch = !q || g.name.toLowerCase().includes(q) || g.specialization.toLowerCase().includes(q) || g.email.toLowerCase().includes(q)
                 const matchStatus = statusFilter === "all" || g.status === statusFilter
@@ -173,10 +276,11 @@ function GuruContent() {
                 if (sortField === "rating") { av = a.rating; bv = b.rating }
                 else if (sortField === "totalStudents") { av = a.stats.totalStudents; bv = b.stats.totalStudents }
                 else if (sortField === "totalRevenue") { av = a.stats.totalRevenue; bv = b.stats.totalRevenue }
+                else if (sortField === "joinDate") { av = a.joinDate; bv = b.joinDate }
                 if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av)
                 return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number)
             })
-    }, [guruList, search, statusFilter, sortField, sortDir])
+    }, [currentBaseList, search, statusFilter, sortField, sortDir])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
     const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -193,15 +297,13 @@ function GuruContent() {
     }
 
     // summary counts
-    const countVerified = guruList.filter(g => g.status === "verified").length
-    const countPending = guruList.filter(g => g.status === "pending").length
-    const countSuspended = guruList.filter(g => g.status === "suspended").length
-    const countRejected = guruList.filter(g => g.status === "rejected").length
+    const countVerified = effectiveApiGurus.filter(g => g.status === "verified").length
+    const countSuspended = effectiveApiGurus.filter(g => g.status === "suspended").length
+    const countRejected = effectiveApiGurus.filter(g => g.status === "rejected").length
 
     const STATUS_TABS: { key: GuruStatus; label: string; count: number; color: string }[] = [
-        { key: "all", label: "Semua", count: guruList.length, color: "emerald" },
+        { key: "all", label: "Semua Aktif", count: effectiveApiGurus.length, color: "emerald" },
         { key: "verified", label: "Terverifikasi", count: countVerified, color: "emerald" },
-        { key: "pending", label: "Menunggu", count: countPending, color: "amber" },
         { key: "suspended", label: "Nonaktif", count: countSuspended, color: "red" },
         { key: "rejected", label: "Ditolak", count: countRejected, color: "rose" },
     ]
@@ -211,17 +313,21 @@ function GuruContent() {
             <ToastContainer />
             <div className="max-w-[1600px] mx-auto space-y-4">
 
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between">
+                {/* ── Header & Main Tabs ── */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Guru</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manajemen Guru</h1>
+                    </div>
+                    <div className="flex bg-gray-200/50 dark:bg-gray-800/50 p-1 rounded-xl w-fit">
+                        <button onClick={() => handleMainTabSwitch("aktif")} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${mainTab === "aktif" ? "bg-white dark:bg-gray-900 shadow-sm text-emerald-600 dark:text-emerald-400" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"}`}>Guru Aktif</button>
+                        <button onClick={() => handleMainTabSwitch("pendaftar")} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${mainTab === "pendaftar" ? "bg-white dark:bg-gray-900 shadow-sm text-amber-600 dark:text-amber-400" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"}`}>Pendaftar Baru {effectivePendingGurus.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${mainTab === "pendaftar" ? "bg-amber-100 text-amber-700" : "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>{effectivePendingGurus.length}</span>}</button>
                     </div>
                 </div>
 
                 {/* ── Status filter tabs + Search bar ── */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {STATUS_TABS.map(t => {
+                    <div className="flex items-center gap-2 flex-wrap min-h-[36px]">
+                        {mainTab === "aktif" && STATUS_TABS.map(t => {
                             const active = statusFilter === t.key
                             const colorMap: Record<string, string> = {
                                 emerald: active ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-400",
@@ -270,26 +376,38 @@ function GuruContent() {
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700">
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">
-                                        Guru
+                                        {mainTab === "aktif" ? "Guru" : "Pendaftar"}
                                     </th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
-                                        onClick={() => handleSort("rating")}>
-                                        Rating <SortIcon field="rating" />
-                                    </th>
+                                    {mainTab === "aktif" && (
+                                        <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
+                                            onClick={() => handleSort("rating")}>
+                                            Rating <SortIcon field="rating" />
+                                        </th>
+                                    )}
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">
-                                        Metode Mengaji
+                                        {mainTab === "aktif" ? "Metode Mengaji" : "Spesialisasi"}
                                     </th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
-                                        onClick={() => handleSort("totalStudents")}>
-                                        Murid <SortIcon field="totalStudents" />
-                                    </th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
-                                        onClick={() => handleSort("totalRevenue")}>
-                                        Total Revenue <SortIcon field="totalRevenue" />
-                                    </th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">
-                                        Pesanan Aktif
-                                    </th>
+                                    {mainTab === "aktif" && (
+                                        <>
+                                            <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
+                                                onClick={() => handleSort("totalStudents")}>
+                                                Murid <SortIcon field="totalStudents" />
+                                            </th>
+                                            <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
+                                                onClick={() => handleSort("totalRevenue")}>
+                                                Total Revenue <SortIcon field="totalRevenue" />
+                                            </th>
+                                            <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">
+                                                Pesanan Aktif
+                                            </th>
+                                        </>
+                                    )}
+                                    {mainTab === "pendaftar" && (
+                                        <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 cursor-pointer select-none whitespace-nowrap"
+                                            onClick={() => handleSort("joinDate")}>
+                                            Tanggal Daftar <SortIcon field="joinDate" />
+                                        </th>
+                                    )}
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">
                                         Status
                                     </th>
@@ -301,7 +419,7 @@ function GuruContent() {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {paged.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                        <td colSpan={mainTab === "aktif" ? 8 : 5} className="text-center py-16 text-gray-400 dark:text-gray-500">
                                             <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
                                             <p>Tidak ada data yang ditemukan</p>
                                         </td>
@@ -311,73 +429,101 @@ function GuruContent() {
                                     return (
                                         <tr key={guru.id}
                                             className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                                            {/* Guru */}
+                                            {/* Guru / Pendaftar */}
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <Link
-                                                        href={`/billing/guru/${guru.id}`}
-                                                        className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30 hover:ring-emerald-400 dark:hover:ring-emerald-500 transition-all hover:scale-110"
-                                                        title={`Lihat profil ${guru.name}`}
-                                                    >
-                                                        <Image
-                                                            src={guru.avatar}
-                                                            alt={guru.name}
-                                                            fill
-                                                            className="object-cover"
-                                                            unoptimized
-                                                        />
-                                                    </Link>
-                                                    <div>
+                                                    {mainTab === "aktif" ? (
                                                         <Link
                                                             href={`/billing/guru/${guru.id}`}
-                                                            className="font-bold text-gray-900 dark:text-white text-xs leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors"
+                                                            className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30 hover:ring-emerald-400 dark:hover:ring-emerald-500 transition-all hover:scale-110"
+                                                            title={`Lihat profil ${guru.name}`}
                                                         >
-                                                            {guru.name}
+                                                            {guru.avatar ? (
+                                                                <Image
+                                                                    src={guru.avatar}
+                                                                    alt={guru.name}
+                                                                    fill
+                                                                    className="object-cover"
+                                                                    unoptimized
+                                                                />
+                                                            ) : (
+                                                                <div className="w-full h-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center font-bold">
+                                                                    {guru.name.charAt(0).toUpperCase()}
+                                                                </div>
+                                                            )}
                                                         </Link>
+                                                    ) : (
+                                                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center font-bold flex-shrink-0">
+                                                            {guru.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        {mainTab === "aktif" ? (
+                                                            <Link
+                                                                href={`/billing/guru/${guru.id}`}
+                                                                className="font-bold text-gray-900 dark:text-white text-xs leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors"
+                                                            >
+                                                                {guru.name}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="font-bold text-gray-900 dark:text-white text-xs leading-tight">
+                                                                {guru.name}
+                                                            </span>
+                                                        )}
                                                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">
-                                                            @{guru.username}
+                                                            {mainTab === "aktif" ? `@${guru.username}` : (guru.email || `@${guru.username}`)}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </td>
                                             {/* Rating */}
-                                            <td className="px-4 py-3">
-                                                {guru.rating > 0 ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{guru.rating.toFixed(1)}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
-                                                )}
-                                            </td>
-                                            {/* Metode */}
+                                            {mainTab === "aktif" && (
+                                                <td className="px-4 py-3">
+                                                    {guru.rating > 0 ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                                                            <span className="text-xs font-bold text-gray-900 dark:text-white">{guru.rating.toFixed(1)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {/* Metode / Spesialisasi */}
                                             <td className="px-4 py-3 text-xs italic font-semibold text-gray-700 dark:text-gray-300">
-                                                {guru.teachingMethod}
+                                                {mainTab === "aktif" ? guru.teachingMethod : guru.specialization}
                                             </td>
-                                            {/* Murid */}
-                                            <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white">
-                                                {guru.status === "verified"
-                                                    ? <>{guru.stats.totalStudents} murid</>
-                                                    : <span className="text-gray-400 dark:text-gray-600">—</span>}
-                                            </td>
-                                            {/* Revenue */}
-                                            <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white">
-                                                {guru.status === "verified"
-                                                    ? formatRupiah(guru.stats.totalRevenue)
-                                                    : <span className="text-gray-400 dark:text-gray-600">—</span>}
-                                            </td>
-                                            {/* Aktif */}
-                                            <td className="px-4 py-3">
-                                                {guru.status === "verified" ? (
-                                                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                                        {guru.stats.activeBookings} aktif
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
-                                                )}
-                                            </td>
+                                            {/* Murid, Revenue, Aktif */}
+                                            {mainTab === "aktif" && (
+                                                <>
+                                                    <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white">
+                                                        {guru.status === "verified"
+                                                            ? <>{guru.stats.totalStudents} murid</>
+                                                            : <span className="text-gray-400 dark:text-gray-600">—</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white">
+                                                        {guru.status === "verified"
+                                                            ? formatRupiah(guru.stats.totalRevenue)
+                                                            : <span className="text-gray-400 dark:text-gray-600">—</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {guru.status === "verified" ? (
+                                                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                                {guru.stats.activeBookings} aktif
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                                        )}
+                                                    </td>
+                                                </>
+                                            )}
+                                            {/* Tanggal Daftar (Pending Only) */}
+                                            {mainTab === "pendaftar" && (
+                                                <td className="px-4 py-3 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                                    {guru.joinDate}
+                                                </td>
+                                            )}
                                             {/* Status */}
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st?.bg ?? ""} ${st?.text ?? ""}`}>
@@ -389,17 +535,10 @@ function GuruContent() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                                     <Link
-                                                        href={`/billing/guru/${guru.id}`}
+                                                        href={mainTab === "aktif" ? `/billing/guru/${guru.id}` : `/billing/guru/${guru.id}/review`}
                                                         className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors">
-                                                        <Eye className="w-3.5 h-3.5" /> Detail
+                                                        <Eye className="w-3.5 h-3.5" /> {mainTab === "aktif" ? "Detail" : "Review"}
                                                     </Link>
-                                                    {guru.status === "pending" && (
-                                                        <button
-                                                            onClick={() => handleGuruAction(guru.id, guru.name, guru.status)}
-                                                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg transition-colors">
-                                                            <BadgeCheck className="w-3.5 h-3.5" /> Verifikasi
-                                                        </button>
-                                                    )}
                                                     {guru.status === "verified" && (
                                                         <button
                                                             onClick={() => handleGuruAction(guru.id, guru.name, guru.status)}
@@ -463,7 +602,9 @@ export default function GuruPage() {
     return (
         <DashboardLayout>
             <I18nProvider namespaces={["billing", "common"]}>
-                <GuruContent />
+                <Suspense fallback={<div className="p-4 text-gray-500">Memuat data...</div>}>
+                    <GuruContent />
+                </Suspense>
             </I18nProvider>
         </DashboardLayout>
     )

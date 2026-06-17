@@ -176,7 +176,7 @@ function PaymentsContent() {
             })
 
         } catch (err: any) {
-            console.error("API Fetch Error:", err)
+            console.warn("API Fetch Error:", err.message)
             // Error is suppressed in UI to avoid disrupting the user experience, dummy data is used instead.
             let dummy = [...localDummyData];
 
@@ -510,7 +510,6 @@ function PaymentsContent() {
                                             onChange={toggleSelectAll}
                                         />
                                     </th>
-                                    <th className="px-4 py-3 font-semibold">{t("billing.payments.table.id", "ID")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.user", "User")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.trainer", "Trainer")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.amount", "Nominal")}</th>
@@ -523,13 +522,13 @@ function PaymentsContent() {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                                             {t("billing.payments.loading", "Memuat data pembayaran...")}
                                         </td>
                                     </tr>
                                 ) : payments.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                                             {t("billing.payments.empty", "Tidak ada pembayaran yang ditemukan.")}
                                         </td>
                                     </tr>
@@ -544,14 +543,11 @@ function PaymentsContent() {
                                                     onChange={() => toggleSelect(payment.id)}
                                                 />
                                             </td>
-                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">#{payment.id}</td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.userName || '-'}</div>
-                                                <div className="text-xs text-gray-500">ID: {payment.userId}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>
-                                                <div className="text-xs text-gray-500">ID: {payment.trainerId}</div>
                                             </td>
                                             <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400">
                                                 {formatRupiah(payment.amount)}

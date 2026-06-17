@@ -156,7 +156,7 @@
       "totalPrice": 80000,
       "status": "active",
       "category": "Satuan",
-      "description": "Sesi pertama bersama Nanda Ã¢â‚¬â€ ramah & sabar untuk pemula.",
+      "description": "Sesi pertama bersama Nanda Ã¢â‚¬- ramah & sabar untuk pemula.",
       "totalOrders": 14,
       "totalRevenue": 1120000
     },
@@ -884,7 +884,7 @@
         {
           "no": 1,
           "date": "2026-02-17",
-          "time": "14:00 â€“ 15:00",
+          "time": "14:00 -“ 15:00",
           "status": "scheduled",
           "notes": "Sesi perkenalan tatap muka"
         }
@@ -931,7 +931,7 @@
         {
           "no": 1,
           "date": "2026-01-05",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": "Tes bacaan awal",
           "feedback": {
@@ -942,7 +942,7 @@
         {
           "no": 2,
           "date": "2026-01-08",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -953,7 +953,7 @@
         {
           "no": 3,
           "date": "2026-01-12",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -964,7 +964,7 @@
         {
           "no": 4,
           "date": "2026-01-15",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -975,7 +975,7 @@
         {
           "no": 5,
           "date": "2026-01-19",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -986,7 +986,7 @@
         {
           "no": 6,
           "date": "2026-01-22",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -997,7 +997,7 @@
         {
           "no": 7,
           "date": "2026-01-26",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -1008,7 +1008,7 @@
         {
           "no": 8,
           "date": "2026-01-29",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -1019,7 +1019,7 @@
         {
           "no": 9,
           "date": "2026-02-02",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": null,
           "feedback": {
@@ -1030,7 +1030,7 @@
         {
           "no": 10,
           "date": "2026-02-05",
-          "time": "07:00 â€“ 08:00",
+          "time": "07:00 -“ 08:00",
           "status": "completed",
           "notes": "Ujian akhir & evaluasi",
           "feedback": {
@@ -1081,9 +1081,9 @@
         {
           "no": 1,
           "date": "2026-01-10",
-          "time": "10:00 â€“ 11:00",
+          "time": "10:00 -“ 11:00",
           "status": "completed",
-          "notes": "Sesi perkenalan Ã¢â‚¬â€ offline di rumah siswa"
+          "notes": "Sesi perkenalan Ã¢â‚¬- offline di rumah siswa"
         }
       ],
       "payment": {
@@ -1127,14 +1127,14 @@
         {
           "no": 1,
           "date": "2025-10-07",
-          "time": "19:00 â€“ 20:00",
+          "time": "19:00 -“ 20:00",
           "status": "completed",
           "notes": "Perkenalan dan tes awal"
         },
         {
           "no": 2,
           "date": "2025-10-14",
-          "time": "19:00 â€“ 20:00",
+          "time": "19:00 -“ 20:00",
           "status": "completed",
           "notes": "Latihan huruf hijaiyah lanjutan",
           "feedback": {
@@ -1145,7 +1145,7 @@
         {
           "no": 3,
           "date": "2025-10-21",
-          "time": "19:00 â€“ 20:00",
+          "time": "19:00 -“ 20:00",
           "status": "completed",
           "notes": "Makharijul huruf dan sifatnya",
           "feedback": {
@@ -1156,14 +1156,14 @@
         {
           "no": 4,
           "date": "2025-10-28",
-          "time": "19:00 â€“ 20:00",
+          "time": "19:00 -“ 20:00",
           "status": "ongoing",
           "notes": "Sesi sedang berlangsung"
         },
         {
           "no": 5,
           "date": "2025-11-04",
-          "time": "19:00 â€“ 20:00",
+          "time": "19:00 -“ 20:00",
           "status": "scheduled",
           "notes": null
         }
@@ -1298,35 +1298,35 @@
         {
           "no": 1,
           "date": "2026-01-20",
-          "time": "20:00 â€“ 21:00",
+          "time": "20:00 -“ 21:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 2,
           "date": "2026-01-27",
-          "time": "20:00 â€“ 21:00",
+          "time": "20:00 -“ 21:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 3,
           "date": "2026-02-03",
-          "time": "20:00 â€“ 21:00",
+          "time": "20:00 -“ 21:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 4,
           "date": "2026-02-10",
-          "time": "20:00 â€“ 21:00",
+          "time": "20:00 -“ 21:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 5,
           "date": "2026-02-17",
-          "time": "20:00 â€“ 21:00",
+          "time": "20:00 -“ 21:00",
           "status": "scheduled",
           "notes": null
         }
@@ -1373,9 +1373,9 @@
         {
           "no": 1,
           "date": "2026-02-20",
-          "time": "13:00 â€“ 14:00",
+          "time": "13:00 -“ 14:00",
           "status": "scheduled",
-          "notes": "Sesi perkenalan Ã¢â‚¬â€ offline"
+          "notes": "Sesi perkenalan Ã¢â‚¬- offline"
         }
       ],
       "payment": {
@@ -1419,35 +1419,35 @@
         {
           "no": 1,
           "date": "2026-02-22",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 2,
           "date": "2026-02-24",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 3,
           "date": "2026-02-26",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 4,
           "date": "2026-02-28",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 5,
           "date": "2026-03-02",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": "Latihan waqaf dan ibtida",
           "feedback": {
@@ -1458,7 +1458,7 @@
         {
           "no": 6,
           "date": "2026-03-04",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "completed",
           "notes": "Mad dan qashr",
           "feedback": {
@@ -1469,28 +1469,28 @@
         {
           "no": 7,
           "date": "2026-03-06",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "ongoing",
           "notes": "Sesi sedang berlangsung"
         },
         {
           "no": 8,
           "date": "2026-03-08",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 9,
           "date": "2026-03-10",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "scheduled",
           "notes": null
         },
         {
           "no": 10,
           "date": "2026-03-12",
-          "time": "08:00 â€“ 09:00",
+          "time": "08:00 -“ 09:00",
           "status": "scheduled",
           "notes": null
         }
@@ -1537,35 +1537,35 @@
         {
           "no": 1,
           "date": "2025-12-22",
-          "time": "09:00 â€“ 10:00",
+          "time": "09:00 -“ 10:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 2,
           "date": "2025-12-26",
-          "time": "09:00 â€“ 10:00",
+          "time": "09:00 -“ 10:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 3,
           "date": "2025-12-30",
-          "time": "09:00 â€“ 10:00",
+          "time": "09:00 -“ 10:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 4,
           "date": "2026-01-03",
-          "time": "09:00 â€“ 10:00",
+          "time": "09:00 -“ 10:00",
           "status": "completed",
           "notes": null
         },
         {
           "no": 5,
           "date": "2026-01-07",
-          "time": "09:00 â€“ 10:00",
+          "time": "09:00 -“ 10:00",
           "status": "completed",
           "notes": "Sesi terakhir & evaluasi akhir"
         }

@@ -1,56 +1,35 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
-import { invalidateSettingGlobalCache } from "./fetch";
+import { fetchWithAutoRefresh } from "@/utils/api/token-refresh";
+import { updateSettingGlobalStatus } from "./update";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
 
 export async function deleteSettingGlobal(id: number) {
   try {
-    const supabase = await createClient();
+    const response = await fetchWithAutoRefresh(`${API_BASE_URL}/api/v1/qurani/settings/${id}`, {
+      method: 'DELETE',
+    });
 
-    // Cek apakah data exists sebelum delete
-    const { data: existingData, error: checkError } = await supabase
-      .from("setting_global")
-      .select("id, key, value")
-      .eq("id", id)
-      .single();
-
-    if (checkError || !existingData) {
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[deleteSettingGlobal] API Error:", response.status, errorText);
       return { 
         status: "error", 
-        message: "Data setting global tidak ditemukan" 
+        message: "Gagal menghapus setting global di server",
       };
     }
-
-    // Hapus data
-    const { data: deletedData, error } = await supabase
-      .from("setting_global")
-      .delete()
-      .eq("id", id)
-      .select();
-
-    if (error) {
-      console.error("Error deleting setting global:", error);
-      return { 
-        status: "error", 
-        message: "Gagal menghapus setting global",
-        error: error.message 
-      };
-    }
-
-    // Invalidate cache after successful delete
-    await invalidateSettingGlobalCache();
 
     return {
       status: "success",
-      message: `Setting global '${existingData.value}' berhasil dihapus`,
-      data: deletedData?.[0] || existingData,
+      message: `Setting global berhasil dihapus`,
+      data: { id },
     };
   } catch (error) {
     console.error("Unexpected error:", error);
     return { 
       status: "error", 
       message: "Terjadi kesalahan tidak terduga",
-      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
@@ -58,44 +37,25 @@ export async function deleteSettingGlobal(id: number) {
 // Fungsi untuk soft delete (mengubah status menjadi 0/inactive)
 export async function softDeleteSettingGlobal(id: number) {
   try {
-    const supabase = await createClient();
+    const result = await updateSettingGlobalStatus(id, 0);
 
-    const { data: updatedData, error } = await supabase
-      .from("setting_global")
-      .update({ status: 0 })
-      .eq("id", id)
-      .select();
-
-    if (error) {
-      console.error("Error soft deleting setting global:", error);
+    if (result.status === "error") {
       return { 
         status: "error", 
         message: "Gagal menonaktifkan setting global",
-        error: error.message 
       };
     }
-
-    if (!updatedData || updatedData.length === 0) {
-      return { 
-        status: "error", 
-        message: "Data setting global tidak ditemukan" 
-      };
-    }
-
-    // Invalidate cache after successful soft delete
-    await invalidateSettingGlobalCache();
 
     return {
       status: "success",
       message: "Setting global berhasil dinonaktifkan",
-      data: updatedData[0],
+      data: "data" in result ? result.data : undefined,
     };
   } catch (error) {
     console.error("Unexpected error:", error);
     return { 
       status: "error", 
       message: "Terjadi kesalahan tidak terduga",
-      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
@@ -103,37 +63,28 @@ export async function softDeleteSettingGlobal(id: number) {
 // Fungsi untuk delete multiple records
 export async function deleteMultipleSettingGlobal(ids: number[]) {
   try {
-    const supabase = await createClient();
+    const deletePromises = ids.map(id => deleteSettingGlobal(id));
+    const results = await Promise.all(deletePromises);
+    
+    const failedDeletes = results.filter(r => r.status === "error");
 
-    const { data: deletedData, error } = await supabase
-      .from("setting_global")
-      .delete()
-      .in("id", ids)
-      .select();
-
-    if (error) {
-      console.error("Error deleting multiple setting global:", error);
+    if (failedDeletes.length > 0) {
       return { 
         status: "error", 
-        message: "Gagal menghapus setting global",
-        error: error.message 
+        message: `Gagal menghapus ${failedDeletes.length} dari ${ids.length} setting global`,
       };
     }
 
-    // Invalidate cache after successful delete
-    await invalidateSettingGlobalCache();
-
     return {
       status: "success",
-      message: `${deletedData?.length || 0} setting global berhasil dihapus`,
-      data: deletedData,
+      message: `${ids.length} setting global berhasil dihapus`,
+      data: ids,
     };
   } catch (error) {
     console.error("Unexpected error:", error);
     return { 
       status: "error", 
       message: "Terjadi kesalahan tidak terduga",
-      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }

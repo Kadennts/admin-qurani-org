@@ -188,6 +188,7 @@ export default function Qurani() {
             isOpen: true,
             setting,
             formData: {
+                key: setting.key,
                 value: setting.value,
                 color: setting.color || "",
                 status: setting.status
@@ -306,6 +307,7 @@ export default function Qurani() {
             // Update all changed settings using Promise.all for batch processing
             const updatePromises = allChanges.map(async (change) => {
                 return updateSettingGlobal(change.id, {
+                    key: change.key,
                     value: change.value,
                     color: change.color || "",
                     status: change.status

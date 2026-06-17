@@ -1,8 +1,10 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { fetchWithAutoRefresh } from "@/utils/api/token-refresh";
 import { SettingGlobal } from "@/types/setting global";
-import { invalidateSettingGlobalCache } from "./fetch";
+import { fetchSettingGlobal } from "./fetch";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
 
 interface CreateSettingGlobalData {
   key: string;
@@ -19,20 +21,16 @@ interface ApiResponse {
 
 // Get next available key for sa (kesalahan ayat) or sk (kesalahan kata)
 export async function getNextKey(type: "sa" | "sk"): Promise<string> {
-  const supabase = await createClient();
-
   try {
-    const { data, error } = await supabase
-      .from("setting_global")
-      .select("key")
-      .like("key", `${type}-%`);
-
-    if (error) {
-      console.error("Error fetching keys:", error);
+    const result = await fetchSettingGlobal();
+    
+    if (result.status !== "success" || !result.data) {
       return `${type}-1`;
     }
 
-    if (!data || data.length === 0) {
+    const data = result.data.filter(item => item.key.startsWith(`${type}-`));
+
+    if (data.length === 0) {
       return `${type}-1`;
     }
 
@@ -56,71 +54,44 @@ export async function getNextKey(type: "sa" | "sk"): Promise<string> {
   }
 }
 
-// Get next available ID
-async function getNextId(): Promise<number> {
-  const supabase = await createClient();
-
-  try {
-    const { data, error } = await supabase
-      .from("setting_global")
-      .select("id")
-      .order("id", { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error("Error fetching max ID:", error);
-      return 1;
-    }
-
-    if (!data || data.length === 0) {
-      return 1;
-    }
-
-    return data[0].id + 1;
-  } catch (error) {
-    console.error("Error in getNextId:", error);
-    return 1;
-  }
-}
-
 // Create new setting global
 export async function createSettingGlobal(
   data: CreateSettingGlobalData
 ): Promise<ApiResponse> {
-  const supabase = await createClient();
-
   try {
-    // Get next available ID
-    const nextId = await getNextId();
+    const response = await fetchWithAutoRefresh(`${API_BASE_URL}/api/v1/qurani/settings`, {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: "public",
+        scopeId: null,
+        code: data.key,
+        name: data.value,
+        color: data.color && data.color !== "NULL" ? data.color : null
+      })
+    });
 
-    const { data: result, error } = await supabase
-      .from("setting_global")
-      .insert([
-        {
-          id: nextId,
-          key: data.key,
-          value: data.value,
-          color: data.color,
-          status: data.status,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error creating setting global:", error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[createSettingGlobal] API Error:", response.status, errorText);
       return {
         status: "error",
-        message: "Gagal membuat setting global: " + error.message,
+        message: "Gagal membuat setting global di server",
       };
     }
 
-    await invalidateSettingGlobalCache();
+    const result = await response.json();
+    const createdData = result.data || result;
 
     return {
       status: "success",
       message: "Setting global berhasil dibuat",
-      data: result,
+      data: {
+        id: createdData.id,
+        key: createdData.code,
+        value: createdData.name,
+        color: createdData.color,
+        status: createdData.isActive !== undefined ? createdData.isActive : 1,
+      },
     };
   } catch (error) {
     console.error("Error in createSettingGlobal:", error);

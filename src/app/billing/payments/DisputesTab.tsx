@@ -279,7 +279,7 @@ export default function DisputesTab() {
                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-4 py-3">ID Sengketa</th>
+                                <th className="px-4 py-3">Tanggal</th>
                                 <th className="px-4 py-3">Pembayaran</th>
                                 <th className="px-4 py-3">Pengguna</th>
                                 <th className="px-4 py-3">Tipe</th>
@@ -290,7 +290,7 @@ export default function DisputesTab() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Memuat data sengketa...</td>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Memuat data sengketa...</td>
                                 </tr>
                             ) : disputes.length === 0 ? (
                                 <tr>
@@ -299,10 +299,9 @@ export default function DisputesTab() {
                             ) : (
                                 disputes.map((item) => (
                                     <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">#{item.id}</td>
+                                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{formatDate(item.createdAt)}</td>
                                         <td className="px-4 py-3">
                                             <div className="font-medium text-emerald-600">{formatRupiah(item.amount)}</div>
-                                            <div className="text-xs text-gray-500">ID: #{item.paymentId}</div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="font-medium text-gray-900 dark:text-white">{item.userName}</div>

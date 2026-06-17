@@ -1959,4 +1959,80 @@ export const paymentsApi = {
         
 };
 
+// ============================================
+// Wallet Admin API
+// ============================================
+
+export const walletApi = {
+    // Get pending topup requests (Admin)
+    getPendingTopups: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Wallet/admin/topups/pending${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get pending withdraw requests (Admin)
+    getPendingWithdraws: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Wallet/admin/withdraws/pending${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Approve withdraw request (Admin)
+    approveWithdraw: (id: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/withdraws/${id}/approve`, { method: 'POST', token }),
+
+    // Reject withdraw request (Admin)
+    rejectWithdraw: (id: number | string, reason: string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/withdraws/${id}/reject`, {
+            method: 'POST',
+            body: { reason },
+            token
+        }),
+
+    // Process/Complete withdraw request (Admin)
+    completeWithdraw: (id: number | string, externalTransactionId: string | null, gatewayReference: string | null, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/withdraws/${id}/complete`, {
+            method: 'POST',
+            body: { externalTransactionId, gatewayReference },
+            token
+        }),
+
+    // Confirm topup request (Admin)
+    confirmTopup: (id: number | string, externalReference: string | null, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/topups/${id}/confirm`, {
+            method: 'POST',
+            body: { externalReference },
+            token
+        }),
+
+    // Reject topup request (Admin)
+    rejectTopup: (id: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/topups/${id}/reject`, { method: 'POST', token }),
+
+    // Get wallet statistics overview (Admin)
+    getStatisticsOverview: (token?: string, signal?: AbortSignal) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/stats`, { token, signal }),
+
+    // Get wallet by user ID (Admin)
+    getWalletByUserId: (userId: number | string, token?: string, signal?: AbortSignal) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/user/${userId}`, { token, signal }),
+
+    // Suspend wallet (Admin)
+    suspendWallet: (walletId: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/suspend`, { method: 'POST', token }),
+
+    // Activate wallet (Admin)
+    activateWallet: (walletId: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/activate`, { method: 'POST', token }),
+
+    // Update wallet limits (Admin)
+    updateWalletLimits: (walletId: number | string, data: any, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/limits`, { method: 'PUT', body: data, token })
+};
+
 export { API_BASE };

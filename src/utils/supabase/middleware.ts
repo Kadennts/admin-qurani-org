@@ -40,8 +40,11 @@ function getMyQuraniUser(request: NextRequest): MyQuraniUser | null {
  * Kita gunakan NEXT_PUBLIC_BASE_URL sebagai base URL yang benar.
  */
 function buildRedirectUrl(request: NextRequest, pathname: string): URL {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.startsWith('192.168.');
+
   const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  if (publicBaseUrl) {
+  if (publicBaseUrl && !isLocal) {
     return new URL(pathname, publicBaseUrl);
   }
   // Fallback: gunakan request URL (benar untuk local dev tanpa reverse proxy)

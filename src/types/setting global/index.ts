@@ -8,6 +8,7 @@ interface SettingGlobal {
 }
 
 interface EditLabelData {
+  key?: string;
   value: string;
   color: string;
   status: number;
