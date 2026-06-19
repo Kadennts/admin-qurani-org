@@ -1,80 +1,92 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import { I18nProvider } from "@/components/providers/i18n-provider"
+import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 import {
-    Search, Filter, MoreHorizontal, Calendar,
-    ChevronLeft, ChevronRight, Clock, CheckCircle2, XCircle,
-    CreditCard, RefreshCw, ChevronDown, Check,
-    X, Phone, MapPin, User, Flag, Hash, Shield, RotateCcw, FileText
+    Search, Filter, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle2,
+    XCircle, CreditCard, RefreshCw, Check, X, Phone, MapPin, User, Hash,
+    Shield, RotateCcw, FileText, Eye, ChevronDown, AlertCircle, Loader2,
+    PlayCircle, Flag, Database
 } from "lucide-react"
-import rawData from "@/data/kyc-dummy.json"
+import dummyRaw from "@/data/kyc-dummy.json"
+import { KycSubmission } from "@/utils/api/kyc/fetch"
+import { getKycAll, startKycReview, reviewKyc } from "@/utils/api/kyc/fetch"
+
+// ─── Dummy Fallback Data ───────────────────────────────────────────────────────
+const DUMMY_DATA: KycSubmission[] = (dummyRaw as any).kyc_member_api_dummy as KycSubmission[]
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function val(v: string | null | undefined, fallback = "-"): string {
+    if (!v || v.trim() === "") return fallback
+    return v
+}
+
+function formatDate(iso: string | null | undefined): string {
+    if (!iso) return "-"
+    try {
+        return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+    } catch { return iso }
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+    if (!iso) return "-"
+    try {
+        const d = new Date(iso)
+        return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) +
+            ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+    } catch { return iso }
+}
+
+function getInitials(name: string | null | undefined): string {
+    if (!name) return "?"
+    return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()
+}
+
+function getAvatarColor(id: number): string {
+    const colors = [
+        "bg-emerald-500", "bg-teal-500", "bg-blue-500", "bg-indigo-500",
+        "bg-purple-500", "bg-pink-500", "bg-rose-500", "bg-orange-500",
+        "bg-amber-500", "bg-cyan-500"
+    ]
+    return colors[id % colors.length]
+}
+
+function getClientToken(): string | null {
+    if (typeof window === "undefined") return null
+    try {
+        const s = localStorage.getItem("myqurani_auth")
+        if (!s) return null
+        return JSON.parse(s)?.accessToken || null
+    } catch { return null }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type KycMember = {
-    id: number
-    nama: string
-    avatar: string
-    avatarBg: string
-    avatarUrl?: string
-    tipeDokumen: string
-    retryCount: number
-    tglPengajuan: string
-    status: "menunggu" | "disetujui" | "ditolak"
-    noWhatsapp?: string
-    tempatLahir?: string
-    tanggalLahir?: string
-    alamat?: string
-    nik?: string
-    namaResmi?: string
-    username?: string
-    email?: string
-    ktpImage?: string
-    selfieImage?: string
-    rejectionReason?: string | null
-    rejectionHistory?: { id: number; date: string; reason: string }[]
-    notes?: string
-}
+type TabKey = "semua" | "pending" | "in_review" | "approved" | "rejected"
 
-const DATA: KycMember[] = rawData.kyc_member as KycMember[]
+// ─── Toast ────────────────────────────────────────────────────────────────────
+type ToastItem = { id: number; message: string; type: "success" | "error" | "info" }
 
-const STATUS_CONFIG = {
-    menunggu: { label: "Pending", cls: "bg-amber-50 text-amber-600 border border-amber-200", icon: Clock },
-    disetujui: { label: "Disetujui", cls: "bg-emerald-50 text-emerald-600 border border-emerald-200", icon: CheckCircle2 },
-    ditolak: { label: "Ditolak", cls: "bg-red-50 text-red-600 border border-red-200", icon: XCircle },
-}
-const STATUS_BADGE: Record<string, string> = {
-    menunggu: "bg-amber-100 text-amber-700 border border-amber-200",
-    disetujui: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    ditolak: "bg-red-100 text-red-600 border border-red-200",
-}
-
-// ─── Toast Component ───────────────────────────────────────────────────────
-type ToastData = { id: number; message: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastData[]; onRemove: (id: number) => void }) {
+function Toast({ toasts, onRemove }: { toasts: ToastItem[]; onRemove: (id: number) => void }) {
     return (
-        <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+        <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
             {toasts.map(t => (
-                <div
-                    key={t.id}
+                <div key={t.id}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium pointer-events-auto
                         animate-in slide-in-from-right-5 duration-300
                         ${t.type === "success"
                             ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-300"
+                            : t.type === "info"
+                            ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300"
                             : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300"
-                        }`}
-                >
+                        }`}>
                     {t.type === "success"
                         ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    }
+                        : t.type === "info"
+                        ? <Database className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                        : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
                     <span>{t.message}</span>
-                    <button
-                        onClick={() => onRemove(t.id)}
-                        className="ml-1 opacity-50 hover:opacity-100 transition-opacity"
-                    >
+                    <button onClick={() => onRemove(t.id)} className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
                         <X className="w-3.5 h-3.5" />
                     </button>
                 </div>
@@ -83,35 +95,24 @@ function Toast({ toasts, onRemove }: { toasts: ToastData[]; onRemove: (id: numbe
     )
 }
 
-// ─── Per-Page Custom Dropdown ─────────────────────────────────────────────────
-const PER_PAGE_OPTIONS = [10, 25, 50, 100]
+// ─── Per Page Select ───────────────────────────────────────────────────────────
+const PER_PAGE_OPTIONS = [10, 25, 50]
 
 function PerPageSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
     const [open, setOpen] = useState(false)
     return (
         <div className="relative inline-block ml-2">
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
+            <button onClick={() => setOpen(o => !o)}
+                className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 {value} <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
             </button>
             {open && (
-                <div
-                    className="absolute bottom-full left-0 mb-1 w-28 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-50 overflow-hidden py-1"
-                    onMouseLeave={() => setOpen(false)}
-                >
+                <div className="absolute bottom-full left-0 mb-1 w-24 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-50 overflow-hidden py-1"
+                    onMouseLeave={() => setOpen(false)}>
                     {PER_PAGE_OPTIONS.map(n => (
-                        <button
-                            key={n}
-                            onClick={() => { onChange(n); setOpen(false) }}
-                            className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${value === n
-                                ? "bg-orange-50 dark:bg-emerald-900/20 text-gray-900 dark:text-white font-medium"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                }`}
-                        >
-                            {n}
-                            {value === n && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                        <button key={n} onClick={() => { onChange(n); setOpen(false) }}
+                            className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${value === n ? "bg-emerald-50 dark:bg-emerald-900/20 text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
+                            {n}{value === n && <Check className="w-3.5 h-3.5 text-emerald-500" />}
                         </button>
                     ))}
                 </div>
@@ -120,556 +121,403 @@ function PerPageSelect({ value, onChange }: { value: number; onChange: (v: numbe
     )
 }
 
-// ─── Dropdown Aksi ────────────────────────────────────────────────────────────
-function AksiDropdown({ id }: { id: number }) {
-    const [open, setOpen] = useState(false)
-    return (
-        <div className="relative" onClick={e => e.stopPropagation()}>
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-                <MoreHorizontal className="w-4 h-4" />
-            </button>
-            {open && (
-                <div
-                    className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
-                    onMouseLeave={() => setOpen(false)}
-                >
-                    {[
-                        { label: "Setujui" },
-                        { label: "Tolak" },
-                    ].map(item => (
-                        <button
-                            key={item.label}
-                            onClick={() => setOpen(false)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            {item.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-        </div>
-    )
+// ─── Status Config ─────────────────────────────────────────────────────────────
+function useStatusConfig(t: (key: string) => string) {
+    return useMemo(() => ({
+        0: { label: t("kyc_member.status_pending"), cls: "bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800", icon: Clock },
+        1: { label: t("kyc_member.status_in_review"), cls: "bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800", icon: Eye },
+        2: { label: t("kyc_member.status_approved"), cls: "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800", icon: CheckCircle2 },
+        3: { label: t("kyc_member.status_rejected"), cls: "bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800", icon: XCircle },
+    }), [t])
 }
 
-// ─── KTP Document (real image or placeholder) ────────────────────────────────────────────
-function KtpCardPreview({ member }: { member: KycMember }) {
-    if (member.ktpImage) {
-        return (
-            <div className="w-full h-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center p-6">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={member.ktpImage}
-                    alt={`KTP ${member.namaResmi || member.nama}`}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-md"
-                />
-            </div>
-        )
-    }
-    return (
-        <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl flex flex-col">
-            {/* KTP header */}
-            <div className="bg-red-600 text-white text-center py-2 px-3 rounded-t-xl">
-                <p className="text-[10px] font-bold tracking-wider">PROVINSI</p>
-                <p className="text-xs font-bold tracking-widest">INDONESIA</p>
-            </div>
-            <div className="flex-1 p-3 flex gap-3">
-                {/* Photo placeholder */}
-                <div className="w-16 h-20 bg-gray-300 dark:bg-gray-600 rounded flex items-center justify-center flex-shrink-0">
-                    <User className="w-8 h-8 text-gray-400" />
-                </div>
-                {/* Fields */}
-                <div className="flex-1 space-y-1">
-                    {[
-                        ["NIK", member.nik || "—"],
-                        ["Nama", member.nama],
-                        ["Tempat/Tgl Lahir", `${member.tempatLahir || "—"}, ${member.tanggalLahir || "—"}`],
-                        ["Alamat", member.alamat || "—"],
-                    ].map(([label, val]) => (
-                        <div key={label}>
-                            <p className="text-[8px] text-gray-500 uppercase leading-tight">{label}</p>
-                            <p className="text-[9px] font-semibold text-gray-800 dark:text-gray-200 leading-tight">{val}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    )
+function useDocLabel(t: (key: string) => string) {
+    return useCallback((docType: string | null) => {
+        const map: Record<string, string> = {
+            NATIONAL_ID: t("kyc_member.doc_national_id"),
+            PASSPORT: t("kyc_member.doc_passport"),
+            DRIVING_LICENSE: t("kyc_member.doc_driving_license"),
+            STUDENT_CARD: t("kyc_member.doc_student_card"),
+            RESIDENCE_PERMIT: t("kyc_member.doc_residence_permit"),
+        }
+        return docType ? (map[docType] || docType) : t("kyc_member.doc_unknown")
+    }, [t])
 }
 
-// ─── Selfie Photo (real image or avatar placeholder) ─────────────────────────────────
-function SelfiePlaceholder({ member }: { member: KycMember }) {
-    if (member.selfieImage) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={member.selfieImage}
-                alt={`Selfie ${member.nama}`}
-                className="w-full h-full object-cover object-top"
-            />
-        )
-    }
-    return (
-        <div className={`w-full h-full ${member.avatarBg} opacity-80 rounded-xl flex flex-col items-center justify-center gap-3`}>
-            <div className="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center">
-                <span className="text-white text-3xl font-bold">{member.avatar}</span>
-            </div>
-            <p className="text-white/80 text-xs font-medium">Foto Selfie</p>
-        </div>
-    )
-}
-// ─── Filter Constants (Member) ───────────────────────────────────────────────
-const TIPE_DOKUMEN_OPTIONS = ["KTP", "Kartu Pelajar"] as const
-const RIWAYAT_OPTIONS = ["0x (Baru)", "1x Gagal", "2-3x Gagal", ">3x Gagal"] as const
-
-type MemberFilterState = {
-    tipeDokumen: string[]
-    riwayat: string[]
-}
-const MEMBER_EMPTY_FILTER: MemberFilterState = { tipeDokumen: [], riwayat: [] }
-
-// ─── Member FilterModal ───────────────────────────────────────────────────────
-function MemberFilterModal({
-    initial,
-    onApply,
-    onClose,
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+function KycDetailModal({
+    member, onClose, onStartReview, onApprove, onReject, isProcessing
 }: {
-    initial: MemberFilterState
-    onApply: (f: MemberFilterState) => void
+    member: KycSubmission
     onClose: () => void
+    onStartReview: (id: number) => void
+    onApprove: (id: number) => void
+    onReject: (id: number, reason: string, notes: string) => void
+    isProcessing: boolean
 }) {
-    const [draft, setDraft] = useState<MemberFilterState>({
-        tipeDokumen: [...initial.tipeDokumen],
-        riwayat: [...initial.riwayat],
-    })
-
-    const toggle = (key: keyof MemberFilterState, val: string) => {
-        setDraft(prev => ({
-            ...prev,
-            [key]: prev[key].includes(val)
-                ? prev[key].filter(v => v !== val)
-                : [...prev[key], val],
-        }))
-    }
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-
-            {/* Panel */}
-            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[480px]">
-                <div className="p-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                            <Filter className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                            <h2 className="text-base font-bold text-gray-900 dark:text-white">Filter Data</h2>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <X className="w-4 h-4 text-gray-400" />
-                        </button>
-                    </div>
-                    <p className="text-sm text-emerald-500 mb-5">Tampilkan data spesifik berdasarkan kriteria.</p>
-
-                    {/* ── Tipe Dokumen (checkbox style) ── */}
-                    <div className="mb-1">
-                        <div className="flex items-center gap-2 mb-3">
-                            <FileText className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Tipe Dokumen</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-6 mb-4">
-                            {TIPE_DOKUMEN_OPTIONS.map(t => (
-                                <label
-                                    key={t}
-                                    className="flex items-center gap-2.5 cursor-pointer group"
-                                    onClick={() => toggle("tipeDokumen", t)}
-                                >
-                                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${draft.tipeDokumen.includes(t)
-                                        ? "bg-emerald-500 border-emerald-500"
-                                        : "border-gray-300 dark:border-gray-600 group-hover:border-emerald-400"
-                                        }`}>
-                                        {draft.tipeDokumen.includes(t) && (
-                                            <Check className="w-2.5 h-2.5 text-white" />
-                                        )}
-                                    </span>
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">{t}</span>
-                                </label>
-                            ))}
-                        </div>
-                        {/* Divider */}
-                        <div className="border-t border-gray-100 dark:border-gray-800 mb-4" />
-                    </div>
-
-                    {/* ── Riwayat Penolakan (pill chips) ── */}
-                    <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3">
-                            <RotateCcw className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Riwayat Penolakan</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {RIWAYAT_OPTIONS.map(r => (
-                                <button
-                                    key={r}
-                                    onClick={() => toggle("riwayat", r)}
-                                    className={`px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all ${draft.riwayat.includes(r)
-                                        ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"
-                                        }`}
-                                >
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* ── Footer ── */}
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                        <button
-                            onClick={() => setDraft(MEMBER_EMPTY_FILTER)}
-                            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5" /> Reset
-                        </button>
-                        <button
-                            onClick={() => { onApply(draft); onClose() }}
-                            className="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors"
-                        >
-                            Terapkan
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-
-
-function KycMemberDetailModal({
-    member,
-    onClose,
-    onUpdateStatus,
-}: {
-    member: KycMember
-    onClose: () => void
-    onUpdateStatus: (id: number, status: "disetujui" | "ditolak", rejectionReason?: string) => void
-}) {
+    const { t } = useI18n()
+    const statusConfig = useStatusConfig(t)
+    const getDocLabel = useDocLabel(t)
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [selectedReasons, setSelectedReasons] = useState<string[]>([])
     const [additionalNote, setAdditionalNote] = useState("")
+    const [showStartReviewConfirm, setShowStartReviewConfirm] = useState(false)
+
+    const statusInfo = statusConfig[member.status as 0 | 1 | 2 | 3] ?? { label: t("kyc_member.status_unknown"), cls: "bg-gray-100 text-gray-500 border border-gray-200", icon: AlertCircle }
+    const StatusIcon = statusInfo.icon
 
     const REJECTION_REASONS = [
-        "Foto identitas buram atau tidak terbaca.",
-        "Foto selfie tidak sesuai dengan kartu identitas.",
-        "Dokumen identitas sudah kadaluwarsa.",
-        "Nama di profil tidak sesuai dengan dokumen identitas.",
-        "Dokumen yang diunggah bukan KTP/Kartu Pelajar yang valid.",
-        "Nomor identitas tidak terdaftar atau format salah.",
+        t("kyc_member.reject_reason_1"),
+        t("kyc_member.reject_reason_2"),
+        t("kyc_member.reject_reason_3"),
+        t("kyc_member.reject_reason_4"),
+        t("kyc_member.reject_reason_5"),
+        t("kyc_member.reject_reason_6"),
     ]
 
-    const toggleReason = (reason: string) => {
-        setSelectedReasons(prev =>
-            prev.includes(reason) ? prev.filter(r => r !== reason) : [...prev, reason]
-        )
-    }
+    const toggleReason = (r: string) =>
+        setSelectedReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
 
     const handleConfirmReject = () => {
         const fullReason = [...selectedReasons, ...(additionalNote.trim() ? [additionalNote] : [])].join(". ")
-        onUpdateStatus(member.id, "ditolak", fullReason)
+        onReject(member.id, fullReason, additionalNote)
         setShowRejectModal(false)
         onClose()
     }
-    const statusBadge = STATUS_BADGE[member.status]
-    const statusLabel = STATUS_CONFIG[member.status].label.toUpperCase()
 
-    // Status verifikasi card config
-    const verifikasiConfig = {
-        menunggu: { icon: Clock, cls: "border-amber-200 bg-amber-50 dark:bg-amber-900/20", iconCls: "text-amber-400", label: "Menunggu Persetujuan", sub: "Mohon periksa kelengkapan dokumen." },
-        disetujui: { icon: CheckCircle2, cls: "border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20", iconCls: "text-emerald-500", label: "Dokumen Disetujui", sub: "Verifikasi identitas berhasil." },
-        ditolak: { icon: XCircle, cls: "border-red-200 bg-red-50 dark:bg-red-900/20", iconCls: "text-red-400", label: "Dokumen Ditolak", sub: "Dokumen tidak memenuhi syarat." },
-    }
-    const vConf = verifikasiConfig[member.status]
-    const VIcon = vConf.icon
+    const displayName = val(member.fullName, val(member.username, `User #${member.userId}`))
+    const initials = getInitials(member.fullName || member.username)
+    const avatarBg = getAvatarColor(member.id)
+
+    const genderLabel = member.gender === "male" ? t("kyc_member.detail_gender_male")
+        : member.gender === "female" ? t("kyc_member.detail_gender_female")
+            : val(member.gender)
+
+    const riskLabel = member.riskLevel === "low" ? t("kyc_member.detail_risk_low")
+        : member.riskLevel === "medium" ? t("kyc_member.detail_risk_medium")
+            : member.riskLevel === "high" ? t("kyc_member.detail_risk_high")
+                : val(member.riskLevel)
+
+    const riskColor = member.riskLevel === "low" ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+        : member.riskLevel === "medium" ? "text-amber-600 bg-amber-50 border-amber-200"
+            : member.riskLevel === "high" ? "text-red-600 bg-red-50 border-red-200"
+                : "text-gray-500"
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
-            {/* Backdrop */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ maxWidth: "calc(100vw - 24px)", maxHeight: "95vh", width: "1100px" }}>
 
-            {/* Modal Panel */}
-            <div
-                className="relative w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-                style={{ maxWidth: "calc(100vw - 80px)", height: "96vh" }}
-            >
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-                    {/* Left: Avatar + Name */}
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full ${member.avatarBg} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                            {member.selfieImage ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={member.selfieImage} alt={member.nama} className="w-full h-full object-cover object-top" />
-                            ) : (
-                                <span className="text-white text-sm font-bold">{member.avatar}</span>
-                            )}
+                        <div className={`w-10 h-10 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
+                            <span className="text-white text-sm font-bold">{initials}</span>
                         </div>
-                        <div className="flex flex-col">
-                            <p className="font-bold text-gray-900 dark:text-white text-base">{member.nama}</p>
-                            {member.username && (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{member.username}</p>
-                            )}
+                        <div>
+                            <p className="font-bold text-gray-900 dark:text-white text-base">{displayName}</p>
+                            {member.username && <p className="text-xs text-gray-400 mt-0.5">@{member.username}</p>}
                         </div>
                     </div>
-
-                    {/* Right: Status Pengajuan + Close */}
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">STATUS PENGAJUAN</p>
+                    <div className="flex items-center gap-3">
+                        <div className="hidden sm:block text-right">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t("kyc_member.detail_submission_status")}</p>
                             <div className="flex items-center gap-2 justify-end mt-0.5">
-                                <p className="text-sm text-gray-600 dark:text-gray-300">{member.tglPengajuan}</p>
-                                <span className={`text-xs font-bold px-3 py-0.5 rounded-full border ${statusBadge}`}>
-                                    {statusLabel}
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(member.createdAt)}</p>
+                                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 ${statusInfo.cls}`}>
+                                    <StatusIcon className="w-3 h-3" />{statusInfo.label}
                                 </span>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors">
-                            <X className="w-5 h-5" />
-                        </button>
+                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors"><X className="w-5 h-5" /></button>
                     </div>
                 </div>
 
-                {/* ── Body ── */}
-                <div className="flex flex-1 overflow-hidden">
+                {/* Body — scrollable */}
+                <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
-                    {/* Left: User Info */}
-                    <div
-                        className="w-[360px] flex-shrink-0 border-r border-gray-100 dark:border-gray-800 overflow-y-auto [&::-webkit-scrollbar]:hidden"
-                        style={{ scrollbarWidth: "none" }}
-                    >
-                        <div className="p-6">
-                            {/* Section header */}
-                            <div className="flex items-center gap-2 mb-4">
-                                <User className="w-3.5 h-3.5 text-gray-400" />
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Data &amp; Informasi User</span>
-                            </div>
+                    {/* LEFT — User Info */}
+                    <div className="w-full lg:w-[340px] flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 dark:border-gray-800 overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+                        <div className="p-4 sm:p-6 space-y-5">
 
-                            {/* Info card — persis MagangHub: card border + divider antar group */}
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                                {/* Nama Lengkap */}
-                                <div className="px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Nama Lengkap</p>
-                                    <p className="text-sm font-bold text-gray-900 dark:text-white">{member.nama}</p>
+                            {/* Personal Info */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <User className="w-3.5 h-3.5 text-gray-400" />
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t("kyc_member.detail_user_info")}</span>
                                 </div>
-
-                                {/* No. WhatsApp */}
-                                {member.noWhatsapp && (
-                                    <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">No. WhatsApp</p>
-                                        <div className="flex items-center gap-1.5">
-                                            <Phone className="w-3.5 h-3.5 text-emerald-500" />
-                                            <p className="text-sm text-gray-700 dark:text-gray-300">{member.noWhatsapp}</p>
+                                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                    {[
+                                        [t("kyc_member.detail_full_name"), val(member.fullName)],
+                                        [t("kyc_member.detail_username"), member.username ? `@${member.username}` : "-"],
+                                        [t("kyc_member.detail_phone"), val(member.phone)],
+                                        [t("kyc_member.detail_gender"), genderLabel],
+                                        [t("kyc_member.detail_nationality"), val(member.nationality)],
+                                    ].map(([label, value], i) => (
+                                        <div key={label} className={`px-4 py-3 ${i > 0 ? "border-t border-gray-100 dark:border-gray-800" : ""}`}>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+                                            <p className="text-sm font-medium text-gray-800 dark:text-white break-all">{value}</p>
+                                        </div>
+                                    ))}
+                                    {/* DOB + POB */}
+                                    <div className="grid grid-cols-2 border-t border-gray-100 dark:border-gray-800">
+                                        <div className="px-4 py-3 border-r border-gray-100 dark:border-gray-800">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_pob")}</p>
+                                            <p className="text-sm text-gray-700 dark:text-gray-300">{val(member.placeOfBirth)}</p>
+                                        </div>
+                                        <div className="px-4 py-3">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_dob")}</p>
+                                            <div className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3 text-gray-400" />
+                                                <p className="text-sm text-gray-700 dark:text-gray-300">{formatDate(member.dateOfBirth)}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Tempat & Tgl Lahir */}
-                                <div className="grid grid-cols-2 border-t border-gray-100 dark:border-gray-800">
-                                    <div className="px-4 py-3 border-r border-gray-100 dark:border-gray-800">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Tempat Lahir</p>
-                                        <p className="text-sm text-gray-700 dark:text-gray-300">{member.tempatLahir || "—"}</p>
-                                    </div>
-                                    <div className="px-4 py-3">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Tanggal Lahir</p>
-                                        <div className="flex items-center gap-1">
-                                            <Calendar className="w-3 h-3 text-gray-400" />
-                                            <p className="text-sm text-gray-700 dark:text-gray-300">{member.tanggalLahir || "—"}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Alamat Domisili */}
-                                {member.alamat && (
+                                    {/* Address */}
                                     <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Alamat Domisili (KTP)</p>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{t("kyc_member.detail_address")}</p>
                                         <div className="flex items-start gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
                                             <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                                            <p className="text-sm text-gray-700 dark:text-gray-300">{member.alamat}</p>
+                                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                {[member.address, member.city, member.province, member.postalCode, member.country]
+                                                    .filter(Boolean).join(", ") || "-"}
+                                            </p>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* NIK */}
-                                {member.nik && (
+                                    {/* Document */}
                                     <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nomor Induk Kependudukan (NIK)</p>
-                                        <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-3 py-2">
-                                            <Hash className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                                            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-wide">{member.nik}</p>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_doc_type")}</p>
+                                        <div className="flex items-center gap-2">
+                                            <CreditCard className="w-3.5 h-3.5 text-gray-400" />
+                                            <p className="text-sm font-bold text-gray-800 dark:text-white">{getDocLabel(member.documentType)}</p>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Tipe Dokumen */}
-                                <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Tipe Dokumen</p>
-                                    <p className="text-sm font-bold text-gray-800 dark:text-white">{member.tipeDokumen}</p>
+                                    {/* Doc Number */}
+                                    <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{t("kyc_member.detail_doc_number")}</p>
+                                        {member.documentNumber ? (
+                                            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-3 py-2">
+                                                <Hash className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                                <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-wide">{member.documentNumber}</p>
+                                            </div>
+                                        ) : <p className="text-sm text-gray-400">-</p>}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Status Verifikasi */}
-                            <div className="mt-5">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Shield className="w-3.5 h-3.5 text-gray-400" />
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status Verifikasi</span>
-                                </div>
-                                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${vConf.cls}`}>
-                                    <VIcon className={`w-5 h-5 flex-shrink-0 ${vConf.iconCls}`} />
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-800 dark:text-white">{vConf.label}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{vConf.sub}</p>
+                            {/* Review Info */}
+                            {(member.reviewedBy || member.riskLevel || member.reviewNotes || member.rejectionReason) && (
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Shield className="w-3.5 h-3.5 text-gray-400" />
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t("kyc_member.detail_review_info")}</span>
                                     </div>
+                                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden space-y-0">
+                                        {member.reviewedBy && (
+                                            <div className="px-4 py-3">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_reviewed_by")}</p>
+                                                <p className="text-sm text-gray-700 dark:text-gray-300">{member.reviewedBy}</p>
+                                            </div>
+                                        )}
+                                        {member.reviewedAt && (
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_reviewed_at")}</p>
+                                                <p className="text-sm text-gray-700 dark:text-gray-300">{formatDateTime(member.reviewedAt)}</p>
+                                            </div>
+                                        )}
+                                        {member.riskLevel && (
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{t("kyc_member.detail_risk_level")}</p>
+                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${riskColor}`}>{riskLabel}</span>
+                                            </div>
+                                        )}
+                                        {member.reviewNotes && (
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_review_notes")}</p>
+                                                <p className="text-sm text-gray-600 dark:text-gray-400">{member.reviewNotes}</p>
+                                            </div>
+                                        )}
+                                        {member.rejectionReason && (
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-red-50/50 dark:bg-red-900/10">
+                                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-0.5">{t("kyc_member.detail_rejection_reason")}</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">{member.rejectionReason}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Verification Status Card */}
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusInfo.cls}`}>
+                                <StatusIcon className="w-5 h-5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm font-bold">{statusInfo.label}</p>
+                                    <p className="text-xs opacity-70">{t("kyc_member.detail_submission_status")}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Right: Document Images — isi penuh tinggi */}
-                    <div className="flex-1 flex gap-5 p-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-                        {/* Dokumen Asli */}
-                        <div className="flex-1 flex flex-col gap-2 min-w-0">
+                    {/* RIGHT — Document Images */}
+                    <div className="flex-1 flex flex-col sm:flex-row gap-4 p-4 sm:p-6 overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+                        {/* Doc Image */}
+                        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-[220px]">
                             <div className="flex items-center gap-2 bg-gray-800 dark:bg-gray-950 text-white text-xs font-semibold px-3 py-1.5 rounded-lg w-fit">
-                                <CreditCard className="w-3.5 h-3.5" />
-                                Dokumen Asli
+                                <CreditCard className="w-3.5 h-3.5" />{t("kyc_member.detail_doc_image")}
                             </div>
-                            <div className="flex-1 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-                                <KtpCardPreview member={member} />
+                            <div className="flex-1 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm bg-gray-50 dark:bg-gray-800 flex items-center justify-center min-h-[200px]">
+                                {(member.documentImageUrl || member._dummyDocImage) ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={member.documentImageUrl || member._dummyDocImage} alt="Document" className="max-w-full max-h-full object-contain" />
+                                ) : (
+                                    <div className="flex flex-col items-center gap-3 text-gray-400 p-8">
+                                        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                            <CreditCard className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                                        </div>
+                                        <p className="text-sm text-center">{t("kyc_member.detail_no_image")}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Foto Selfie */}
-                        <div className="flex-1 flex flex-col gap-2 min-w-0">
+                        {/* Selfie */}
+                        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-[220px]">
                             <div className="flex items-center gap-2 bg-gray-800 dark:bg-gray-950 text-white text-xs font-semibold px-3 py-1.5 rounded-lg w-fit">
-                                <User className="w-3.5 h-3.5" />
-                                Foto Selfie
+                                <User className="w-3.5 h-3.5" />{t("kyc_member.detail_selfie")}
                             </div>
-                            <div className="flex-1 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-                                <SelfiePlaceholder member={member} />
+                            <div className="flex-1 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm bg-gray-50 dark:bg-gray-800 flex items-center justify-center min-h-[200px]">
+                                {(member.selfieImageUrl || member._dummySelfieImage) ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={member.selfieImageUrl || member._dummySelfieImage} alt="Selfie" className="w-full h-full object-cover object-top" />
+                                ) : (
+                                    <div className="flex flex-col items-center gap-3 text-gray-400 p-8">
+                                        <div className={`w-24 h-24 rounded-full ${avatarBg} flex items-center justify-center`}>
+                                            <span className="text-white text-3xl font-bold">{initials}</span>
+                                        </div>
+                                        <p className="text-sm text-center">{t("kyc_member.detail_no_image")}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ── Footer ── */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-white dark:bg-gray-900">
+                {/* Footer */}
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-white dark:bg-gray-900">
                     <span className="text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-                        ID: #{member.id}
+                        {t("kyc_member.detail_id")}: #{member.id}
                     </span>
-                    <div className="flex items-center gap-2">
-                        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium rounded-xl transition-colors">
-                            <Flag className="w-3.5 h-3.5" /> Laporkan
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium rounded-xl transition-colors">
+                            <Flag className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("kyc_member.detail_report")}</span>
                         </button>
-                        {member.status !== "ditolak" && (
+
+                        {/* Start Review */}
+                        {member.status === 0 && (
                             <button
-                                onClick={() => { setSelectedReasons([]); setAdditionalNote(""); setShowRejectModal(true) }}
-                                className="flex items-center gap-2 px-5 py-2 border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold rounded-xl transition-colors"
-                            >
-                                <XCircle className="w-4 h-4" /> Tolak
+                                disabled={isProcessing}
+                                onClick={() => setShowStartReviewConfirm(true)}
+                                className="flex items-center gap-2 px-4 py-1.5 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                                <span className="hidden sm:inline">{t("kyc_member.action_start_review")}</span>
                             </button>
                         )}
-                        {member.status !== "disetujui" && (
+
+                        {/* Reject */}
+                        {member.status !== 3 && (
                             <button
-                                onClick={() => { onUpdateStatus(member.id, "disetujui"); onClose() }}
-                                className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors"
-                            >
-                                <CheckCircle2 className="w-4 h-4" /> Setujui
+                                disabled={isProcessing}
+                                onClick={() => { setSelectedReasons([]); setAdditionalNote(""); setShowRejectModal(true) }}
+                                className="flex items-center gap-2 px-4 py-1.5 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                <span className="hidden sm:inline">{t("kyc_member.action_reject")}</span>
+                            </button>
+                        )}
+
+                        {/* Approve */}
+                        {member.status !== 2 && (
+                            <button
+                                disabled={isProcessing}
+                                onClick={() => { onApprove(member.id); onClose() }}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                <span className="hidden sm:inline">{t("kyc_member.action_approve")}</span>
                             </button>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* ── Reject Reason Modal ── */}
+            {/* Start Review Confirm */}
+            {showStartReviewConfirm && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowStartReviewConfirm(false)} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-[400px] max-w-full animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                <PlayCircle className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t("kyc_member.start_review_confirm")}</h3>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 pl-11">{t("kyc_member.start_review_confirm_sub")}</p>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowStartReviewConfirm(false)} className="px-5 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">{t("kyc_member.btn_cancel")}</button>
+                            <button
+                                disabled={isProcessing}
+                                onClick={() => { onStartReview(member.id); setShowStartReviewConfirm(false); onClose() }}
+                                className="px-5 py-2 text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
+                                {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {t("kyc_member.btn_confirm")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
             {showRejectModal && (
                 <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
-                    {/* Backdrop - NO BLUR */}
                     <div className="absolute inset-0 bg-black/40" onClick={() => setShowRejectModal(false)} />
-                    
-                    <div className="relative bg-white dark:bg-gray-900 rounded-[28px] shadow-2xl p-8 w-[540px] max-w-full animate-in fade-in zoom-in duration-200">
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-[520px] max-w-full animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-500">
-                                <XCircle className="w-5 h-5" />
+                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                                <XCircle className="w-5 h-5 text-red-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Tolak Verifikasi?</h3>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t("kyc_member.reject_modal_title")}</h3>
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 pl-1">Pilih 1-3 alasan penolakan untuk memberitahu user.</p>
-
-                        <div className="space-y-4 mb-6">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 pl-11">{t("kyc_member.reject_modal_sub")}</p>
+                        <div className="space-y-3 mb-4">
                             <div className="flex items-center justify-between px-1">
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none">Alasan Penolakan</span>
+                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{t("kyc_member.reject_reasons_label")}</span>
                                 <span className="text-[10px] font-bold bg-gray-50 dark:bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">{selectedReasons.length}/3</span>
                             </div>
-                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
-                                {REJECTION_REASONS.map((reason) => (
-                                    <label
-                                        key={reason}
-                                        className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all cursor-pointer group ${
-                                            selectedReasons.includes(reason)
-                                                ? "bg-red-50/50 dark:bg-red-900/5 border-red-200 dark:border-red-900/50"
-                                                : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200"
-                                        }`}
-                                    >
-                                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                                            selectedReasons.includes(reason)
-                                                ? "bg-red-500 border-red-500"
-                                                : "border-gray-300 dark:border-gray-600 group-hover:border-red-300"
-                                        }`}>
-                                            {selectedReasons.includes(reason) && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                {REJECTION_REASONS.map(r => (
+                                    <label key={r}
+                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group ${selectedReasons.includes(r) ? "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800" : "border-gray-100 dark:border-gray-800 hover:border-gray-200"}`}>
+                                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${selectedReasons.includes(r) ? "bg-red-500 border-red-500" : "border-gray-300 dark:border-gray-600"}`}>
+                                            {selectedReasons.includes(r) && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                                         </div>
-                                        <input
-                                            type="checkbox"
-                                            className="hidden"
-                                            checked={selectedReasons.includes(reason)}
-                                            onChange={() => toggleReason(reason)}
-                                            disabled={selectedReasons.length >= 3 && !selectedReasons.includes(reason)}
-                                        />
-                                        <span className={`text-[13px] font-medium transition-colors ${
-                                            selectedReasons.includes(reason) ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-300"
-                                        }`}>{reason}</span>
+                                        <input type="checkbox" className="hidden" checked={selectedReasons.includes(r)} onChange={() => toggleReason(r)} disabled={selectedReasons.length >= 3 && !selectedReasons.includes(r)} />
+                                        <span className={`text-sm transition-colors ${selectedReasons.includes(r) ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-300"}`}>{r}</span>
                                     </label>
                                 ))}
                             </div>
                         </div>
-
-                        <div className="space-y-2 mb-8">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1 leading-none">Catatan tambahan (opsional)</span>
-                            <textarea
-                                rows={3}
-                                value={additionalNote}
-                                onChange={e => setAdditionalNote(e.target.value)}
-                                placeholder="Catatan tambahan (opsional)..."
-                                className="w-full px-4 py-3.5 text-[13px] border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/50 resize-none transition-all placeholder:text-gray-400"
-                            />
+                        <div className="space-y-1 mb-5">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1">{t("kyc_member.reject_note_label")}</span>
+                            <textarea rows={3} value={additionalNote} onChange={e => setAdditionalNote(e.target.value)}
+                                placeholder={t("kyc_member.reject_note_placeholder")}
+                                className="w-full px-4 py-3 text-sm border border-gray-100 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none placeholder:text-gray-400" />
                         </div>
-
-                        <div className="flex gap-3 justify-end items-center mt-2">
-                            <button
-                                onClick={() => setShowRejectModal(false)}
-                                className="px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors border border-gray-100 dark:border-gray-800"
-                            >
-                                Batal
-                            </button>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowRejectModal(false)} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors">{t("kyc_member.reject_btn_cancel")}</button>
                             <button
                                 disabled={selectedReasons.length === 0 && !additionalNote.trim()}
                                 onClick={handleConfirmReject}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-[#FF7070] hover:bg-[#FF5C5C] disabled:opacity-40 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-[0.98]"
-                            >
-                                <XCircle className="w-4 h-4" /> Tolak
+                                className="flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-all">
+                                <XCircle className="w-4 h-4" />{t("kyc_member.reject_btn_confirm")}
                             </button>
                         </div>
                     </div>
@@ -681,166 +529,329 @@ function KycMemberDetailModal({
 
 // ─── Main Content ─────────────────────────────────────────────────────────────
 function KycMemberContent() {
-    const [activeTab, setActiveTab] = useState<"menunggu" | "disetujui" | "ditolak" | "semua">("menunggu")
+    const { t } = useI18n()
+    const statusConfig = useStatusConfig(t)
+    const getDocLabel = useDocLabel(t)
+
+    // Data
+    const [items, setItems] = useState<KycSubmission[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [isApiData, setIsApiData] = useState(false)
+    const [totalCount, setTotalCount] = useState(0)
+    const [isProcessing, setIsProcessing] = useState(false)
+
+    // Dummy image mapping (id => doc & selfie image path)
+    const DUMMY_IMG_MAP: Record<number, { doc: string; selfie: string }> = {
+        1001: { doc: "/dummy-member/3.webp", selfie: "/dummy-member/1.webp" },
+        1002: { doc: "/dummy-member/4.webp", selfie: "/dummy-member/5.webp" },
+        1003: { doc: "/dummy-member/2.webp", selfie: "/dummy-member/8.png" },
+        1004: { doc: "/dummy-member/3.webp", selfie: "/dummy-member/6.webp" },
+    }
+
+    // UI State
+    const [activeTab, setActiveTab] = useState<TabKey>("semua")
     const [search, setSearch] = useState("")
     const [searchInput, setSearchInput] = useState("")
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
-    const [selectedMember, setSelectedMember] = useState<KycMember | null>(null)
-    const [members, setMembers] = useState<KycMember[]>(DATA)
+    const [selectedMember, setSelectedMember] = useState<KycSubmission | null>(null)
     const [showFilter, setShowFilter] = useState(false)
-    const [appliedFilter, setAppliedFilter] = useState<MemberFilterState>(MEMBER_EMPTY_FILTER)
-    const [toasts, setToasts] = useState<ToastData[]>([])
+    const [filterDocType, setFilterDocType] = useState<string>("all")
+    const [toasts, setToasts] = useState<ToastItem[]>([])
 
-    const removeToast = useCallback((id: number) => {
-        setToasts(prev => prev.filter(t => t.id !== id))
-    }, [])
-
-    const showToast = useCallback((message: string, type: "success" | "error") => {
+    // Toast helpers
+    const removeToast = useCallback((id: number) => setToasts(p => p.filter(t => t.id !== id)), [])
+    const addToast = useCallback((message: string, type: "success" | "error") => {
         const id = Date.now()
-        setToasts(prev => [...prev, { id, message, type }])
-        setTimeout(() => removeToast(id), 3500)
+        setToasts(p => [...p, { id, message, type }])
+        setTimeout(() => removeToast(id), 4000)
     }, [removeToast])
 
-    const handleUpdateStatus = (id: number, status: "disetujui" | "ditolak", rejectionReason?: string) => {
-        const member = members.find(m => m.id === id)
-        setMembers(prev => prev.map(m =>
-            m.id === id
-                ? {
-                    ...m,
-                    status,
-                    ...(rejectionReason ? { rejectionReason } : {}),
-                }
-                : m
-        ))
-        setSelectedMember(null)
-        if (status === "disetujui") {
-            showToast(`✓ KYC ${member?.nama ?? "Member"} berhasil disetujui`, "success")
-        } else {
-            showToast(`✗ KYC ${member?.nama ?? "Member"} telah ditolak`, "error")
+    // Fetch data
+    const fetchData = useCallback(async () => {
+        setIsLoading(true)
+        try {
+            const clientToken = getClientToken()
+            const res = await getKycAll(1, 100, undefined, clientToken || undefined)
+            if (res.success && res.data.length > 0) {
+                setItems(res.data)
+                setTotalCount(res.totalCount)
+                setIsApiData(true)
+            } else {
+                // fallback to dummy — attach placeholder images
+                const withImages = DUMMY_DATA.map(d => ({
+                    ...d,
+                    _dummyDocImage: DUMMY_IMG_MAP[d.id]?.doc,
+                    _dummySelfieImage: DUMMY_IMG_MAP[d.id]?.selfie,
+                }))
+                setItems(withImages)
+                setTotalCount(DUMMY_DATA.length)
+                setIsApiData(false)
+            }
+        } catch {
+            const withImages = DUMMY_DATA.map(d => ({
+                ...d,
+                _dummyDocImage: DUMMY_IMG_MAP[d.id]?.doc,
+                _dummySelfieImage: DUMMY_IMG_MAP[d.id]?.selfie,
+            }))
+            setItems(withImages as any)
+            setTotalCount(DUMMY_DATA.length)
+            setIsApiData(false)
+        } finally {
+            setIsLoading(false)
         }
+    }, [])
+
+    useEffect(() => { fetchData() }, [fetchData])
+
+    // Tab counts
+    const tabCounts = useMemo(() => ({
+        semua: items.length,
+        pending: items.filter(x => x.status === 0).length,
+        in_review: items.filter(x => x.status === 1).length,
+        approved: items.filter(x => x.status === 2).length,
+        rejected: items.filter(x => x.status === 3).length,
+    }), [items])
+
+    const tabs: { key: TabKey; label: string }[] = [
+        { key: "semua", label: t("kyc_member.tab_all") },
+        { key: "pending", label: t("kyc_member.tab_pending") },
+        { key: "in_review", label: t("kyc_member.tab_in_review") },
+        { key: "approved", label: t("kyc_member.tab_approved") },
+        { key: "rejected", label: t("kyc_member.tab_rejected") },
+    ]
+
+    const tabStatusMap: Record<TabKey, number | null> = {
+        semua: null, pending: 0, in_review: 1, approved: 2, rejected: 3
     }
 
+    // Filter & paginate
     const filteredData = useMemo(() => {
-        let data = members
-        if (activeTab !== "semua") data = data.filter(d => d.status === activeTab)
-        if (search.trim()) data = data.filter(d =>
-            d.nama.toLowerCase().includes(search.toLowerCase())
-        )
-        // Tipe Dokumen filter
-        if (appliedFilter.tipeDokumen.length > 0) {
-            data = data.filter(d => appliedFilter.tipeDokumen.some(t =>
-                t === "Kartu Pelajar"
-                    ? d.tipeDokumen.toLowerCase().includes("pelajar")
-                    : d.tipeDokumen.toUpperCase() === t.toUpperCase()
-            ))
+        let data = [...items]
+        const tabStatus = tabStatusMap[activeTab]
+        if (tabStatus !== null) data = data.filter(x => x.status === tabStatus)
+        if (search.trim()) {
+            const q = search.toLowerCase()
+            data = data.filter(x =>
+                (x.fullName?.toLowerCase().includes(q)) ||
+                (x.username?.toLowerCase().includes(q)) ||
+                (x.email?.toLowerCase().includes(q))
+            )
         }
-        // Riwayat Penolakan filter
-        if (appliedFilter.riwayat.length > 0) {
-            data = data.filter(d => {
-                const rc = d.retryCount
-                return appliedFilter.riwayat.some(r =>
-                    r === "0x (Baru)" ? rc === 0 :
-                        r === "1x Gagal" ? rc === 1 :
-                            r === "2-3x Gagal" ? (rc >= 2 && rc <= 3) :
-                                r === ">3x Gagal" ? rc > 3 : false
-                )
-            })
-        }
+        if (filterDocType !== "all") data = data.filter(x => x.documentType === filterDocType)
         return data
-    }, [activeTab, search, members, appliedFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items, activeTab, search, filterDocType])
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage))
     const paginatedData = filteredData.slice((page - 1) * perPage, page * perPage)
 
-    const tabCounts = {
-        menunggu: members.filter(d => d.status === "menunggu").length,
-        disetujui: members.filter(d => d.status === "disetujui").length,
-        ditolak: members.filter(d => d.status === "ditolak").length,
-        semua: members.length,
+    // Actions
+    const handleStartReview = async (id: number) => {
+        setIsProcessing(true)
+        try {
+            if (!isApiData) {
+                // Dummy mode: update local state only
+                const name = items.find(x => x.id === id)?.fullName || `#${id}`
+                await new Promise(r => setTimeout(r, 500))
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 1 as const } : x))
+                addToast(t("kyc_member.toast_start_review_ok").replace("{name}", name), "success")
+                return
+            }
+            const token = getClientToken()
+            const res = await startKycReview(id, token || undefined)
+            if (res.success) {
+                const name = items.find(x => x.id === id)?.fullName || `#${id}`
+                addToast(t("kyc_member.toast_start_review_ok").replace("{name}", name), "success")
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 1 as const } : x))
+            } else {
+                addToast(t("kyc_member.toast_start_review_err").replace("{msg}", res.message), "error")
+            }
+        } catch (e: any) {
+            addToast(t("kyc_member.toast_start_review_err").replace("{msg}", e?.message || ""), "error")
+        } finally {
+            setIsProcessing(false)
+        }
     }
 
-    const tabs: { key: typeof activeTab; label: string }[] = [
-        { key: "menunggu", label: "Menunggu" },
-        { key: "disetujui", label: "Disetujui" },
-        { key: "ditolak", label: "Ditolak" },
-        { key: "semua", label: "Semua" },
-    ]
+    const handleApprove = async (id: number) => {
+        setIsProcessing(true)
+        try {
+            if (!isApiData) {
+                // Dummy mode: update local state only
+                const name = items.find(x => x.id === id)?.fullName || `#${id}`
+                await new Promise(r => setTimeout(r, 500))
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const } : x))
+                addToast(t("kyc_member.toast_approve_ok").replace("{name}", name), "success")
+                return
+            }
+            const token = getClientToken()
+            const res = await reviewKyc(id, true, null, null, null, token || undefined)
+            const name = items.find(x => x.id === id)?.fullName || `#${id}`
+            if (res.success) {
+                addToast(t("kyc_member.toast_approve_ok").replace("{name}", name), "success")
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const } : x))
+            } else {
+                addToast(t("kyc_member.toast_approve_err").replace("{msg}", res.message), "error")
+            }
+        } catch (e: any) {
+            addToast(t("kyc_member.toast_approve_err").replace("{msg}", e?.message || ""), "error")
+        } finally {
+            setIsProcessing(false)
+        }
+    }
+
+    const handleReject = async (id: number, reason: string, notes: string) => {
+        setIsProcessing(true)
+        try {
+            if (!isApiData) {
+                // Dummy mode: update local state only
+                const name = items.find(x => x.id === id)?.fullName || `#${id}`
+                await new Promise(r => setTimeout(r, 500))
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 3 as const, rejectionReason: reason } : x))
+                addToast(t("kyc_member.toast_reject_ok").replace("{name}", name), "success")
+                return
+            }
+            const token = getClientToken()
+            const res = await reviewKyc(id, false, reason, notes, null, token || undefined)
+            const name = items.find(x => x.id === id)?.fullName || `#${id}`
+            if (res.success) {
+                addToast(t("kyc_member.toast_reject_ok").replace("{name}", name), "success")
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 3 as const, rejectionReason: reason } : x))
+            } else {
+                addToast(t("kyc_member.toast_reject_err").replace("{msg}", res.message), "error")
+            }
+        } catch (e: any) {
+            addToast(t("kyc_member.toast_reject_err").replace("{msg}", e?.message || ""), "error")
+        } finally {
+            setIsProcessing(false)
+        }
+    }
+
+    const DOC_TYPES = ["NATIONAL_ID", "PASSPORT", "DRIVING_LICENSE", "STUDENT_CARD", "RESIDENCE_PERMIT"]
+
+    // Show dummy-mode info toast once on mount
+    useEffect(() => {
+        if (!isLoading && !isApiData) {
+            const id = Date.now()
+            setToasts(p => [...p, { id, message: "Mode demo aktif — data dummy, API belum tersedia", type: "info" }])
+            setTimeout(() => removeToast(id), 6000)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading])
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
-            {/* Toast Notifications */}
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 sm:p-5">
             <Toast toasts={toasts} onRemove={removeToast} />
-            {/* Detail Modal */}
+
             {selectedMember && (
-                <KycMemberDetailModal member={selectedMember} onClose={() => setSelectedMember(null)} onUpdateStatus={handleUpdateStatus} />
+                <KycDetailModal
+                    member={selectedMember}
+                    onClose={() => setSelectedMember(null)}
+                    onStartReview={handleStartReview}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    isProcessing={isProcessing}
+                />
             )}
 
-            {/* Filter Modal */}
+            {/* Filter Drawer */}
             {showFilter && (
-                <MemberFilterModal
-                    initial={appliedFilter}
-                    onApply={f => { setAppliedFilter(f); setPage(1) }}
-                    onClose={() => setShowFilter(false)}
-                />
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilter(false)} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[400px] max-w-[calc(100vw-24px)] p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Filter className="w-4 h-4 text-gray-500" />
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white">{t("kyc_member.filter")}</h2>
+                            </div>
+                            <button onClick={() => setShowFilter(false)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <X className="w-4 h-4 text-gray-400" />
+                            </button>
+                        </div>
+                        {/* Doc Type Filter */}
+                        <div className="mb-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileText className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t("kyc_member.filter_doc_type")}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => setFilterDocType("all")}
+                                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${filterDocType === "all" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                    {t("kyc_member.filter_doc_all")}
+                                </button>
+                                {DOC_TYPES.map(d => (
+                                    <button key={d} onClick={() => setFilterDocType(d)}
+                                        className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${filterDocType === d ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                        {getDocLabel(d)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <button onClick={() => { setFilterDocType("all"); setShowFilter(false) }}
+                                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                                <RotateCcw className="w-3.5 h-3.5" />{t("kyc_member.filter_reset")}
+                            </button>
+                            <button onClick={() => setShowFilter(false)}
+                                className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors">
+                                {t("kyc_member.filter_apply")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <div className="max-w-[1600px] mx-auto">
 
-                {/* ── Search + Filter Bar ── */}
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t("kyc_member.page_title")}</h1>
+                    </div>
+                    <button onClick={fetchData} disabled={isLoading}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 self-start sm:self-auto">
+                        <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+                        {t("kyc_member.refresh")}
+                    </button>
+                </div>
+
+                {/* Search + Filter */}
                 <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center w-72 md:w-96 h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
-                        <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <div className="flex items-center flex-1 max-w-md h-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+                        <Search className="w-4 h-4 text-gray-400 ml-3 flex-shrink-0" />
                         <input
-                            type="text"
-                            placeholder="Cari nama member..."
                             value={searchInput}
                             onChange={e => setSearchInput(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                    setSearch(searchInput);
-                                    setPage(1);
-                                }
-                            }}
-                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
+                            onKeyDown={e => { if (e.key === "Enter") { setSearch(searchInput); setPage(1) } }}
+                            placeholder={t("kyc_member.search_placeholder")}
+                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400"
                         />
-                        <button
-                            onClick={() => { setSearch(searchInput); setPage(1); }}
-                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
-                        >
-                            <Search className="w-4 h-4" /> Cari
+                        <button onClick={() => { setSearch(searchInput); setPage(1) }}
+                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors flex items-center gap-1.5">
+                            <Search className="w-4 h-4" />
+                            <span className="hidden sm:inline">Cari</span>
                         </button>
                     </div>
-                    <button
-                        onClick={() => setShowFilter(true)}
-                        className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${(appliedFilter.tipeDokumen.length + appliedFilter.riwayat.length) > 0
-                            ? "border-emerald-400 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
-                            : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                            }`}
-                    >
-                        <Filter className="w-4 h-4" /> Filter
-                        {(appliedFilter.tipeDokumen.length + appliedFilter.riwayat.length) > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">
-                                {appliedFilter.tipeDokumen.length + appliedFilter.riwayat.length}
-                            </span>
+                    <button onClick={() => setShowFilter(true)}
+                        className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${filterDocType !== "all" ? "border-emerald-400 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"}`}>
+                        <Filter className="w-4 h-4" />
+                        <span className="hidden sm:inline">{t("kyc_member.filter")}</span>
+                        {filterDocType !== "all" && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">1</span>
                         )}
                     </button>
                 </div>
 
-                {/* ── Tabs ── */}
-                <div className="flex gap-0 mb-0">
+                {/* Tabs */}
+                <div className="flex gap-0 mb-0 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
                     {tabs.map(tab => (
-                        <button
-                            key={tab.key}
+                        <button key={tab.key}
                             onClick={() => { setActiveTab(tab.key); setPage(1) }}
-                            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer ${activeTab === tab.key
-                                ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                                }`}
-                        >
+                            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${activeTab === tab.key ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                             {tab.label}
-                            {activeTab === tab.key && tabCounts[tab.key] > 0 && (
-                                <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold rounded-full bg-emerald-500 text-white">
+                            {tabCounts[tab.key] > 0 && (
+                                <span className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold rounded-full ${activeTab === tab.key ? "bg-emerald-500 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}>
                                     {tabCounts[tab.key]}
                                 </span>
                             )}
@@ -848,153 +859,220 @@ function KycMemberContent() {
                     ))}
                 </div>
 
-                {/* ── Table Card ── */}
+                {/* Table Card */}
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-gray-100 dark:border-gray-800">
-                                    <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-5 py-3 w-[30%]">User</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[18%]">Tipe Dokumen</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[18%]">Tgl Pengajuan</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[18%]">Status</th>
-                                    <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[8%]">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedData.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="text-center py-20 text-gray-400 text-sm">
-                                            Tidak ada data member ditemukan
-                                        </td>
-                                    </tr>
-                                ) : paginatedData.map(member => {
-                                    const status = STATUS_CONFIG[member.status]
-                                    const StatusIcon = status.icon
-                                    return (
-                                        <tr
-                                            key={member.id}
-                                            onClick={() => setSelectedMember(member)}
-                                            className="border-b border-gray-50 dark:border-gray-800 hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10 transition-colors cursor-pointer"
-                                        >
-                                            {/* User */}
-                                            <td className="px-5 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-9 h-9 rounded-full ${member.avatarBg} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                                                        {member.selfieImage ? (
-                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                            <img
-                                                                src={member.selfieImage}
-                                                                alt={member.nama}
-                                                                className="w-full h-full object-cover object-top"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-white text-xs font-bold">{member.avatar}</span>
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
+                            <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                            <span className="text-sm">{t("kyc_member.loading")}</span>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Desktop Table */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 dark:border-gray-800">
+                                            <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-5 py-3 w-[28%]">{t("kyc_member.col_user")}</th>
+                                            <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[16%]">{t("kyc_member.col_document")}</th>
+                                            <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[15%]">{t("kyc_member.col_submitted")}</th>
+                                            <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 w-[16%]">{t("kyc_member.col_status")}</th>
+                                            <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3">{t("kyc_member.col_action")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedData.length === 0 ? (
+                                            <tr><td colSpan={5} className="text-center py-20">
+                                                <div className="flex flex-col items-center gap-3 text-gray-400">
+                                                    <AlertCircle className="w-12 h-12 text-gray-200 dark:text-gray-700" />
+                                                    <p className="text-sm font-medium">{t("kyc_member.no_data")}</p>
+                                                    <p className="text-xs text-gray-400">{t("kyc_member.no_data_sub")}</p>
+                                                </div>
+                                            </td></tr>
+                                        ) : paginatedData.map(member => {
+                                            const st = statusConfig[member.status as 0 | 1 | 2 | 3] ?? statusConfig[0]
+                                            const StIcon = st.icon
+                                            const initials = getInitials(member.fullName || member.username)
+                                            const avatarBg = getAvatarColor(member.id)
+                                            const displayName = val(member.fullName, val(member.username, `User #${member.userId}`))
+                                            return (
+                                                <tr key={member.id}
+                                                    onClick={() => setSelectedMember(member)}
+                                                    className="border-b border-gray-50 dark:border-gray-800 hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10 transition-colors cursor-pointer">
+                                                    {/* User */}
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
+                                                                <span className="text-white text-xs font-bold">{initials}</span>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-gray-900 dark:text-white text-sm">{displayName}</p>
+                                                                {member.username && <p className="text-xs text-gray-400 mt-0.5">@{member.username}</p>}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {/* Document */}
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                            <CreditCard className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                                            {getDocLabel(member.documentType)}
+                                                        </div>
+                                                        {member.documentNumber && (
+                                                            <p className="text-xs text-gray-400 mt-0.5 ml-5">{member.documentNumber}</p>
                                                         )}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-semibold text-gray-900 dark:text-white text-sm">{member.nama}</p>
-                                                            {member.retryCount > 0 && (
-                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 px-1.5 py-0.5 rounded-full">
-                                                                    <RefreshCw className="w-2.5 h-2.5" />{member.retryCount}x
-                                                                </span>
+                                                    </td>
+                                                    {/* Date */}
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                                            <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                                            {formatDate(member.createdAt)}
+                                                        </div>
+                                                    </td>
+                                                    {/* Status */}
+                                                    <td className="px-4 py-4">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.cls}`}>
+                                                            <StIcon className="w-3 h-3" />{st.label}
+                                                        </span>
+                                                    </td>
+                                                    {/* Action */}
+                                                    <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button onClick={() => setSelectedMember(member)}
+                                                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors">
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            {member.status === 0 && (
+                                                                <button onClick={() => handleStartReview(member.id)} disabled={isProcessing}
+                                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 transition-colors disabled:opacity-50">
+                                                                    <PlayCircle className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {member.status !== 2 && (
+                                                                <button onClick={() => handleApprove(member.id)} disabled={isProcessing}
+                                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-emerald-300 dark:border-emerald-700 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50">
+                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                                </button>
                                                             )}
                                                         </div>
-                                                        {member.username && (
-                                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">@{member.username}</p>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-800">
+                                {paginatedData.length === 0 ? (
+                                    <div className="flex flex-col items-center gap-3 py-16 text-gray-400 px-4">
+                                        <AlertCircle className="w-10 h-10 text-gray-200 dark:text-gray-700" />
+                                        <p className="text-sm font-medium text-center">{t("kyc_member.no_data")}</p>
+                                    </div>
+                                ) : paginatedData.map(member => {
+                                    const st = statusConfig[member.status as 0 | 1 | 2 | 3] ?? statusConfig[0]
+                                    const StIcon = st.icon
+                                    const initials = getInitials(member.fullName || member.username)
+                                    const avatarBg = getAvatarColor(member.id)
+                                    const displayName = val(member.fullName, val(member.username, `User #${member.userId}`))
+                                    return (
+                                        <div key={member.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => setSelectedMember(member)}>
+                                            <div className="flex items-start gap-3">
+                                                <div className={`w-10 h-10 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                                                    <span className="text-white text-xs font-bold">{initials}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div>
+                                                            <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{displayName}</p>
+                                                            {member.username && <p className="text-xs text-gray-400">@{member.username}</p>}
+                                                        </div>
+                                                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${st.cls}`}>
+                                                            <StIcon className="w-2.5 h-2.5" />{st.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                                            <CreditCard className="w-3 h-3" />
+                                                            {getDocLabel(member.documentType)}
+                                                        </div>
+                                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                                            <Calendar className="w-3 h-3" />
+                                                            {formatDate(member.createdAt)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-3" onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => setSelectedMember(member)}
+                                                            className="flex-1 py-1.5 text-xs font-medium border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-1">
+                                                            <Eye className="w-3.5 h-3.5" />{t("kyc_member.action_view")}
+                                                        </button>
+                                                        {member.status !== 2 && (
+                                                            <button onClick={() => handleApprove(member.id)} disabled={isProcessing}
+                                                                className="flex-1 py-1.5 text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1">
+                                                                <CheckCircle2 className="w-3.5 h-3.5" />{t("kyc_member.action_approve")}
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </div>
-                                            </td>
-
-                                            {/* Tipe Dokumen */}
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                    <CreditCard className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                                    {member.tipeDokumen}
-                                                </div>
-                                            </td>
-
-                                            {/* Tgl Pengajuan */}
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                                                    <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                                    {member.tglPengajuan}
-                                                </div>
-                                            </td>
-
-                                            {/* Status */}
-                                            <td className="px-4 py-4">
-                                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${status.cls}`}>
-                                                    <StatusIcon className="w-3 h-3" />
-                                                    {status.label}
-                                                </span>
-                                            </td>
-
-                                            {/* Aksi */}
-                                            <td className="px-4 py-4">
-                                                <AksiDropdown id={member.id} />
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        </div>
                                     )
                                 })}
-                            </tbody>
-                        </table>
-                    </div>
+                            </div>
+                        </>
+                    )}
                 </div>
 
-                {/* ── Pagination (OUTSIDE the card) ── */}
-                <div className="flex items-center justify-between px-1 py-4">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center flex-wrap gap-1">
-                        Menampilkan{" "}
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                            {filteredData.length === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, filteredData.length)}
-                        </span>{" "}
-                        dari <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredData.length}</span> data
-                        &nbsp;
-                        <span className="text-gray-400">Baris:</span>
-                        <PerPageSelect value={perPage} onChange={v => { setPerPage(v); setPage(1) }} />
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                            <button
-                                key={p}
-                                onClick={() => setPage(p)}
-                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${page === p
-                                    ? "bg-emerald-500 text-white"
-                                    : "border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                    }`}
-                            >
-                                {p}
+                {/* Pagination */}
+                {!isLoading && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1 py-4">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center flex-wrap gap-1">
+                            {t("kyc_member.showing")}{" "}
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                {filteredData.length === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, filteredData.length)}
+                            </span>{" "}
+                            {t("kyc_member.of")}{" "}
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredData.length}</span>{" "}
+                            {t("kyc_member.data")}
+                            &nbsp;<span className="text-gray-400">{t("kyc_member.per_page")}</span>
+                            <PerPageSelect value={perPage} onChange={v => { setPerPage(v); setPage(1) }} />
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronLeft className="w-4 h-4" />
                             </button>
-                        ))}
-                        <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
+                            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                let p = i + 1
+                                if (totalPages > 5) {
+                                    if (page <= 3) p = i + 1
+                                    else if (page >= totalPages - 2) p = totalPages - 4 + i
+                                    else p = page - 2 + i
+                                }
+                                return (
+                                    <button key={p} onClick={() => setPage(p)}
+                                        className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${page === p ? "bg-emerald-500 text-white" : "border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}>
+                                        {p}
+                                    </button>
+                                )
+                            })}
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-                </div>
-
+                )}
             </div>
         </div>
     )
 }
 
+// ─── Export ───────────────────────────────────────────────────────────────────
 export default function KycMemberPage() {
     return (
         <DashboardLayout>
-            <I18nProvider namespaces={["common"]}>
+            <I18nProvider namespaces={["support"]}>
                 <KycMemberContent />
             </I18nProvider>
         </DashboardLayout>

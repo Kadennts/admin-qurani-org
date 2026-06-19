@@ -421,8 +421,8 @@ function UserProfileContent() {
         .or(`requester_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`);
 
       if (error) {
-        console.error("Supabase error:", error);
-        throw error;
+        console.warn("Supabase error (likely RLS / 42501):", error);
+        return {};
       }
 
       // Process the results
@@ -642,11 +642,26 @@ function UserProfileContent() {
       // Fetch user profile if not cached
       if (!cachedProfile) {
         promises.push(
-          // Try fetching from new API first
-          usersApi.search({ keyword: userName })
-            .then(async (res) => {
+          (async () => {
+            try {
+              // 1. Try fetching by ID directly first
+              const detailRes = await usersApi.getById(userName);
+              const detailData = detailRes.data || detailRes;
+              if (detailData && (detailData.id || detailData.userId)) {
+                console.log(`[Profile] Successfully loaded profile by ID: ${userName}`);
+                ClientCache.set(cacheKeys.userProfile, detailData, 300000);
+                setUserId(detailData.id || detailData.userId);
+                return { type: 'profile', data: detailData };
+              }
+            } catch (err) {
+              console.log(`[Profile] Failed to fetch by ID (${userName}), falling back to search...`);
+            }
+
+            // 2. Fallback to search if getById fails (meaning userName might be a username string)
+            try {
+              const res = await usersApi.search({ keyword: `@${userName.replace(/^@/, '')}` });
               const searchData = res.data || res;
-              // Handle diverse response structures (items array, data array, or direct array)
+              
               let users: any[] = [];
               if (Array.isArray(searchData)) {
                 users = searchData;
@@ -656,16 +671,14 @@ function UserProfileContent() {
                 users = searchData.data;
               }
 
-              // Find exact match (case insensitive, ignore @)
               const cleanTarget = userName.toLowerCase().replace('@', '');
               const targetUser = users.find((u: any) =>
                 u.username?.toLowerCase().replace('@', '') === cleanTarget
               );
 
               if (targetUser) {
-                // Found in API! Fetch full details
                 const userIdToFetch = targetUser.userId || targetUser.id;
-                console.log(`[Profile] Found user in API: ${targetUser.username} (${userIdToFetch}), fetching detail...`);
+                console.log(`[Profile] Found user in API via search: ${targetUser.username} (${userIdToFetch}), fetching detail...`);
 
                 if (!userIdToFetch) {
                   throw new Error(t('profile.failed_fetch_profile', 'User ID invalid'));
@@ -681,14 +694,13 @@ function UserProfileContent() {
                 }
               }
 
-              // Not found in API or fetch detail failed
               console.log(`[Profile] User ${userName} not found in API search.`);
               throw new Error(t('profile.failed_fetch_profile', 'Failed to fetch user profile: User not found in API'));
-            })
-            .catch(err => {
+            } catch (err) {
               console.error("[Profile] API Fetch Error:", err);
               throw new Error(t('profile.failed_fetch_profile', 'Failed to fetch user profile'));
-            })
+            }
+          })()
         )
       }
 

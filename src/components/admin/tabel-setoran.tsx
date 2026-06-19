@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Check, Search, Filter, RotateCcw, BookOpen, CheckCircle, Loader2, CalendarIcon } from "lucide-react"
+import { Check, Search, Filter, RotateCcw, BookOpen, CheckCircle, Loader2, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -140,6 +140,20 @@ export function HasilSetoranTableContent() {
 
     // Constants for pagination
     const PAGE_SIZE = 10
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1)
+
+    // Reset pagination when filters change or data is loaded
+    useEffect(() => {
+        // We do not reset to page 1 merely on recapsData.length change unless it's a filter change,
+        // but to ensure consistency, if data shrinks, we reset.
+        if (currentPage > 1) {
+            // Check if current page is still valid
+            const maxPage = Math.max(1, Math.ceil(filtered ? filtered.length / PAGE_SIZE : 1));
+            if (currentPage > maxPage) setCurrentPage(maxPage);
+        }
+    }, [tanggalDari, tanggalSampai, filterPenyetor, filterType, filterMemorizationType]);
 
     // Helper to get token from localStorage
     const getClientToken = (): string | null => {
@@ -318,60 +332,12 @@ export function HasilSetoranTableContent() {
     const [tempFilterType, setTempFilterType] = useState<"all" | HasilSetoranRow["type"]>("all")
     const [tempFilterMemorizationType, setTempFilterMemorizationType] = useState<"all" | HasilSetoranRow["memorization_type"]>("all")
 
-    // Refs for infinite scroll
-    const observerRef = useRef<IntersectionObserver | null>(null)
-    const desktopLoadMoreRef = useRef<HTMLDivElement | null>(null)
-    const mobileLoadMoreRef = useRef<HTMLDivElement | null>(null)
-
-    // Load more function
-    const loadMore = useCallback(() => {
+    // Load more function for server data
+    const loadMoreServerData = useCallback(() => {
         if (!isLoadingMore && !isReachingEnd && hasMore) {
             setSize(size + 1)
         }
     }, [isLoadingMore, isReachingEnd, hasMore, setSize, size])
-
-    // Setup Intersection Observer for infinite scroll
-    useEffect(() => {
-        // Clean up previous observer
-        if (observerRef.current) {
-            observerRef.current.disconnect()
-        }
-
-        // Create new observer
-        observerRef.current = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.target) {
-                        console.log("hit intersection observer")
-                    }
-                    if (entry.isIntersecting && !isLoadingMore && !isReachingEnd) {
-                        console.log("hit intersecting - load more")
-                        loadMore()
-                    }
-                })
-            },
-            {
-                root: null,
-                rootMargin: '200px',
-                threshold: 0.1
-            }
-        )
-
-        // Observe both desktop and mobile refs if they exist
-        if (desktopLoadMoreRef.current) {
-            observerRef.current.observe(desktopLoadMoreRef.current)
-        }
-        if (mobileLoadMoreRef.current) {
-            observerRef.current.observe(mobileLoadMoreRef.current)
-        }
-
-        // Cleanup
-        return () => {
-            if (observerRef.current) {
-                observerRef.current.disconnect()
-            }
-        }
-    }, [loadMore, isLoadingMore, isReachingEnd])
 
     // Paraf functions
     const handleParafClick = (recapId: string, currentParafStatus: boolean) => {
@@ -467,10 +433,14 @@ export function HasilSetoranTableContent() {
         return data
     }, [tanggalDari, tanggalSampai, filterPenyetor, filterType, filterMemorizationType, recapsData])
 
-    // Display data (all filtered data for infinite scroll)
+    // Calculate total pages based on filtered data length
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+
+    // Display data (paginated)
     const displayedData = useMemo(() => {
-        return filtered
-    }, [filtered])
+        const startIndex = (currentPage - 1) * PAGE_SIZE;
+        return filtered.slice(startIndex, startIndex + PAGE_SIZE);
+    }, [filtered, currentPage])
 
     const resetFilters = useCallback(() => {
         setTanggalDari("")
@@ -1039,21 +1009,6 @@ export function HasilSetoranTableContent() {
                                         </TableBody>
                                     )}
                                 </Table>
-
-                                {/* Infinite scroll loading indicator */}
-                                {!isLoading && (
-                                    <div ref={desktopLoadMoreRef} className="border-t border-slate-200 dark:border-slate-700 p-6 flex justify-center">
-                                        {isLoadingMore && (
-                                            <Loader2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400 animate-spin" />
-                                        )}
-                                        {isReachingEnd && displayedData.length > 0 && (
-                                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                {t("hasil-setoran.all_data_displayed") || "Semua data telah ditampilkan"}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
                             </div>
 
                             {/* Mobile Card View */}
@@ -1278,21 +1233,65 @@ export function HasilSetoranTableContent() {
                                         )
                                     })
                                 )}
-
-                                {/* Mobile infinite scroll loading indicator */}
-                                {!isLoading && (
-                                    <div ref={mobileLoadMoreRef} className="border-t border-slate-200 dark:border-slate-700 p-3 sm:p-6 flex justify-center">
-                                        {isLoadingMore && (
-                                            <Loader2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 animate-spin" />
-                                        )}
-                                        {isReachingEnd && displayedData.length > 0 && (
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                {t("hasil-setoran.all_data_displayed") || "Semua data telah ditampilkan"}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
                             </div>
+
+                            {/* Global Pagination Controls */}
+                            {!isLoading && (
+                                <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                                        Menampilkan{" "}
+                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                            {filtered.length === 0 ? 0 : ((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}
+                                        </span>{" "}
+                                        dari{" "}
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{filtered.length}</span>{" "}
+                                        data
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage <= 1}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </button>
+                                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                            let p = i + 1
+                                            if (totalPages > 5) {
+                                                if (currentPage <= 3) p = i + 1
+                                                else if (currentPage >= totalPages - 2) p = totalPages - 4 + i
+                                                else p = currentPage - 2 + i
+                                            }
+                                            return (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => {
+                                                        if (p > totalPages && hasMore) loadMoreServerData()
+                                                        setCurrentPage(p)
+                                                    }}
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
+                                                        currentPage === p
+                                                            ? "bg-emerald-500 text-white"
+                                                            : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                    }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            )
+                                        })}
+                                        <button
+                                            onClick={() => {
+                                                if (currentPage >= totalPages && hasMore) loadMoreServerData()
+                                                setCurrentPage(p => Math.min(totalPages, p + 1))
+                                            }}
+                                            disabled={currentPage >= totalPages && !hasMore}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </CardContent>

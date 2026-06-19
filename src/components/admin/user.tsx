@@ -337,8 +337,14 @@ export default function Users() {
                             role = String(profileData.role).toLowerCase();
                         }
 
+                        // Clear stale imageBase64 if profileData has fresh image and no new imageBase64
+                        let updatedUser = { ...user };
+                        if (profileData && profileData.image && !profileData.imageBase64) {
+                            updatedUser.imageBase64 = undefined;
+                        }
+
                         return {
-                            ...user,
+                            ...updatedUser,
                             ...profileData, // Merge profile data (email, created, isBlocked, etc.)
                             userId: id,     // Ensure userId is preserved
                             role: role      // Set calculated role
@@ -888,7 +894,7 @@ export default function Users() {
                                         <TableRow key={getUserId(user)} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                                             <TableCell className="py-2 px-3">
                                                 <div className="flex items-center space-x-3">
-                                                    <Link href={'/profile/' + user.username?.replace(/^@/, '')}>
+                                                    <Link href={'/profile/' + getUserId(user)}>
                                                         <Avatar className="w-8 h-8">
                                                             <AvatarImage src={getAvatarSrc(user) || undefined} alt={user.name || user.username || ''} />
                                                             <AvatarFallback className="bg-blue-100 text-blue-600 text-xs font-semibold">
@@ -898,7 +904,7 @@ export default function Users() {
                                                     </Link>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-2 px-3" onClick={() => router.push('/profile/' + user.username?.replace(/^@/, ''))}>
+                                            <TableCell className="py-2 px-3" onClick={() => router.push('/profile/' + getUserId(user))}>
                                                 <span className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
                                                     {user.username}
                                                 </span>
