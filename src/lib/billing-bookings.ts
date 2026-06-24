@@ -314,6 +314,17 @@ export async function fetchBookingById(id: string | number) {
     }
 }
 
+export async function fetchBookingAuditTrail(id: string | number) {
+    try {
+        const payload = await apiJson(`/api/v1/Bookings/${id}/audit-trail`)
+        return unwrapList(payload)
+    } catch (err: any) {
+        if (err?.message && /40[14]/.test(err.message)) return []
+        throw err
+    }
+}
+
+
 export async function bulkUpdateBookingStatus(bookingIds: Array<string | number>, status: BillingPipelineStatus) {
     return apiJson("/api/v1/Bookings/bulk/status", {
         method: "POST",

@@ -23,6 +23,7 @@ import {
     type SimOrder,
 } from "@/lib/sim-store"
 import { SimToast, SimNotifBell } from "@/components/sim-notif"
+import { formatTooltipDate } from "@/lib/date-utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // PipelineStatus comes from the Qurani booking API normalizer.
@@ -928,6 +929,7 @@ function PesananContent() {
                                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                         />
                                     </th>
+                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Kode Pesanan</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Member</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Guru</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Paket</th>
@@ -940,7 +942,7 @@ function PesananContent() {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {paged.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                        <td colSpan={9} className="text-center py-16 text-gray-400 dark:text-gray-500">
                                             <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
                                             <p>Tidak ada pesanan ditemukan</p>
                                         </td>
@@ -962,6 +964,12 @@ function PesananContent() {
                                                     onChange={() => toggleSelected(order.id)}
                                                     className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                                 />
+                                            </td>
+                                            {/* Kode Pesanan */}
+                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                <span className="inline-flex items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap">
+                                                    #{order.id}
+                                                </span>
                                             </td>
                                             {/* Member */}
                                             <td className="px-4 py-3">
@@ -986,7 +994,9 @@ function PesananContent() {
                                                 <p className="text-[11px] text-gray-500">{order.sesiSelesai}/{order.sesi} Sesi</p>
                                             </td>
                                             {/* Tanggal */}
-                                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{order.tglPesan}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                <span title={formatTooltipDate(order.rawDate)}>{order.tglPesan}</span>
+                                            </td>
                                             {/* Harga */}
                                             <td className="px-4 py-3 text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">{formatRupiah(order.harga)}</td>
                                             {/* Status */}

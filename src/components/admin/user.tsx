@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Edit, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check } from "lucide-react"
+import { Search, Edit, Eye, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check } from "lucide-react"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -26,6 +26,7 @@ import { normalizeUsername, validateUsername } from "@/utils/validation/username
 import { toast } from "sonner"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { UserDetailDrawer } from "./user-detail-drawer"
 
 // Import from centralized API lib
 import {
@@ -137,6 +138,8 @@ export default function Users() {
     const [currentPage, setCurrentPage] = useState(1)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingUser, setEditingUser] = useState<UserItem | null>(null)
+    const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
+    const [selectedDetailUser, setSelectedDetailUser] = useState<UserItem | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [isCheckingUsername, setIsCheckingUsername] = useState(false)
     const router = useRouter()
@@ -663,6 +666,14 @@ export default function Users() {
         }
     }
 
+    const handleOpenDetail = (userId: string | number) => {
+        const user = users.find((u: UserItem) => getUserId(u) === String(userId))
+        if (user) {
+            setSelectedDetailUser(user)
+            setIsDetailDrawerOpen(true)
+        }
+    }
+
     const handleSaveChanges = async () => {
         if (editingUser) {
             // Basic validation for required fields
@@ -904,7 +915,7 @@ export default function Users() {
                                                     </Link>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-2 px-3" onClick={() => router.push('/profile/' + getUserId(user))}>
+                                            <TableCell className="py-2 px-3" onClick={() => handleOpenDetail(getUserId(user))}>
                                                 <span className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
                                                     {user.username}
                                                 </span>
@@ -968,6 +979,14 @@ export default function Users() {
                                             </TableCell>
                                             <TableCell className="py-2 px-3">
                                                 <div className="flex items-center space-x-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleOpenDetail(getUserId(user))}
+                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -1515,6 +1534,15 @@ export default function Users() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <UserDetailDrawer 
+                isOpen={isDetailDrawerOpen} 
+                onClose={() => { setIsDetailDrawerOpen(false); setSelectedDetailUser(null); }} 
+                user={selectedDetailUser} 
+                onEdit={(userId) => {
+                    handleEdit(userId)
+                }}
+            />
         </div>
     )
 }

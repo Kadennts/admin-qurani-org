@@ -180,12 +180,25 @@ export const updateUserProfile = async (
 
       if (token) {
         const finalPayload = {
-          name: fullName, nickname, username, gender, birthDate: date_of_birth,
-          job, hp: phoneNumber, bio, avatar: profilePhotoUrl,
-          countryId, stateId, cityId, countryName, stateName: statesName, cityName, timezone,
+          name: fullName || "", 
+          nickname: nickname || "", 
+          username: username || "", 
+          sex: gender ?? 0, 
+          dateOfBirth: date_of_birth || "",
+          job: job || "", 
+          address: phoneNumber || "", // Map phoneNumber to address temporarily if API lacks phone
+          bio: bio || "", 
+          imageBase64: profilePhotoUrl || "", // Send URL if base64 isn't strictly required by API wrapper
+          countryId: countryId || 0, 
+          stateId: stateId || 0, 
+          cityId: cityId || 0, 
+          country: countryName || "", 
+          state: statesName || "", 
+          city: cityName || "", 
+          timezone: timezone || ""
         };
 
-        fetch(`${API_BASE_URL}/api/v1/Users/${userId}`, {
+        fetch(`${API_BASE_URL}/api/v1/Users/me`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",

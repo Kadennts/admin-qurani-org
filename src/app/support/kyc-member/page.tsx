@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 import {
     Search, Filter, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle2,
     XCircle, CreditCard, RefreshCw, Check, X, Phone, MapPin, User, Hash,
     Shield, RotateCcw, FileText, Eye, ChevronDown, AlertCircle, Loader2,
-    PlayCircle, Flag, Database
+    PlayCircle, Flag, Database, MoreHorizontal
 } from "lucide-react"
 import dummyRaw from "@/data/kyc-dummy.json"
 import { KycSubmission } from "@/utils/api/kyc/fetch"
@@ -527,6 +527,67 @@ function KycDetailModal({
     )
 }
 
+// ─── Action Dropdown (titik tiga) per baris tabel ───────────────────────────
+function KycActionDropdown({
+    member, onView, onStartReview, isProcessing
+}: {
+    member: KycSubmission
+    onView: () => void
+    onStartReview: (id: number) => void
+    isProcessing: boolean
+}) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
+                className="flex items-center justify-center w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 transition-colors"
+            >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
+            {open && (
+                <div
+                    onClick={e => e.stopPropagation()}
+                    className="absolute right-0 top-9 z-40 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl py-1.5 overflow-hidden"
+                >
+                    {/* Lihat Detail */}
+                    <button
+                        onClick={() => { setOpen(false); onView() }}
+                        className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                    >
+                        <Eye className="w-3.5 h-3.5 text-gray-400" />
+                        Lihat Detail
+                    </button>
+                    {/* Sedang Direview — hanya muncul jika status Pending */}
+                    {member.status === 0 && (
+                        <>
+                            <div className="my-1 h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+                            <button
+                                onClick={() => { setOpen(false); onStartReview(member.id) }}
+                                disabled={isProcessing}
+                                className="w-full px-3 py-2 text-left text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2 disabled:opacity-50 transition-colors"
+                            >
+                                <PlayCircle className="w-3.5 h-3.5" />
+                                Sedang Direview
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
 // ─── Main Content ─────────────────────────────────────────────────────────────
 function KycMemberContent() {
     const { t } = useI18n()
@@ -934,26 +995,14 @@ function KycMemberContent() {
                                                             <StIcon className="w-3 h-3" />{st.label}
                                                         </span>
                                                     </td>
-                                                    {/* Action */}
+                                                    {/* Action — titik tiga dropdown */}
                                                     <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <button onClick={() => setSelectedMember(member)}
-                                                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors">
-                                                                <Eye className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            {member.status === 0 && (
-                                                                <button onClick={() => handleStartReview(member.id)} disabled={isProcessing}
-                                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 transition-colors disabled:opacity-50">
-                                                                    <PlayCircle className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                            {member.status !== 2 && (
-                                                                <button onClick={() => handleApprove(member.id)} disabled={isProcessing}
-                                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-emerald-300 dark:border-emerald-700 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50">
-                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                        <KycActionDropdown
+                                                            member={member}
+                                                            onView={() => setSelectedMember(member)}
+                                                            onStartReview={handleStartReview}
+                                                            isProcessing={isProcessing}
+                                                        />
                                                     </td>
                                                 </tr>
                                             )

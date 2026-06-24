@@ -1656,9 +1656,66 @@ export const masterdataApi = {
 
     // ========== Locales ==========
     locales: {
-        // Get all locales
-        getAll: (token?: string) =>
-            apiRequest<any[]>('/api/v1/Locales', { token }),
+        // Get all locales (cached for 24 hours)
+        getAll: (token?: string, signal?: AbortSignal) =>
+            apiRequest<any>('/api/v1/Locales', { token, signal }),
+        
+        // Get active locales only
+        getActive: (token?: string, signal?: AbortSignal) =>
+            apiRequest<any>('/api/v1/Locales/active', { token, signal }),
+
+        // Get locale by ID
+        getById: (id: string, token?: string, signal?: AbortSignal) =>
+            apiRequest<any>(`/api/v1/Locales/${id}`, { token, signal }),
+
+        // Search locales by name with offset pagination
+        search: (params: { q?: string; page?: number; pageSize?: number }, token?: string, signal?: AbortSignal) => {
+            const searchParams = new URLSearchParams();
+            if (params.q) searchParams.append('q', params.q);
+            if (params.page) searchParams.append('page', params.page.toString());
+            if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+            const qs = searchParams.toString();
+            return apiRequest<any>(
+                `/api/v1/Locales/search${qs ? `?${qs}` : ''}`,
+                { token, signal }
+            );
+        },
+
+        // Search locales with cursor pagination
+        searchCursor: (params: { q?: string; cursor?: string; pageSize?: number }, token?: string, signal?: AbortSignal) => {
+            const searchParams = new URLSearchParams();
+            if (params.q) searchParams.append('q', params.q);
+            if (params.cursor) searchParams.append('cursor', params.cursor);
+            if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+            const qs = searchParams.toString();
+            return apiRequest<any>(
+                `/api/v1/Locales/search/cursor${qs ? `?${qs}` : ''}`,
+                { token, signal }
+            );
+        },
+
+        // Create a new locale (Admin only)
+        create: (data: any, token?: string) =>
+            apiRequest<any>('/api/v1/Locales', {
+                method: 'POST',
+                body: data,
+                token
+            }),
+
+        // Update a locale (Admin only)
+        update: (id: string, data: any, token?: string) =>
+            apiRequest<any>(`/api/v1/Locales/${id}`, {
+                method: 'PUT',
+                body: data,
+                token
+            }),
+
+        // Delete a locale (Admin only)
+        delete: (id: string, token?: string) =>
+            apiRequest<any>(`/api/v1/Locales/${id}`, {
+                method: 'DELETE',
+                token
+            }),
     },
 
     // ========== Languages ==========
@@ -1861,6 +1918,23 @@ export const paymentsApi = {
         return apiRequest<any>(`/api/v1/Payments${query ? `?${query}` : ''}`, { token, signal });
     },
 
+    // Export payments to CSV
+    exportCSV: (params: PaymentSearchParams = {}, token?: string) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                searchParams.append(key, String(value));
+            }
+        });
+        const query = searchParams.toString();
+        const authToken = token || getAuthToken();
+        const url = `${API_BASE}/api/v1/Payments/export${query ? `?${query}` : ''}`;
+        
+        return fetch(url, {
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+        });
+    },
+
     // Get payment stats
     getStats: (params: { fromDate?: string; toDate?: string } = {}, token?: string, signal?: AbortSignal) => {
         const searchParams = new URLSearchParams();
@@ -2023,8 +2097,8 @@ export const walletApi = {
         apiRequest<any>(`/api/v1/Wallet/admin/user/${userId}`, { token, signal }),
 
     // Suspend wallet (Admin)
-    suspendWallet: (walletId: number | string, token?: string) =>
-        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/suspend`, { method: 'POST', token }),
+    suspendWallet: (walletId: number | string, reason: string, token?: string) =>
+        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/suspend`, { method: 'POST', body: { reason }, token }),
 
     // Activate wallet (Admin)
     activateWallet: (walletId: number | string, token?: string) =>
@@ -2032,7 +2106,19 @@ export const walletApi = {
 
     // Update wallet limits (Admin)
     updateWalletLimits: (walletId: number | string, data: any, token?: string) =>
-        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/limits`, { method: 'PUT', body: data, token })
+        apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/limits`, { method: 'PUT', body: data, token }),
+
+
+};
+
+// ============================================
+// Audit API
+// ============================================
+
+export const auditApi = {
+    // Get audit logs for a specific user
+    getUserLogs: (userId: number | string, token?: string, signal?: AbortSignal) =>
+        apiRequest<any>(`/api/v1/audit-logs/user/${userId}`, { token, signal }),
 };
 
 export { API_BASE };

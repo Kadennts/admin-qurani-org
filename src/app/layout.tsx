@@ -27,7 +27,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Qurani - Islamic Social Media",
+  title: "Qurani Admin",
   description: "Modern Quran application - Read, listen, and learn the Holy Quran with advanced features and beautiful interface",
   manifest: "/manifest.json",
   icons: {

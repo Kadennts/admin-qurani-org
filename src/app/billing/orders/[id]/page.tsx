@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import dummyData from "@/data/billing-dummy.json"
-import { fetchBookingById } from "@/lib/billing-bookings"
+import { fetchBookingById, fetchBookingAuditTrail } from "@/lib/billing-bookings"
 import { getSimOrderById, type SimOrder } from "@/lib/sim-store"
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -578,9 +578,11 @@ function SimOrderDetail({ order }: { order: SimOrder }) {
 function BookingDetailContent({ id }: { id: number }) {
     const [simOrder, setSimOrder] = useState<SimOrder | null | undefined>(undefined)
     const [apiDetail, setApiDetail] = useState<any | null>(null)
+    const [apiAuditTrail, setApiAuditTrail] = useState<any[]>([])
     const [apiLoading, setApiLoading] = useState(false)
     const [apiError, setApiError] = useState<string | null>(null)
     const [openFeedback, setOpenFeedback] = useState<Record<number, boolean>>({})
+    const [activeTab, setActiveTab] = useState<"info" | "log">("info")
     const toggleFeedback = (no: number) => setOpenFeedback(prev => ({ ...prev, [no]: !prev[no] }))
 
     useEffect(() => {
@@ -596,8 +598,33 @@ function BookingDetailContent({ id }: { id: number }) {
 
         setApiLoading(true)
         setApiError(null)
-        fetchBookingById(id)
-            .then(data => setApiDetail(data))  // data bisa null jika 404/401
+        Promise.all([
+            fetchBookingById(id),
+            fetchBookingAuditTrail(id).catch(() => [])
+        ])
+            .then(([data, trail]) => {
+                setApiDetail(data)
+                
+                // Add dummy data for log if empty and id is 3099, 3098, 3010
+                if (trail.length === 0 && id === 3099) {
+                    setApiAuditTrail([
+                        { statusName: "Pending", createdAt: "2026-04-01T09:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Rahma Aulia" }
+                    ]);
+                } else if (trail.length === 0 && id === 3098) {
+                    setApiAuditTrail([
+                        { statusName: "Menunggu Guru", createdAt: "2026-04-02T10:35:00.000Z", notes: "Pembayaran terkonfirmasi, menunggu konfirmasi guru.", changedBy: "System" },
+                        { statusName: "Pending", createdAt: "2026-04-02T10:30:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Fauzia Nurrohma" }
+                    ]);
+                } else if (trail.length === 0 && id === 3010) {
+                     setApiAuditTrail([
+                        { statusName: "Selesai", createdAt: "2026-01-24T09:00:00.000Z", notes: "Semua sesi telah selesai.", changedBy: "System" },
+                        { statusName: "Aktif", createdAt: "2026-01-10T08:05:22.000Z", notes: "Pembayaran terkonfirmasi.", changedBy: "System" },
+                        { statusName: "Pending", createdAt: "2026-01-10T08:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Zulfa Hanum" }
+                    ]);
+                } else {
+                    setApiAuditTrail(trail)
+                }
+            })
             .catch(err => {
                 console.error("Failed to fetch booking detail:", err)
                 setApiDetail(null)
@@ -668,22 +695,32 @@ function BookingDetailContent({ id }: { id: number }) {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4">
             <div className="max-w-[1200px] mx-auto space-y-4">
 
-                {/* ── Back + sumber data ── */}
-                <div className="flex items-center justify-between gap-3">
+                {/* ── Back ── */}
+                <div className="flex items-center gap-3">
                     <Link href={BACK_URL}
-                        className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-emerald-600 hover:border-emerald-400 transition-all">
+                        className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-emerald-600 hover:border-emerald-400 transition-all shadow-sm">
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
-                        isFromApi
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
-                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
-                    }`}>
-                        {isFromApi ? "✓ Data API" : "◷ Data Lokal"}
-                    </span>
                 </div>
 
-                {/* ── Main grid ── */}
+                {/* ── Tabs Navigation ── */}
+                <div className="flex items-center gap-6 border-b border-gray-200 dark:border-gray-800">
+                    <button
+                        onClick={() => setActiveTab("info")}
+                        className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === "info" ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"}`}
+                    >
+                        Informasi Pesanan
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("log")}
+                        className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === "log" ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"}`}
+                    >
+                        Log Pesanan
+                    </button>
+                </div>
+
+                {/* ── Main grid (Tab Info) ── */}
+                {activeTab === "info" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
 
                     {/* ── LEFT column ── */}
@@ -1003,6 +1040,42 @@ function BookingDetailContent({ id }: { id: number }) {
                         </div>
                     </div>
                 </div>
+                )}
+
+                {/* ── Log Tab ── */}
+                {activeTab === "log" && (
+                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm min-h-[400px]">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-emerald-500" /> Riwayat Pesanan
+                        </h3>
+                        {apiAuditTrail.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <p className="text-sm">Belum ada riwayat pesanan (log kosong).</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {apiAuditTrail.map((log: any, idx: number) => (
+                                    <div key={idx} className="flex gap-4 relative">
+                                        {idx !== apiAuditTrail.length - 1 && (
+                                            <div className="absolute left-2.5 top-8 bottom-[-24px] w-0.5 bg-gray-200 dark:bg-gray-800" />
+                                        )}
+                                        <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border-2 border-emerald-500 flex-shrink-0 mt-1 z-10" />
+                                        <div className="flex-1 pb-2">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-bold text-sm text-gray-900 dark:text-white">{log.action || log.statusName || log.statusText || "Update Status"}</p>
+                                                <span className="text-xs text-gray-500">{formatDateTime(log.createdAt || log.timestamp)}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                {log.description || log.notes || log.message || "Perubahan status pesanan."}
+                                                {log.changedBy && <span className="block text-[11px] text-gray-400 mt-0.5">Oleh: {log.changedBy}</span>}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )

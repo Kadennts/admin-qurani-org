@@ -181,6 +181,11 @@ const getSidebarData = (
           icon: Languages,
         },
         {
+          title: t("navigation.locales", "Locales"),
+          url: "/master/locales",
+          icon: Languages,
+        },
+        {
           title: t("navigation.manage_categories", "Group Categories"),
           url: "/groups/categories",
           icon: Tags,

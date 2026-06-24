@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 import { paymentsApi, type PaymentSearchParams } from "@/lib/api"
-import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, FileText, MoreHorizontal, CheckCircle2, AlertCircle, ChevronDown, MessageSquare } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatTooltipDate } from "@/lib/date-utils"
+import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, FileText, MoreHorizontal, AlertCircle, SlidersHorizontal, Download } from "lucide-react"
 import DisputesTab from "./DisputesTab"
 
 interface PaymentData {
@@ -52,6 +52,40 @@ function formatDate(dateStr: string) {
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit"
     })
+}
+
+// Time ago: menampilkan waktu relatif ("3 menit lalu", "2 jam lalu", dll.)
+function timeAgo(dateStr: string): { relative: string; full: string } {
+    if (!dateStr) return { relative: "-", full: "-" };
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    const full = date.toLocaleDateString("id-ID", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+    });
+
+    let relative: string;
+    if (diffSec < 60) {
+        relative = "Baru saja";
+    } else if (diffMin < 60) {
+        relative = `${diffMin} menit lalu`;
+    } else if (diffHour < 24) {
+        relative = `${diffHour} jam lalu`;
+    } else if (diffDay === 1) {
+        relative = `Kemarin, ${date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
+    } else if (diffDay < 7) {
+        relative = `${diffDay} hari lalu`;
+    } else {
+        relative = date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    }
+
+    return { relative, full };
 }
 
 // Action dropdown component to avoid clipping issues
@@ -118,6 +152,8 @@ function PaymentsContent() {
     const [searchInput, setSearchInput] = useState("")
     const [activeSearch, setActiveSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState("")
+    const [methodFilter, setMethodFilter] = useState("")
+    const [showFilterPanel, setShowFilterPanel] = useState(false)
 
     // Bulk action state
     const [selectedIds, setSelectedIds] = useState<Array<number | string>>([])
@@ -141,6 +177,71 @@ function PaymentsContent() {
         pendingRefunds: 0,
         pendingPayouts: 0
     });
+
+    // Export State
+    const [isExporting, setIsExporting] = useState(false);
+
+    const handleExportCSV = async () => {
+        setIsExporting(true);
+        try {
+            const params: PaymentSearchParams = {};
+            if (activeSearch && !isNaN(Number(activeSearch))) {
+                params.UserId = activeSearch;
+            }
+            if (statusFilter) {
+                params.Status = statusFilter;
+            }
+            
+            const res = await paymentsApi.exportCSV(params);
+            if (!res.ok) throw new Error("Failed to export");
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Payments_Export_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.warn("API Export failed, using fallback export:", err);
+            // Fallback: Export current data in `payments`
+            if (payments.length === 0) {
+                alert("Tidak ada data untuk diexport.");
+                setIsExporting(false);
+                return;
+            }
+            const headers = ["ID", "User", "Trainer", "Amount", "Status", "Payment Method", "Date"];
+            const csvRows = [headers.join(",")];
+            
+            payments.forEach(p => {
+                const row = [
+                    p.id,
+                    `"${p.userName || ''}"`,
+                    `"${p.trainerName || ''}"`,
+                    p.amount,
+                    p.status,
+                    p.paymentMethod,
+                    p.createdAt || ''
+                ];
+                csvRows.push(row.join(","));
+            });
+            
+            const csvContent = csvRows.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Payments_Export_Fallback_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const fetchPayments = useCallback(async () => {
         setLoading(true)
@@ -187,12 +288,17 @@ function PaymentsContent() {
                     (p.trainerName && p.trainerName.toLowerCase().includes(searchLower)) ||
                     (p.paymentMethod && p.paymentMethod.toLowerCase().includes(searchLower)) ||
                     String(p.userId).includes(searchLower) ||
-                    String(p.trainerId).includes(searchLower)
+                    String(p.trainerId).includes(searchLower) ||
+                    (p.bookingId && String(p.bookingId).includes(searchLower))
                 );
             }
 
             if (statusFilter) {
                 dummy = dummy.filter(p => p.status === statusFilter);
+            }
+
+            if (methodFilter) {
+                dummy = dummy.filter(p => p.paymentMethod && p.paymentMethod.toLowerCase() === methodFilter.toLowerCase());
             }
 
             setPayments(dummy)
@@ -205,7 +311,7 @@ function PaymentsContent() {
         } finally {
             setLoading(false)
         }
-    }, [page, activeSearch, statusFilter])
+    }, [page, activeSearch, statusFilter, methodFilter])
 
     useEffect(() => {
         fetchPayments()
@@ -430,71 +536,188 @@ function PaymentsContent() {
                 </div>
 
                 {/* Filters & Search */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    {/* Left Side: Bulk & Status */}
-                    <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
-                        <button
-                            onClick={() => setBulkPayoutModal(true)}
-                            disabled={selectedIds.length === 0}
-                            className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                                selectedIds.length === 0 
-                                ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600" 
-                                : "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50"
-                            }`}
-                        >
-                            {t("billing.payments.bulk.markPayout", "Bulk Payout")}
-                            {selectedIds.length > 0 && (
-                                <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                    {selectedIds.length}
-                                </span>
-                            )}
-                        </button>
-
-                        <Select
-                            value={statusFilter || "all"}
-                            onValueChange={(val) => {
-                                setStatusFilter(val === "all" ? "" : val);
-                                setPage(1);
-                                setSelectedIds([]);
-                            }}
-                        >
-                            <SelectTrigger className="w-[180px] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 h-[42px]">
-                                <SelectValue placeholder="Semua Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="paid">{t("billing.payments.status.paid", "Dibayar")}</SelectItem>
-                                <SelectItem value="pending">{t("billing.payments.status.pending", "Menunggu")}</SelectItem>
-                                <SelectItem value="failed">{t("billing.payments.status.failed", "Gagal")}</SelectItem>
-                                <SelectItem value="refunded">{t("billing.payments.status.refunded", "Dikembalikan")}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Right Side: Search Bar */}
-                    <div className="flex items-center w-full sm:w-auto">
-                        <div className="flex w-full sm:w-[400px] shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-shadow">
-                            <div className="relative flex-1 bg-white dark:bg-gray-900">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder={t("billing.payments.searchPlaceholder", "Cari nama, metode, lokasi")}
-                                    value={searchInput}
-                                    onChange={(e) => setSearchInput(e.target.value)}
-                                    onKeyDown={handleKeyPress}
-                                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
-                                />
-                            </div>
+                <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                    {/* Main toolbar */}
+                    <div className="flex flex-col sm:flex-row gap-3 p-4 items-center justify-between">
+                        {/* Left Side: Bulk Payout & Export */}
+                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                             <button
-                                onClick={handleSearch}
-                                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                                onClick={() => setBulkPayoutModal(true)}
+                                disabled={selectedIds.length === 0}
+                                className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
+                                    selectedIds.length === 0 
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600" 
+                                    : "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50"
+                                }`}
                             >
-                                <Search className="w-4 h-4" />
-                                {t("billing.payments.searchButton", "Cari")}
+                                {t("billing.payments.bulk.markPayout", "Bulk Payout")}
+                                {selectedIds.length > 0 && (
+                                    <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                        {selectedIds.length}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={handleExportCSV}
+                                disabled={isExporting}
+                                className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
+                                    isExporting 
+                                    ? "bg-gray-100 text-gray-400 cursor-wait dark:bg-gray-800 dark:text-gray-600" 
+                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800"
+                                }`}
+                            >
+                                <Download className="w-4 h-4" />
+                                {isExporting ? "Mengekspor..." : "Export CSV"}
+                            </button>
+                        </div>
+
+                        {/* Right Side: Search + Filter Button */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <div className="flex flex-1 sm:w-[420px] shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-shadow">
+                                <div className="relative flex-1 bg-white dark:bg-gray-900">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari kode pemesanan, metode..."
+                                        value={searchInput}
+                                        onChange={(e) => setSearchInput(e.target.value)}
+                                        onKeyDown={handleKeyPress}
+                                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSearch}
+                                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                                >
+                                    <Search className="w-4 h-4" />
+                                    {t("billing.payments.searchButton", "Cari")}
+                                </button>
+                            </div>
+                            {/* Filter Modal Button */}
+                            <button
+                                onClick={() => setShowFilterPanel(true)}
+                                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+                                    statusFilter || methodFilter
+                                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400'
+                                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                                }`}
+                            >
+                                <SlidersHorizontal className="w-4 h-4" />
+                                Filter
+                                {(statusFilter || methodFilter) && (
+                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex-shrink-0">
+                                        {[statusFilter, methodFilter].filter(Boolean).length}
+                                    </span>
+                                )}
                             </button>
                         </div>
                     </div>
                 </div>
+
+                {/* Filter Modal Dialog */}
+                {showFilterPanel && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <div
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={() => setShowFilterPanel(false)}
+                        />
+                        {/* Dialog */}
+                        <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                                        <SlidersHorizontal className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                    </div>
+                                    <h2 className="text-base font-bold text-gray-900 dark:text-white">Filter Pembayaran</h2>
+                                </div>
+                                <button
+                                    onClick={() => setShowFilterPanel(false)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors"
+                                >
+                                    <span className="text-lg leading-none">&times;</span>
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="px-5 py-5 space-y-6">
+                                {/* Status */}
+                                <div>
+                                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Status Pembayaran</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { val: "", label: "Semua Status" },
+                                            { val: "paid", label: "✓ Dibayar" },
+                                            { val: "pending", label: "⏳ Menunggu" },
+                                            { val: "failed", label: "✕ Gagal" },
+                                            { val: "refunded", label: "↩ Dikembalikan" },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.val}
+                                                onClick={() => { setStatusFilter(opt.val); setPage(1); setSelectedIds([]); }}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                                                    statusFilter === opt.val
+                                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200 dark:shadow-emerald-900'
+                                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:text-emerald-600'
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-gray-100 dark:bg-gray-800" />
+
+                                {/* Metode */}
+                                <div>
+                                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Metode Pembayaran</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { val: "", label: "Semua" },
+                                            { val: "GoPay", label: "GoPay" },
+                                            { val: "OVO", label: "OVO" },
+                                            { val: "DANA", label: "DANA" },
+                                            { val: "QRIS", label: "QRIS" },
+                                            { val: "Bank Transfer", label: "Bank Transfer" },
+                                            { val: "Midtrans", label: "Midtrans" },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.val}
+                                                onClick={() => { setMethodFilter(opt.val); setPage(1); setSelectedIds([]); }}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                                                    methodFilter === opt.val
+                                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200 dark:shadow-emerald-900'
+                                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:text-emerald-600'
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+                                <button
+                                    onClick={() => { setStatusFilter(""); setMethodFilter(""); setPage(1); }}
+                                    disabled={!statusFilter && !methodFilter}
+                                    className="text-xs font-semibold text-rose-500 hover:text-rose-600 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                                >
+                                    Reset Semua
+                                </button>
+                                <button
+                                    onClick={() => setShowFilterPanel(false)}
+                                    className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors"
+                                >
+                                    Terapkan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Data Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
@@ -510,30 +733,33 @@ function PaymentsContent() {
                                             onChange={toggleSelectAll}
                                         />
                                     </th>
+                                    <th className="px-4 py-3 font-semibold">Kode Pesanan</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.user", "User")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.trainer", "Trainer")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.amount", "Nominal")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.status", "Status")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.paymentMethod", "Metode")}</th>
-                                    <th className="px-4 py-3 font-semibold">{t("billing.payments.table.date", "Tanggal")}</th>
+                                    <th className="px-4 py-3 font-semibold">Tgl Bayar</th>
                                     <th className="px-4 py-3 font-semibold text-center">{t("billing.payments.table.actions", "Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                                             {t("billing.payments.loading", "Memuat data pembayaran...")}
                                         </td>
                                     </tr>
                                 ) : payments.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                                             {t("billing.payments.empty", "Tidak ada pembayaran yang ditemukan.")}
                                         </td>
                                     </tr>
                                 ) : (
-                                    payments.map((payment) => (
+                                    payments.map((payment) => {
+                                        const tglBayar = timeAgo(payment.updatedAt || payment.createdAt);
+                                        return (
                                         <tr key={payment.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3 text-center">
                                                 <input 
@@ -542,6 +768,12 @@ function PaymentsContent() {
                                                     checked={selectedIds.includes(payment.id)}
                                                     onChange={() => toggleSelect(payment.id)}
                                                 />
+                                            </td>
+                                            {/* Kode Pesanan */}
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
+                                                    #{payment.bookingId || payment.id}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.userName || '-'}</div>
@@ -562,8 +794,16 @@ function PaymentsContent() {
                                                     {t(`billing.payments.status.${payment.status?.toLowerCase()}`, payment.status)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3">{payment.paymentMethod || '-'}</td>
-                                            <td className="px-4 py-3 text-xs">{formatDate(payment.createdAt)}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.paymentMethod || '-'}</td>
+                                            {/* Tgl Bayar - Time Ago + tooltip hover */}
+                                            <td className="px-4 py-3">
+                                                <span
+                                                    title={tglBayar.full}
+                                                    className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-default border-b border-dashed border-gray-300 dark:border-gray-600 pb-px"
+                                                >
+                                                    {tglBayar.relative}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 text-center">
                                                 <ActionDropdown 
                                                     payment={payment}
@@ -576,7 +816,8 @@ function PaymentsContent() {
                                                 />
                                             </td>
                                         </tr>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
