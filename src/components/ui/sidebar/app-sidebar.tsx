@@ -126,6 +126,11 @@ const getSidebarData = (
           url: "/billing/payments",
           icon: Banknote,
         },
+        {
+          title: t("navigation.trainer_payout", "Payout"),
+          url: "/billing/payout",
+          icon: Banknote,
+        },
       ],
     },
     {
@@ -214,11 +219,6 @@ const getSidebarData = (
           title: t("navigation.packages", "Paket"),
           url: "/billing/paket",
           icon: Package,
-        },
-        {
-          title: t("navigation.trainer_payout", "Payout Guru"),
-          url: "/billing/payout",
-          icon: Banknote,
         },
       ],
     },

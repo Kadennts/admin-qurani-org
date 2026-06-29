@@ -35,7 +35,7 @@ import { ImageCropDialog } from "@/components/profile/dialogs/image-crop-dialog"
 // Import custom hooks
 import { useUsernameValidation } from "@/hooks/use-username-validation"
 import { useImageCrop } from "@/hooks/use-image-crop"
-import { useLocationData } from "@/hooks/use-location-data"
+import { useLocationData, resolveIndonesiaTimezone } from "@/hooks/use-location-data"
 
 function ProfilePageContent() {
   const { userId, refreshProfile } = useAuth()
@@ -191,6 +191,14 @@ function ProfilePageContent() {
   // Load profile data
   useEffect(() => {
     if (profile) {
+      // For Indonesian users, re-resolve the correct timezone from state/city
+      // to fix stale values (e.g. stored "Asia/Jakarta" when actually in Bali = WITA)
+      const isIndonesia = profile.countryName?.toLowerCase().includes("indonesia") ||
+        profile.countryId === 101; // Indonesia countryId
+      const correctedTimezone = isIndonesia
+        ? resolveIndonesiaTimezone(profile.stateName || "", profile.cityName || "")
+        : (profile.timezone || "");
+
       setProfileData({
         fullName: profile.name || "",
         nickname: profile.nickname || "",
@@ -200,7 +208,7 @@ function ProfilePageContent() {
         date_of_birth: profile.dob || "",
         job: profile.job || "",
         phoneNumber: profile.hp || "",
-        timezone: profile.timezone || "",
+        timezone: correctedTimezone,
         bio: profile.bio || "",
       })
 
@@ -208,7 +216,8 @@ function ProfilePageContent() {
         setCurrentState({ id: profile.stateId, name: profile.stateName || "" })
       }
       if (profile.cityId) {
-        setCurrentCity({ id: profile.cityId, name: profile.cityName || "", timezone: profile.timezone || "" })
+        // Use corrected timezone so displayTimezone shows the right value immediately
+        setCurrentCity({ id: profile.cityId, name: profile.cityName || "", timezone: correctedTimezone })
       }
       if (profile.countryId) {
         const countryRow = countries.find(c => c.id === profile.countryId)

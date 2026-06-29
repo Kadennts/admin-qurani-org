@@ -209,9 +209,23 @@
       "title": "الدفع",
       "searchPlaceholder": "البحث عن معرّف المستخدم، معرّف المعلم، الحالة...",
       "searchButton": "بحث",
+      "tabs": {
+        "payments": "قائمة المدفوعات",
+        "disputes": "النزاعات"
+      },
+      "disputes": {
+        "table": {
+          "type": "النوع"
+        },
+        "action": {
+          "detail": "عرض التفاصيل",
+          "reply": "رد",
+          "resolve": "حل"
+        }
+      },
       "summary": {
         "total": "إجمالي المدفوعات",
-        "revenue": "إجمالي الإيرادات",
+        "revenue": "الإيرادات",
         "pendingRefunds": "المبالغ المستردة المعلقة",
         "pendingPayouts": "المدفوعات المعلقة"
       },
@@ -253,7 +267,7 @@
       "bulk": {
         "selected": "{{count}} محدد",
         "actions": "إجراءات جماعية",
-        "markPayout": "تحديد كمدفوع (جماعي)"
+        "markPayout": "Bulk Mark Payout"
       },
       "empty": "لم يتم العثور على مدفوعات.",
       "loading": "جاري تحميل بيانات الدفع..."

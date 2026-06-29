@@ -209,9 +209,23 @@
       "title": "Payment",
       "searchPlaceholder": "Search UserId, TrainerId, Status...",
       "searchButton": "Search",
+      "tabs": {
+        "payments": "Payments List",
+        "disputes": "Disputes"
+      },
+      "disputes": {
+        "table": {
+          "type": "Type"
+        },
+        "action": {
+          "detail": "View Detail",
+          "reply": "Reply",
+          "resolve": "Resolve"
+        }
+      },
       "summary": {
         "total": "Total Payments",
-        "revenue": "Total Revenue",
+        "revenue": "Revenue",
         "pendingRefunds": "Pending Refunds",
         "pendingPayouts": "Pending Payouts"
       },
@@ -253,7 +267,7 @@
       "bulk": {
         "selected": "{{count}} selected",
         "actions": "Bulk Actions",
-        "markPayout": "Mark Payout (Bulk)"
+        "markPayout": "Bulk Mark Payout"
       },
       "empty": "No payments found.",
       "loading": "Loading payment data..."

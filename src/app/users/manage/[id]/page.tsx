@@ -86,6 +86,9 @@ export default function UserDetailPage() {
     const [loadingWallet, setLoadingWallet] = useState(false)
     const [loadingLogs, setLoadingLogs] = useState(false)
 
+    const [walletForbidden, setWalletForbidden] = useState(false)
+    const [logsForbidden, setLogsForbidden] = useState(false)
+
     useEffect(() => {
         if (user && userId) {
             fetchKyc()
@@ -117,11 +120,15 @@ export default function UserDetailPage() {
     const fetchWallet = async () => {
         if (!userId) return
         setLoadingWallet(true)
+        setWalletForbidden(false)
         try {
             const res = await walletApi.getWalletByUserId(userId)
             setWalletData(res.data || res)
         } catch (error) {
             console.error("Failed to fetch Wallet", error)
+            if (error instanceof Error && error.message.includes("403")) {
+                setWalletForbidden(true)
+            }
             setWalletData(null)
         } finally {
             setLoadingWallet(false)
@@ -131,6 +138,7 @@ export default function UserDetailPage() {
     const fetchLogs = async () => {
         if (!userId) return
         setLoadingLogs(true)
+        setLogsForbidden(false)
         try {
             const res = await auditApi.getUserLogs(userId)
             let logs: any[] = []
@@ -143,6 +151,9 @@ export default function UserDetailPage() {
             setActivityLogs(logs.slice(0, 50))
         } catch (error) {
             console.error("Failed to fetch logs", error)
+            if (error instanceof Error && error.message.includes("403")) {
+                setLogsForbidden(true)
+            }
             setActivityLogs([])
         } finally {
             setLoadingLogs(false)
@@ -357,6 +368,14 @@ export default function UserDetailPage() {
                                                     <span className="text-emerald-100/80 font-mono text-xs opacity-80">ID: {walletData.id || '-'}</span>
                                                 </div>
                                             </div>
+                                        </div>
+                                    ) : walletForbidden ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-amber-600 gap-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800 border-dashed max-w-md">
+                                            <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
+                                                <CreditCard className="w-12 h-12 text-amber-400" />
+                                            </div>
+                                            <p className="text-base font-medium text-amber-700 dark:text-amber-400">Tidak memiliki izin untuk mengakses data dompet</p>
+                                            <p className="text-sm text-amber-500/70">Hubungi admin sistem untuk memberikan akses wallet</p>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-4 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-800 border-dashed max-w-md">

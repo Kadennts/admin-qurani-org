@@ -110,11 +110,11 @@ export const updateUserProfile = async (
 
     const adminSupabase = await createAdminClient();
 
-    // 1. Cek manual apakah profil sudah ada (berdasarkan email)
+    // 1. Cek manual apakah profil sudah ada (berdasarkan id)
     const { data: existing, error: findError } = await adminSupabase
       .from("user_profiles")
       .select("id, auth, email")
-      .eq("email", email || "")
+      .eq("id", userId)
       .maybeSingle();
 
     if (findError) {

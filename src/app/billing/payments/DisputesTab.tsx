@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from "react"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { paymentsApi } from "@/lib/api"
+import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import { Search, ChevronLeft, ChevronRight, Eye, MoreHorizontal, CheckCircle2, XCircle, AlertCircle, ChevronDown, MessageSquare } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import { formatTooltipDate } from "@/lib/date-utils"
 
 interface DisputeData {
     id: number | string;
@@ -48,16 +50,65 @@ let localDisputeDummyData: DisputeData[] = [
     }
 ];
 
-function formatRupiah(n: number) {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n)
+function formatCurrency(amount: number, currency: string = "IDR") {
+    return new Intl.NumberFormat("id-ID", { 
+        style: "currency", 
+        currency: currency, 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount).replace("IDR", "Rp");
 }
 
 function formatDate(dateStr: string) {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("id-ID", {
+    let normalized = dateStr.trim();
+    if (normalized.includes(" ") && !normalized.includes("T")) normalized = normalized.replace(" ", "T");
+    if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) normalized += "Z";
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return "-";
+    return new Intl.DateTimeFormat("id-ID", {
         day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit"
-    })
+        hour: "2-digit", minute: "2-digit", hour12: false
+    }).format(d);
+}
+
+function timeAgo(dateStr: string): { relative: string; full: string } {
+    if (!dateStr) return { relative: "-", full: "-" };
+    let normalized = dateStr.trim();
+    if (normalized.includes(" ") && !normalized.includes("T")) normalized = normalized.replace(" ", "T");
+    if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) normalized += "Z";
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return { relative: "-", full: "-" };
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffWeek = Math.floor(diffDay / 7);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffDay / 365);
+
+    const tz = typeof window !== 'undefined'
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : 'UTC';
+    const full = new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+        hour12: false, timeZone: tz, timeZoneName: "short"
+    }).format(date);
+
+    let relative: string;
+    if (diffSec < 60) relative = "Baru saja";
+    else if (diffMin < 60) relative = `${diffMin} menit lalu`;
+    else if (diffHour < 24) relative = `${diffHour} jam lalu`;
+    else if (diffDay === 1) relative = "Kemarin";
+    else if (diffDay < 7) relative = `${diffDay} hari lalu`;
+    else if (diffWeek < 5) relative = `${diffWeek} minggu lalu`;
+    else if (diffMonth < 12) relative = `${diffMonth} bulan lalu`;
+    else relative = `${diffYear} tahun lalu`;
+
+    return { relative, full };
 }
 
 export default function DisputesTab() {
@@ -88,6 +139,7 @@ export default function DisputesTab() {
     const [autoProcessRefund, setAutoProcessRefund] = useState(false)
 
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isDemoMode, setIsDemoMode] = useState(false)
 
     const fetchDisputes = useCallback(async () => {
         setLoading(true)
@@ -107,12 +159,14 @@ export default function DisputesTab() {
             if (Array.isArray(items) && items.length > 0) {
                 setDisputes(items)
                 setTotalItems(response.totalCount || items.length)
+                setIsDemoMode(false)
             } else {
                 throw new Error("No items from API or empty array")
             }
 
         } catch (err: any) {
             console.log("API Fetch Disputes Error (using dummy data):", err.message)
+            setIsDemoMode(true)
             // Fallback to localDummyData
             let dummy = [...localDisputeDummyData];
 
@@ -151,7 +205,7 @@ export default function DisputesTab() {
     // Action Handlers
     const submitRespond = async () => {
         if (!responseText.trim()) {
-            alert("Response text is required");
+            showToast({ type: 'error', title: 'Teks respons wajib diisi', message: 'Harap isi kolom respons sebelum mengirim.' });
             return;
         }
         setIsSubmitting(true)
@@ -161,23 +215,22 @@ export default function DisputesTab() {
                     response: responseText,
                     merchantEvidence
                 });
-                // Update local dummy
                 localDisputeDummyData = localDisputeDummyData.map(d => 
                     d.id === respondModal.id ? { ...d, response: responseText, status: "In Progress" } : d
                 );
             }
-            
-            // Success
+            showToast({ type: 'success', title: 'Reply Terkirim', message: 'Reply dispute berhasil dikirim.' });
             closeModals();
             fetchDisputes();
         } catch (err: any) {
             console.error("Submit Respond Error:", err);
-            // Even if it fails, update dummy data to show success locally for testing
+            // Even if API fails, update dummy data locally for testing
             if (respondModal) {
                 localDisputeDummyData = localDisputeDummyData.map(d => 
                     d.id === respondModal.id ? { ...d, response: responseText, status: "In Progress" } : d
                 );
             }
+            showToast({ type: 'info', title: '[DEMO] Reply Tersimpan', message: 'Reply berhasil disimpan secara lokal (simulasi).' });
             closeModals();
             fetchDisputes();
         } finally {
@@ -187,7 +240,7 @@ export default function DisputesTab() {
 
     const submitResolve = async () => {
         if (!resolutionText.trim()) {
-            alert("Resolution text is required");
+            showToast({ type: 'error', title: 'Teks resolusi wajib diisi', message: 'Harap isi kolom resolusi sebelum mengirim.' });
             return;
         }
         setIsSubmitting(true)
@@ -203,18 +256,18 @@ export default function DisputesTab() {
                     d.id === resolveModal.id ? { ...d, resolution: resolutionText, status: 'Resolved' } : d
                 );
             }
-            
-            // Success
+            showToast({ type: 'success', title: 'Dispute Diselesaikan', message: 'Dispute berhasil diselesaikan.' + (autoProcessRefund ? ' Refund sedang diproses.' : '') });
             closeModals();
             fetchDisputes();
         } catch (err: any) {
             console.error("Submit Resolve Error:", err);
-            // Local fallback
+            // Local fallback for demo mode
             if (resolveModal) {
                 localDisputeDummyData = localDisputeDummyData.map(d => 
                     d.id === resolveModal.id ? { ...d, resolution: resolutionText, status: 'Resolved' } : d
                 );
             }
+            showToast({ type: 'info', title: '[DEMO] Dispute Diselesaikan', message: 'Dispute berhasil diselesaikan secara lokal (simulasi).' });
             closeModals();
             fetchDisputes();
         } finally {
@@ -236,6 +289,7 @@ export default function DisputesTab() {
 
     return (
         <div className="space-y-6 animate-in fade-in">
+            <ToastContainer />
             {/* Filters & Actions */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
@@ -275,16 +329,79 @@ export default function DisputesTab() {
 
             {/* Table */}
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* MOBILE CARD VIEW (<640px) */}
+                <div className="space-y-3 sm:hidden p-4">
+                    {loading ? (
+                        <div className="text-center py-8 text-gray-500">Memuat data sengketa...</div>
+                    ) : disputes.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">Tidak ada sengketa ditemukan.</div>
+                    ) : (
+                        disputes.map((item) => (
+                            <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${item.priority === 'High' ? 'bg-rose-100 text-rose-700' : item.priority === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {item.priority}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                            item.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' :
+                                            item.status === 'Open' ? 'bg-rose-100 text-rose-700' :
+                                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
+                                            'bg-gray-100 text-gray-700'
+                                        }`}>
+                                            {item.status}
+                                        </span>
+                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                                                <MoreHorizontal className="w-5 h-5" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => setDetailModal(item)}>
+                                                <Eye className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.detail", "Lihat Detail")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setRespondModal(item)}>
+                                                <MessageSquare className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.reply", "Balas")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setResolveModal(item)}>
+                                                <CheckCircle2 className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.resolve", "Selesaikan")}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-gray-900 dark:text-white text-sm mb-1">{item.type}</div>
+                                    <div className="text-xs text-gray-500">
+                                        {t("billing.payments.table.user", "Pengguna")}: <span className="font-medium text-gray-900 dark:text-gray-300">{item.userName}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-0.5">
+                                        {t("billing.payments.table.trainer", "Trainer")}: <span className="font-medium text-gray-900 dark:text-gray-300">{item.trainerName}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                                    <div className="font-medium text-emerald-600 text-sm">{formatCurrency(item.amount)}</div>
+                                    {(() => { const ta = timeAgo(item.createdAt); return (
+                                        <span title={formatTooltipDate(item.createdAt)} className="text-xs text-gray-500 cursor-default border-b border-dashed border-gray-400 pb-px">{ta.relative}</span>
+                                    ); })()}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* TABLE VIEW (Tablet & Desktop) */}
+                <div className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-4 py-3">Tanggal</th>
-                                <th className="px-4 py-3">Pembayaran</th>
-                                <th className="px-4 py-3">Pengguna</th>
-                                <th className="px-4 py-3">Tipe</th>
-                                <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-center">Aksi</th>
+                                <th className="px-4 py-3">{t("billing.payments.table.paymentDate", "Tanggal")}</th>
+                                <th className="px-4 py-3">{t("billing.payments.summary.payments", "Pembayaran")}</th>
+                                <th className="px-4 py-3">{t("billing.payments.table.user", "Pengguna")}</th>
+                                <th className="px-4 py-3">{t("billing.payments.disputes.table.type", "Tipe")}</th>
+                                <th className="px-4 py-3">{t("billing.payments.table.status", "Status")}</th>
+                                <th className="px-4 py-3 text-center">{t("billing.payments.table.actions", "Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -299,9 +416,13 @@ export default function DisputesTab() {
                             ) : (
                                 disputes.map((item) => (
                                     <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{formatDate(item.createdAt)}</td>
                                         <td className="px-4 py-3">
-                                            <div className="font-medium text-emerald-600">{formatRupiah(item.amount)}</div>
+                                            {(() => { const ta = timeAgo(item.createdAt); return (
+                                                <span title={formatTooltipDate(item.createdAt)} className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-default border-b border-dashed border-gray-400 dark:border-gray-500 pb-px">{ta.relative}</span>
+                                            ); })()}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium text-emerald-600">{formatCurrency(item.amount)}</div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="font-medium text-gray-900 dark:text-white">{item.userName}</div>
@@ -335,13 +456,13 @@ export default function DisputesTab() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => setDetailModal(item)}>
-                                                            <Eye className="w-4 h-4 mr-2" /> Lihat Detail
+                                                            <Eye className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.detail", "Lihat Detail")}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => setRespondModal(item)}>
-                                                            <MessageSquare className="w-4 h-4 mr-2" /> Respond
+                                                            <MessageSquare className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.reply", "Balas")}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => setResolveModal(item)}>
-                                                            <CheckCircle2 className="w-4 h-4 mr-2" /> Resolve
+                                                            <CheckCircle2 className="w-4 h-4 mr-2" /> {t("billing.payments.disputes.action.resolve", "Selesaikan")}
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -392,7 +513,7 @@ export default function DisputesTab() {
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500">Nominal</p>
-                                    <p className="font-bold text-emerald-600">{formatRupiah(detailModal.amount)}</p>
+                                    <p className="font-bold text-emerald-600">{formatCurrency(detailModal.amount)}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500">Pengguna (Pelapor)</p>
@@ -458,13 +579,17 @@ export default function DisputesTab() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-4">
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
                             <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                                Respond Sengketa #{respondModal?.id}
+                                {t("billing.payments.disputes.action.reply", "Balas")} Sengketa #{respondModal?.id}
                             </h3>
                         </div>
                         <div className="p-6 space-y-4">
+                            <div className="bg-white dark:bg-gray-900/50 p-3 rounded-lg text-sm border border-gray-100 dark:border-gray-700">
+                                <p className="text-gray-500 dark:text-gray-400">Pengguna: <span className="font-medium text-gray-900 dark:text-white">{respondModal?.userName}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Alasan: <span className="text-gray-700 dark:text-gray-300 italic">{respondModal?.reason || '-'}</span></p>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Response (Wajib)
+                                    Balasan (Wajib)
                                 </label>
                                 <textarea
                                     value={responseText}
@@ -494,7 +619,7 @@ export default function DisputesTab() {
                                     disabled={isSubmitting || !responseText.trim()}
                                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                                 >
-                                    {isSubmitting ? "Menyimpan..." : "Kirim Respond"}
+                                    {isSubmitting ? "Menyimpan..." : "Kirim Reply"}
                                 </Button>
                                 <Button variant="outline" className="flex-1" onClick={closeModals}>Batal</Button>
                             </div>
@@ -509,10 +634,14 @@ export default function DisputesTab() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-4">
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-emerald-50 dark:bg-emerald-900/20">
                             <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-100">
-                                Resolve Sengketa #{resolveModal?.id}
+                                {t("billing.payments.disputes.action.resolve", "Selesaikan")} Sengketa #{resolveModal?.id}
                             </h3>
                         </div>
                         <div className="p-6 space-y-4">
+                            <div className="bg-white dark:bg-gray-900/50 p-3 rounded-lg text-sm border border-gray-100 dark:border-gray-700">
+                                <p className="text-gray-500 dark:text-gray-400">Pengguna: <span className="font-medium text-gray-900 dark:text-white">{resolveModal?.userName}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Alasan: <span className="text-gray-700 dark:text-gray-300 italic">{resolveModal?.reason || '-'}</span></p>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Resolusi Akhir (Wajib)

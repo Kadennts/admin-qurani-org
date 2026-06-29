@@ -5,7 +5,8 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 import { paymentsApi, type PaymentSearchParams } from "@/lib/api"
 import { formatTooltipDate } from "@/lib/date-utils"
-import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, FileText, MoreHorizontal, AlertCircle, SlidersHorizontal, Download } from "lucide-react"
+import { showToast, ToastContainer } from "@/components/ui/toast-sim"
+import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download } from "lucide-react"
 import DisputesTab from "./DisputesTab"
 
 interface PaymentData {
@@ -42,8 +43,13 @@ let localDummyData: PaymentData[] = [
     }
 ];
 
-function formatRupiah(n: number) {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n)
+function formatCurrency(amount: number, currency: string = "IDR") {
+    return new Intl.NumberFormat("id-ID", { 
+        style: "currency", 
+        currency: currency, 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount).replace("IDR", "Rp");
 }
 
 function formatDate(dateStr: string) {
@@ -54,35 +60,59 @@ function formatDate(dateStr: string) {
     })
 }
 
-// Time ago: menampilkan waktu relatif ("3 menit lalu", "2 jam lalu", dll.)
-function timeAgo(dateStr: string): { relative: string; full: string } {
+// Time ago: menampilkan waktu relatif dengan full date di tooltip (timezone-aware)
+function timeAgo(dateStr: string, locale: string = "id", timezone?: string): { relative: string; full: string } {
     if (!dateStr) return { relative: "-", full: "-" };
-    const date = new Date(dateStr);
+    let normalized = dateStr.trim();
+    if (normalized.includes(" ") && !normalized.includes("T")) normalized = normalized.replace(" ", "T");
+    if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) normalized += "Z";
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return { relative: "-", full: "-" };
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
+    const diffWeek = Math.floor(diffDay / 7);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffDay / 365);
 
-    const full = date.toLocaleDateString("id-ID", {
+    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const localeCode = locale === "ar" ? "ar-SA" : locale === "en" ? "en-GB" : "id-ID";
+    const full = new Intl.DateTimeFormat(localeCode, {
         day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit"
-    });
+        hour: "2-digit", minute: "2-digit",
+        hour12: false,
+        timeZone: tz,
+        timeZoneName: "short"
+    }).format(date);
 
     let relative: string;
-    if (diffSec < 60) {
-        relative = "Baru saja";
-    } else if (diffMin < 60) {
-        relative = `${diffMin} menit lalu`;
-    } else if (diffHour < 24) {
-        relative = `${diffHour} jam lalu`;
-    } else if (diffDay === 1) {
-        relative = `Kemarin, ${date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
-    } else if (diffDay < 7) {
-        relative = `${diffDay} hari lalu`;
+    if (locale === "en") {
+        if (diffSec < 60) relative = "just now";
+        else if (diffMin < 60) relative = `${diffMin} min ago`;
+        else if (diffHour < 24) relative = `${diffHour} hr ago`;
+        else if (diffDay === 1) relative = `yesterday`;
+        else if (diffDay < 7) relative = `${diffDay} days ago`;
+        else if (diffWeek < 5) relative = `${diffWeek} wk ago`;
+        else if (diffMonth < 12) relative = `${diffMonth} mo ago`;
+        else relative = `${diffYear} yr ago`;
+    } else if (locale === "ar") {
+        if (diffSec < 60) relative = "الآن";
+        else if (diffMin < 60) relative = `منذ ${diffMin} دقيقة`;
+        else if (diffHour < 24) relative = `منذ ${diffHour} ساعة`;
+        else if (diffDay < 7) relative = `منذ ${diffDay} أيام`;
+        else relative = date.toLocaleDateString("ar-SA", { day: "2-digit", month: "short", year: "numeric" });
     } else {
-        relative = date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+        if (diffSec < 60) relative = "Baru saja";
+        else if (diffMin < 60) relative = `${diffMin} menit lalu`;
+        else if (diffHour < 24) relative = `${diffHour} jam lalu`;
+        else if (diffDay === 1) relative = `Kemarin`;
+        else if (diffDay < 7) relative = `${diffDay} hari lalu`;
+        else if (diffWeek < 5) relative = `${diffWeek} minggu lalu`;
+        else if (diffMonth < 12) relative = `${diffMonth} bulan lalu`;
+        else relative = `${diffYear} tahun lalu`;
     }
 
     return { relative, full };
@@ -144,6 +174,7 @@ function PaymentsContent() {
     const [error, setError] = useState<string | null>(null)
     const [page, setPage] = useState(1)
     const [totalItems, setTotalItems] = useState(0)
+    const [isDemoMode, setIsDemoMode] = useState(false)
     
     // Tab State
     const [activeTab, setActiveTab] = useState<'payments' | 'disputes'>('payments')
@@ -174,8 +205,7 @@ function PaymentsContent() {
     // Stats
     const [stats, setStats] = useState({
         revenue: 0,
-        pendingRefunds: 0,
-        pendingPayouts: 0
+        pendingRefunds: 0
     });
 
     // Export State
@@ -208,7 +238,7 @@ function PaymentsContent() {
             console.warn("API Export failed, using fallback export:", err);
             // Fallback: Export current data in `payments`
             if (payments.length === 0) {
-                alert("Tidak ada data untuk diexport.");
+                showToast({ type: 'info', title: 'Tidak ada data', message: 'Tidak ada data untuk diexport.' });
                 setIsExporting(false);
                 return;
             }
@@ -268,16 +298,17 @@ function PaymentsContent() {
             const dataArr = Array.isArray(items) ? items : [];
             setPayments(dataArr)
             setTotalItems(response.totalCount || response.totalItems || dataArr.length || 0)
+            setIsDemoMode(false)
             
             // Try fetching stats if possible, otherwise calculate dummy stats from current items
             setStats({
                 revenue: dataArr.filter((p: any) => p.status === 'paid').reduce((a: number, b: any) => a + b.amount, 0) || 5000000,
-                pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2,
-                pendingPayouts: dataArr.filter((p: any) => p.status === 'paid' && !p.isPaidOut).length || 5
+                pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2
             })
 
         } catch (err: any) {
             console.warn("API Fetch Error:", err.message)
+            setIsDemoMode(true)
             // Error is suppressed in UI to avoid disrupting the user experience, dummy data is used instead.
             let dummy = [...localDummyData];
 
@@ -305,8 +336,7 @@ function PaymentsContent() {
             setTotalItems(dummy.length)
             setStats({
                 revenue: 250000,
-                pendingRefunds: 0,
-                pendingPayouts: 2
+                pendingRefunds: 0
             })
         } finally {
             setLoading(false)
@@ -338,6 +368,7 @@ function PaymentsContent() {
                 approved: approved ? 1 : 0,
                 notes: actionNotes
             })
+            showToast({ type: 'success', title: 'Refund Diproses', message: `Refund telah berhasil ${approved ? 'disetujui' : 'ditolak'}.` })
             setProcessRefundModal(null)
             setActionNotes("")
             fetchPayments()
@@ -346,6 +377,7 @@ function PaymentsContent() {
             localDummyData = localDummyData.map(p => 
                 p.id === paymentId ? { ...p, status: approved ? "refunded" : p.status } : p
             )
+            showToast({ type: 'info', title: '[DEMO] Refund Diproses', message: `Refund telah berhasil ${approved ? 'disetujui' : 'ditolak'} (simulasi lokal).` })
             setProcessRefundModal(null)
             setActionNotes("")
             fetchPayments()
@@ -356,8 +388,8 @@ function PaymentsContent() {
 
     const handleMarkPayout = async (paymentId: string | number) => {
         if (!payoutReference) {
-            alert("Reference is required")
-            return
+            showToast({ type: 'error', title: 'Referensi wajib diisi', message: 'Harap isi kolom Reference sebelum melanjutkan.' });
+            return;
         }
         setIsSubmitting(true)
         try {
@@ -365,6 +397,7 @@ function PaymentsContent() {
                 payoutReference,
                 notes: actionNotes
             })
+            showToast({ type: 'success', title: 'Payout Ditandai', message: 'Pembayaran telah berhasil ditandai sebagai sudah dibayarkan.' })
             setMarkPayoutModal(null)
             setPayoutReference("")
             setActionNotes("")
@@ -374,6 +407,7 @@ function PaymentsContent() {
             localDummyData = localDummyData.map(p => 
                 p.id === paymentId ? { ...p, isPaidOut: true, payoutReference } : p
             )
+            showToast({ type: 'info', title: '[DEMO] Payout Ditandai', message: 'Pembayaran berhasil ditandai sebagai sudah dibayarkan (simulasi lokal).' })
             setMarkPayoutModal(null)
             setPayoutReference("")
             setActionNotes("")
@@ -385,8 +419,8 @@ function PaymentsContent() {
 
     const handleBulkPayout = async () => {
         if (!payoutReference) {
-            alert("Reference is required")
-            return
+            showToast({ type: 'error', title: 'Referensi wajib diisi', message: 'Harap isi kolom Reference sebelum melanjutkan.' });
+            return;
         }
         setIsSubmitting(true)
         try {
@@ -395,6 +429,7 @@ function PaymentsContent() {
                 payoutReference,
                 notes: actionNotes
             })
+            showToast({ type: 'success', title: 'Bulk Payout Ditandai', message: `${selectedIds.length} pembayaran telah berhasil ditandai sebagai sudah dibayarkan.` })
             setBulkPayoutModal(false)
             setPayoutReference("")
             setActionNotes("")
@@ -405,6 +440,7 @@ function PaymentsContent() {
             localDummyData = localDummyData.map(p => 
                 selectedIds.includes(p.id) ? { ...p, isPaidOut: true, payoutReference } : p
             )
+            showToast({ type: 'info', title: '[DEMO] Bulk Payout Ditandai', message: `${selectedIds.length} pembayaran ditandai sebagai sudah dibayarkan (simulasi lokal).` })
             setBulkPayoutModal(false)
             setPayoutReference("")
             setActionNotes("")
@@ -422,6 +458,7 @@ function PaymentsContent() {
                 status: statusUpdateValue,
                 failureReason: statusUpdateValue === 'failed' ? failureReason : undefined
             })
+            showToast({ type: 'success', title: 'Status Diperbarui', message: `Status pembayaran berhasil diubah menjadi ${statusUpdateValue}.` })
             setUpdateStatusModal(null)
             setFailureReason("")
             fetchPayments()
@@ -430,6 +467,7 @@ function PaymentsContent() {
             localDummyData = localDummyData.map(p => 
                 p.id === paymentId ? { ...p, status: statusUpdateValue } : p
             )
+            showToast({ type: 'info', title: '[DEMO] Status Diperbarui', message: `Status pembayaran diubah menjadi ${statusUpdateValue} (simulasi lokal).` })
             setUpdateStatusModal(null)
             setFailureReason("")
             fetchPayments()
@@ -456,6 +494,7 @@ function PaymentsContent() {
 
     return (
         <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 pb-10">
+            <ToastContainer />
             {/* Header section */}
             <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30">
                 <div className="px-4 sm:px-6 lg:px-8 py-5">
@@ -476,7 +515,7 @@ function PaymentsContent() {
                                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                             }`}
                         >
-                            Daftar Pembayaran
+                            {t("billing.payments.tabs.payments", "Daftar Pembayaran")}
                         </button>
                         <button
                             onClick={() => setActiveTab('disputes')}
@@ -486,7 +525,7 @@ function PaymentsContent() {
                                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                             }`}
                         >
-                            Sengketa (Disputes)
+                            {t("billing.payments.tabs.disputes", "Sengketa")}
                         </button>
                     </div>
                 </div>
@@ -496,13 +535,13 @@ function PaymentsContent() {
             {activeTab === 'payments' && (
             <div className="px-4 sm:px-6 lg:px-8 mt-6">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
                         <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
                             <Activity className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.total", "Total Pembayaran")}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.payments", "Pembayaran")}</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{totalItems}</p>
                         </div>
                     </div>
@@ -511,8 +550,8 @@ function PaymentsContent() {
                             <DollarSign className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.revenue", "Total Pendapatan")}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{formatRupiah(stats.revenue)}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.revenue", "Revenue")}</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.revenue)}</p>
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
@@ -522,15 +561,6 @@ function PaymentsContent() {
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.pendingRefunds", "Pending Refunds")}</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.pendingRefunds}</p>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
-                            <FileText className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.pendingPayouts", "Pending Payouts")}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.pendingPayouts}</p>
                         </div>
                     </div>
                 </div>
@@ -550,7 +580,7 @@ function PaymentsContent() {
                                     : "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50"
                                 }`}
                             >
-                                {t("billing.payments.bulk.markPayout", "Bulk Payout")}
+                                {t("billing.payments.bulk.markPayout", "Bulk Mark Payout")}
                                 {selectedIds.length > 0 && (
                                     <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">
                                         {selectedIds.length}
@@ -721,7 +751,74 @@ function PaymentsContent() {
 
                 {/* Data Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
+                    {/* MOBILE CARD VIEW (<640px) */}
+                    <div className="space-y-3 sm:hidden p-4">
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500">
+                                {t("billing.payments.loading", "Memuat data pembayaran...")}
+                            </div>
+                        ) : payments.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                {t("billing.payments.empty", "Tidak ada pembayaran yang ditemukan.")}
+                            </div>
+                        ) : (
+                            payments.map((payment) => (
+                                <div key={payment.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm relative">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                                                checked={selectedIds.includes(payment.id)}
+                                                onChange={() => toggleSelect(payment.id)}
+                                            />
+                                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">
+                                                #{payment.bookingId || payment.id}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
+                                                payment.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                payment.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                payment.status === 'refunded' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                                            }`}>
+                                                {t(`billing.payments.status.${payment.status?.toLowerCase()}`, payment.status)}
+                                            </span>
+                                            <ActionDropdown 
+                                                payment={payment}
+                                                onRefund={() => setProcessRefundModal(payment)}
+                                                onPayout={() => setMarkPayoutModal(payment)}
+                                                onUpdateStatus={() => {
+                                                    setStatusUpdateValue(payment.status);
+                                                    setUpdateStatusModal(payment);
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500">
+                                            {t("billing.payments.table.user", "User")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.userName || '-'}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                            {t("billing.payments.table.trainer", "Trainer")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.trainerName || '-'}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                            {t("billing.payments.table.paymentMethod", "Metode")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.paymentMethod || '-'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                                        <div className="font-medium text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(payment.amount)}</div>
+                                        <div className="text-xs text-gray-500" title={formatTooltipDate(payment.updatedAt || payment.createdAt)}>
+                                            {timeAgo(payment.updatedAt || payment.createdAt).relative}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
@@ -736,10 +833,10 @@ function PaymentsContent() {
                                     <th className="px-4 py-3 font-semibold">Kode Pesanan</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.user", "User")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.trainer", "Trainer")}</th>
-                                    <th className="px-4 py-3 font-semibold">{t("billing.payments.table.amount", "Nominal")}</th>
-                                    <th className="px-4 py-3 font-semibold">{t("billing.payments.table.status", "Status")}</th>
+                                    <th className="px-4 py-3 font-semibold text-right pr-16">{t("billing.payments.table.amount", "Nominal")}</th>
+                                    <th className="px-4 py-3 font-semibold text-center">{t("billing.payments.table.status", "Status")}</th>
                                     <th className="px-4 py-3 font-semibold">{t("billing.payments.table.paymentMethod", "Metode")}</th>
-                                    <th className="px-4 py-3 font-semibold">Tgl Bayar</th>
+                                    <th className="px-4 py-3 font-semibold">{t("billing.payments.table.paymentDate", "Tgl Bayar")}</th>
                                     <th className="px-4 py-3 font-semibold text-center">{t("billing.payments.table.actions", "Aksi")}</th>
                                 </tr>
                             </thead>
@@ -781,10 +878,10 @@ function PaymentsContent() {
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>
                                             </td>
-                                            <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400">
-                                                {formatRupiah(payment.amount)}
+                                            <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400 text-right pr-16">
+                                                {formatCurrency(payment.amount)}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 text-center">
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
                                                     payment.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
                                                     payment.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
@@ -795,14 +892,14 @@ function PaymentsContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.paymentMethod || '-'}</td>
-                                            {/* Tgl Bayar - Time Ago + tooltip hover */}
-                                            <td className="px-4 py-3">
-                                                <span
-                                                    title={tglBayar.full}
-                                                    className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-default border-b border-dashed border-gray-300 dark:border-gray-600 pb-px"
-                                                >
-                                                    {tglBayar.relative}
-                                                </span>
+                                            {/* Tgl Bayar - Relative time + tooltip */}
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                {(() => { const t2 = timeAgo(payment.updatedAt || payment.createdAt); return (
+                                                    <span
+                                                        title={formatTooltipDate(payment.updatedAt || payment.createdAt)}
+                                                        className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-default border-b border-dashed border-gray-400 dark:border-gray-500 pb-px"
+                                                    >{t2.relative}</span>
+                                                ); })()}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <ActionDropdown 
@@ -870,7 +967,7 @@ function PaymentsContent() {
                         <div className="p-6 space-y-4">
                             <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg text-sm mb-4 border border-gray-100 dark:border-gray-700">
                                 <p className="text-gray-500 dark:text-gray-400">Payment ID: <span className="font-medium text-gray-900 dark:text-white">#{processRefundModal.id}</span></p>
-                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-rose-600">{formatRupiah(processRefundModal.amount)}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-rose-600">{formatCurrency(processRefundModal.amount)}</span></p>
                             </div>
                             
                             <div>
@@ -925,7 +1022,7 @@ function PaymentsContent() {
                             <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg text-sm mb-4 border border-gray-100 dark:border-gray-700">
                                 <p className="text-gray-500 dark:text-gray-400">Payment ID: <span className="font-medium text-gray-900 dark:text-white">#{markPayoutModal.id}</span></p>
                                 <p className="text-gray-500 dark:text-gray-400">Trainer: <span className="font-medium text-gray-900 dark:text-white">{markPayoutModal.trainerName}</span></p>
-                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-emerald-600">{formatRupiah(markPayoutModal.amount)}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-emerald-600">{formatCurrency(markPayoutModal.amount)}</span></p>
                             </div>
                             
                             <div>

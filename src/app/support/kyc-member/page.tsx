@@ -77,14 +77,14 @@ function Toast({ toasts, onRemove }: { toasts: ToastItem[]; onRemove: (id: numbe
                         ${t.type === "success"
                             ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-300"
                             : t.type === "info"
-                            ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300"
-                            : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300"
+                                ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300"
+                                : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300"
                         }`}>
                     {t.type === "success"
                         ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                         : t.type === "info"
-                        ? <Database className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                        : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                            ? <Database className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
                     <span>{t.message}</span>
                     <button onClick={() => onRemove(t.id)} className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
                         <X className="w-3.5 h-3.5" />
@@ -701,7 +701,7 @@ function KycMemberContent() {
         }
         if (filterDocType !== "all") data = data.filter(x => x.documentType === filterDocType)
         return data
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items, activeTab, search, filterDocType])
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage))
@@ -798,7 +798,7 @@ function KycMemberContent() {
             setToasts(p => [...p, { id, message: "Mode demo aktif — data dummy, API belum tersedia", type: "info" }])
             setTimeout(() => removeToast(id), 6000)
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoading])
 
     return (

@@ -46,7 +46,7 @@ function uniq(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-function resolveIndonesiaTimezone(stateName: string, cityName: string): string {
+export function resolveIndonesiaTimezone(stateName: string, cityName: string): string {
   const s = normalize(stateName);
   const c = normalize(cityName);
   const combined = `${s} ${c}`;

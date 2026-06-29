@@ -209,9 +209,23 @@
       "title": "Pembayaran",
       "searchPlaceholder": "Cari UserId, TrainerId, Status...",
       "searchButton": "Cari",
+      "tabs": {
+        "payments": "Daftar Pembayaran",
+        "disputes": "Sengketa"
+      },
+      "disputes": {
+        "table": {
+          "type": "Tipe"
+        },
+        "action": {
+          "detail": "Lihat Detail",
+          "reply": "Balas",
+          "resolve": "Selesaikan"
+        }
+      },
       "summary": {
         "total": "Total Pembayaran",
-        "revenue": "Total Pendapatan",
+        "revenue": "Pendapatan",
         "pendingRefunds": "Pending Refunds",
         "pendingPayouts": "Pending Payouts"
       },
@@ -253,7 +267,7 @@
       "bulk": {
         "selected": "{{count}} dipilih",
         "actions": "Bulk Actions",
-        "markPayout": "Tandai Payout (Bulk)"
+        "markPayout": "Bulk Mark Payout"
       },
       "empty": "Tidak ada pembayaran yang ditemukan.",
       "loading": "Memuat data pembayaran..."

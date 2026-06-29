@@ -254,14 +254,14 @@ function KycDetailModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            
+
             {/* Modal Tolak */}
             {showReject && (
                 <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
                     <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Tolak Pendaftaran</h3>
                         <p className="text-sm text-gray-500 mb-4">Silakan masukkan alasan penolakan. Alasan ini akan dikirimkan kepada pendaftar.</p>
-                        <textarea 
+                        <textarea
                             className="w-full h-32 p-3 border border-gray-200 dark:border-gray-700 rounded-xl mb-4 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
                             placeholder="Contoh: Dokumen legalitas tidak lengkap..."
                             value={rejectReason}
@@ -383,7 +383,7 @@ function KycDetailModal({
 
                             {/* Left Column */}
                             <div className="lg:col-span-2 space-y-8">
-                                
+
                                 {/* Data Legalitas */}
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
                                     <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
