@@ -22,7 +22,17 @@ export function resolveUserTimezone(): string {
     }
 
     if (cachedTimezone && isValidTimezone(cachedTimezone)) return cachedTimezone
-    return "UTC" // fallback
+
+    // Fallback ke browser timezone (e.g. "Asia/Makassar") sebelum "UTC"
+    try {
+        if (typeof window !== 'undefined') {
+            const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+            if (browserTz) return browserTz
+        }
+    } catch {
+        // no-op
+    }
+    return "UTC"
 }
 
 export function formatTooltipDate(dateInput: Date | string | null | undefined): string {

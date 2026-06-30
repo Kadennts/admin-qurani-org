@@ -127,6 +127,14 @@ function PayoutContent() {
         const preferred = cachedTimezone || fromProfile
         if (preferred && isValidTimezone(preferred)) return preferred
         if (fromProfile && isValidTimezone(fromProfile)) return fromProfile
+
+        // Fallback ke browser timezone sebelum "UTC"
+        try {
+            const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+            if (browserTz && isValidTimezone(browserTz)) return browserTz
+        } catch {
+            // no-op
+        }
         return "UTC"
     }, [profile?.timezone])
 
