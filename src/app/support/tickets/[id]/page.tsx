@@ -46,20 +46,8 @@ export default function TicketDetailRoute() {
                 '1': 'TECHNICAL', '2': 'BILLING', '3': 'SALES', '4': 'GENERAL', '5': 'SUPPORT',
             };
 
-            // Deteksi apakah ini tiket Supabase (ID kecil) atau MyQurani API (18 digit snowflake)
-            // Supabase: 1, 2, 3... | MyQurani: 86885945592250369, dll
-            const isSupabaseTicket = parseInt(ticketId) < 1_000_000;
-
-            // Try to fetch ticket detail with replies from API
-            // We'll try multiple endpoints in case one fails
-            let apiData: any = null;
-
-            if (isSupabaseTicket) {
-                // Tiket Supabase: langsung ke Method 4, skip MyQurani API sama sekali
-                console.log('[TicketDetail] Supabase ticket detected (ID:', ticketId, '), skipping MyQurani API');
-            } else {
-
             // Method 1: Try /api/v1/tickets/{id} (admin endpoint)
+            let apiData: any = null;
             try {
                 const result = await ticketsApi.getTicketById(ticketId, auth.accessToken, { signal: controller.signal });
 
@@ -115,52 +103,6 @@ export default function TicketDetailRoute() {
                     }
                 } catch (e35) {
                     console.log('[TicketDetail] Method 3.5 failed');
-                }
-            }
-
-            } // end else (MyQurani API methods)
-
-            // Method 4: Lookup dari Supabase via API route (untuk tiket yang dibuat via app kita)
-            if ((!apiData || !apiData.id) && !controller.signal.aborted) {
-                try {
-                    const sbResponse = await fetch(`/api/tickets/supabase/${ticketId}`, {
-                        signal: controller.signal,
-                    });
-
-                    if (sbResponse.ok) {
-                        const sbResult = await sbResponse.json();
-                        if (sbResult.success && sbResult.data?.ticket) {
-                            const sbTicket = sbResult.data.ticket;
-                            const sbReplies = sbResult.data.replies || [];
-
-                            apiData = {
-                                id: sbTicket.id,
-                                subject: sbTicket.subject,
-                                name: sbTicket.contact,
-                                email: null,
-                                department: sbTicket.department,
-                                priorityName: sbTicket.priority || 'Medium',
-                                statusName: sbTicket.status || 'Open',
-                                message: sbTicket.body,
-                                date: sbTicket.submitted_date,
-                                lastReply: sbTicket.last_reply || null,
-                                ticketKey: sbTicket.ticket_number || `#${sbTicket.id}`,
-                                replies: sbReplies.map((r: any) => ({
-                                    id: r.id,
-                                    ticketId: r.ticket_id,
-                                    name: r.author,
-                                    email: null,
-                                    message: r.message,
-                                    date: r.date,
-                                    isStaffReply: false,
-                                    attachments: null,
-                                })),
-                            };
-                            console.log('[TicketDetail] Method 4 (Supabase API) succeeded');
-                        }
-                    }
-                } catch (e4) {
-                    console.log('[TicketDetail] All methods failed including Supabase:', e4);
                 }
             }
 

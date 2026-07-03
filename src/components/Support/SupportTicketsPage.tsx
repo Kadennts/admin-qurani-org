@@ -240,11 +240,11 @@ export default function SupportTicketsPage() {
             { signal }
           );
 
-          // API response format: { success, data: { items: [...], totalCount, ... } }
+          // API response format: { success, data: { items: [...], pagination: { totalCount } } }
           let responseData = result?.data || result;
           // Check for items array (MyQurani API format), then data array, then direct array
           let tickets = responseData?.items || responseData?.data || (Array.isArray(responseData) ? responseData : []);
-          let total = responseData?.totalCount || tickets.length;
+          let total = responseData?.pagination?.totalCount || responseData?.totalCount || tickets.length;
 
           // If no tickets from admin endpoint, try /api/v1/tickets/my (user's own tickets)
           if (tickets.length === 0 && (!signal || !signal.aborted)) {
@@ -252,7 +252,7 @@ export default function SupportTicketsPage() {
               result = await ticketsApi.getMyTickets(params, auth.accessToken, { signal });
               responseData = result?.data || result;
               tickets = responseData?.items || responseData?.data || (Array.isArray(responseData) ? responseData : []);
-              total = responseData?.totalCount || tickets.length;
+              total = responseData?.pagination?.totalCount || responseData?.totalCount || tickets.length;
             } catch (myTicketsError) {
               // Ignore
             }

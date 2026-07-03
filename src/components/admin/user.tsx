@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Edit, Eye, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check } from "lucide-react"
+import { Search, Edit, Eye, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check, Shield } from "lucide-react"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -158,6 +158,46 @@ export default function Users() {
         stateName: '',
         cityName: ''
     })
+
+    // Manage role states
+    const [manageRoleModal, setManageRoleModal] = useState<{ open: boolean; user: UserItem | null }>({ open: false, user: null })
+    const [isManagingRole, setIsManagingRole] = useState(false)
+    const [availableRoles, setAvailableRoles] = useState<any[]>([])
+    const [selectedRole, setSelectedRole] = useState<string>('')
+
+    useEffect(() => {
+        const loadRoles = async () => {
+            try {
+                const res = await rolesApi.getAll()
+                if (res?.success) setAvailableRoles(res.data)
+            } catch (e) {}
+        }
+        loadRoles()
+    }, [])
+
+    const handleManageRole = (user: UserItem) => {
+        setManageRoleModal({ open: true, user })
+        setSelectedRole(user.role || 'member')
+    }
+
+    const submitManageRole = async () => {
+        if (!manageRoleModal.user || !selectedRole) return
+        setIsManagingRole(true)
+        try {
+            const res = await rolesApi.assign(getUserId(manageRoleModal.user), selectedRole)
+            if (res?.success) {
+                toast.success(`Role berhasil diubah menjadi ${selectedRole}`)
+                setManageRoleModal({ open: false, user: null })
+                loadUsers(searchQuery)
+            } else {
+                toast.error(res?.message || 'Gagal mengubah role')
+            }
+        } catch (e) {
+            toast.error('Terjadi kesalahan')
+        } finally {
+            setIsManagingRole(false)
+        }
+    }
 
     // Location states - using API types
     const [countries, setCountries] = useState<CountryData[]>([])
@@ -361,43 +401,9 @@ export default function Users() {
                 mergedUsers = await Promise.all(fetchPromises);
             }
 
-            try {
-                const overrideResponse = await fetch("/api/admin/users/overrides", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                    body: JSON.stringify({
-                        userIds: mergedUsers.map((u) => getUserId(u)).filter(Boolean),
-                        usernames: mergedUsers.map((u) => u.username).filter(Boolean),
-                    }),
-                })
-
-                if (overrideResponse.ok) {
-                    const overridePayload = await overrideResponse.json().catch(() => null)
-                    const overrideRows = Array.isArray(overridePayload?.data) ? overridePayload.data : []
-                    if (overrideRows.length > 0) {
-                        const byId = new Map(overrideRows.map((row: any) => [String(row.id), row]))
-                        const byUsername = new Map(
-                            overrideRows
-                                .filter((row: any) => typeof row?.username === "string")
-                                .map((row: any) => [String(row.username), row])
-                        )
-
-                        mergedUsers = mergedUsers.map((user) => {
-                            const fromId = byId.get(getUserId(user))
-                            const fromUsername = !fromId ? byUsername.get(String(user.username || "")) : null
-                            const patch = fromId || fromUsername
-                            return patch ? { ...user, ...patch, userId: user.userId ?? user.id } : user
-                        })
-                    }
-                }
-            } catch (overrideError) {
-                console.warn("[Users] Failed to load local overrides:", overrideError)
-            }
-
-            console.log('[Users] Loaded', mergedUsers.length, 'users (Summary + Details + Overrides). Total:', totalFromResponse ?? fallbackTotal)
+            // Data user sudah full dari Qurani API (search + getById + getUserRoles)
+            // Tidak perlu lagi overlay dari Supabase user_profiles
+            console.log('[Users] Loaded', mergedUsers.length, 'users dari Qurani API. Total:', totalFromResponse ?? fallbackTotal)
             setUsers(mergedUsers)
             setTotalCount((prev) => {
                 if (typeof totalFromResponse === "number" && totalFromResponse >= mergedUsers.length) {
@@ -990,6 +996,15 @@ export default function Users() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={() => handleManageRole(user)}
+                                                        title="Kelola Role"
+                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                                    >
+                                                        <Shield className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() => handleEdit(getUserId(user))}
                                                         className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                                     >
@@ -1531,6 +1546,79 @@ export default function Users() {
                                 {t('filter_modal.apply', 'Apply Filters')}
                             </Button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manage Role Modal */}
+            <Dialog open={manageRoleModal.open} onOpenChange={(open) => !open && setManageRoleModal({ open: false, user: null })}>
+                <DialogContent className="sm:max-w-md dark:bg-gray-800">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+                            Kelola Role Pengguna
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <Avatar className="w-10 h-10">
+                                <AvatarImage src={manageRoleModal.user ? getAvatarSrc(manageRoleModal.user) || undefined : undefined} />
+                                <AvatarFallback className="bg-blue-100 text-blue-600">
+                                    {manageRoleModal.user?.name ? manageRoleModal.user.name.charAt(0) : 'U'}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="font-semibold text-sm text-gray-900 dark:text-white">{manageRoleModal.user?.name}</p>
+                                <p className="text-xs text-gray-500">{manageRoleModal.user?.username}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                                Pilih Role
+                            </Label>
+                            <Select value={selectedRole} onValueChange={setSelectedRole}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Pilih Role..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableRoles.length > 0 ? availableRoles.map(r => (
+                                        <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                                    )) : (
+                                        <>
+                                            <SelectItem value="admin">admin</SelectItem>
+                                            <SelectItem value="member">member</SelectItem>
+                                            <SelectItem value="billing">billing</SelectItem>
+                                            <SelectItem value="support">support</SelectItem>
+                                        </>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-gray-500 mt-2">
+                                Role menentukan hak akses halaman mana saja yang dapat dibuka oleh pengguna.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <Button
+                            variant="outline"
+                            onClick={() => setManageRoleModal({ open: false, user: null })}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            onClick={submitManageRole}
+                            disabled={isManagingRole || !selectedRole}
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                            {isManagingRole ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Menyimpan...
+                                </>
+                            ) : (
+                                "Simpan Role"
+                            )}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

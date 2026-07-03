@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { createAdminClient } from "@/utils/supabase/server"
 import { normalizeUsername } from "@/utils/validation/username"
+
+const QURANI_API_BASE = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
 
 type UpdateUserPayload = {
   username?: string
@@ -31,6 +32,10 @@ export async function PUT(
 ) {
   try {
     const cookieStore = await cookies()
+
+    // Ambil access token dari cookie untuk call Qurani API
+    const accessToken = cookieStore.get("myqurani_access_token")?.value
+
     const userCookie = cookieStore.get("myqurani_user")?.value
     if (!userCookie) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
@@ -51,17 +56,18 @@ export async function PUT(
 
     const body = (await request.json()) as UpdateUserPayload
 
-    const normalizedUsername = typeof body.username === "string" && body.username.trim()
-      ? `@${normalizeUsername(body.username)}`
-      : undefined
+    const normalizedUsername =
+      typeof body.username === "string" && body.username.trim()
+        ? `@${normalizeUsername(body.username)}`
+        : undefined
 
+    // Bangun payload untuk Qurani API
     const updateData: Record<string, unknown> = {}
 
     if (normalizedUsername !== undefined) updateData.username = normalizedUsername
     if (typeof body.name === "string") updateData.name = body.name
     if (typeof body.email === "string") updateData.email = body.email
     if (typeof body.isBlocked === "boolean") updateData.isBlocked = body.isBlocked
-    if (typeof body.role === "string" && body.role.trim()) updateData.role = body.role.trim().toLowerCase()
 
     const countryId = toNullableNumber(body.countryId)
     const stateId = toNullableNumber(body.stateId)
@@ -79,58 +85,49 @@ export async function PUT(
       return NextResponse.json({ success: false, message: "No valid fields to update" }, { status: 400 })
     }
 
-    const supabase = await createAdminClient()
+    // Call Qurani API: PUT /api/v1/Users/{userId}
+    const quranApiResponse = await fetch(`${QURANI_API_BASE}/api/v1/Users/${targetUserId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(updateData),
+    })
 
-    const tryUpdateById = await supabase
-      .from("user_profiles")
-      .update(updateData)
-      .eq("id", targetUserId)
-      .select("*")
-      .maybeSingle()
-
-    if (tryUpdateById.error) {
+    if (!quranApiResponse.ok) {
+      const errorPayload = await quranApiResponse.json().catch(() => null)
+      const errMsg = errorPayload?.message || errorPayload?.title || `Qurani API Error: ${quranApiResponse.status}`
+      console.error("[admin/users PUT] Qurani API error:", quranApiResponse.status, errMsg)
       return NextResponse.json(
-        { success: false, message: tryUpdateById.error.message },
-        { status: 500 }
+        { success: false, message: errMsg },
+        { status: quranApiResponse.status }
       )
     }
 
-    if (tryUpdateById.data) {
-      return NextResponse.json({ success: true, data: tryUpdateById.data })
+    const result = await quranApiResponse.json().catch(() => null)
+
+    // Jika role perlu diubah, panggil endpoint role terpisah
+    if (typeof body.role === "string" && body.role.trim()) {
+      const roleValue = body.role.trim().toLowerCase()
+      try {
+        await fetch(`${QURANI_API_BASE}/api/v1/Users/${targetUserId}/roles`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ role: roleValue }),
+        })
+      } catch (roleErr) {
+        // Role assignment failure non-fatal — log saja
+        console.warn("[admin/users PUT] Role update failed (non-fatal):", roleErr)
+      }
     }
 
-    const previousUsername =
-      typeof body.previousUsername === "string" ? body.previousUsername.trim() : ""
-
-    if (!previousUsername) {
-      return NextResponse.json(
-        { success: false, message: "User profile not found in local database" },
-        { status: 404 }
-      )
-    }
-
-    const tryUpdateByUsername = await supabase
-      .from("user_profiles")
-      .update(updateData)
-      .eq("username", previousUsername)
-      .select("*")
-      .maybeSingle()
-
-    if (tryUpdateByUsername.error) {
-      return NextResponse.json(
-        { success: false, message: tryUpdateByUsername.error.message },
-        { status: 500 }
-      )
-    }
-
-    if (!tryUpdateByUsername.data) {
-      return NextResponse.json(
-        { success: false, message: "User profile not found in local database" },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({ success: true, data: tryUpdateByUsername.data })
+    return NextResponse.json({ success: true, data: result?.data ?? result })
   } catch (error) {
     return NextResponse.json(
       {

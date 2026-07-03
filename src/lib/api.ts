@@ -1029,18 +1029,18 @@ export const rolesApi = {
         apiRequest<any>('/api/v1/Roles/me', { token }),
 
     // Assign a role to a user (Admin only)
-    assign: (userId: number | string, roleId: number | string, token?: string) =>
+    assign: (userId: number | string, roleName: string, token?: string) =>
         apiRequest<any>('/api/v1/Roles/assign', {
             method: 'POST',
-            body: { userId, roleId },
+            body: { userId, roleName },
             token
         }),
 
     // Remove a role from a user (Admin only)
-    remove: (userId: number | string, roleId: number | string, token?: string) =>
+    remove: (userId: number | string, roleName: string, token?: string) =>
         apiRequest<any>('/api/v1/Roles/remove', {
             method: 'POST',
-            body: { userId, roleId },
+            body: { userId, roleName },
             token
         }),
 };

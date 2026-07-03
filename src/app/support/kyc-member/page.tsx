@@ -151,7 +151,7 @@ function KycDetailModal({
     member: KycSubmission
     onClose: () => void
     onStartReview: (id: number) => void
-    onApprove: (id: number) => void
+    onApprove: (id: number, notes: string, riskLevel: string) => void
     onReject: (id: number, reason: string, notes: string) => void
     isProcessing: boolean
 }) {
@@ -162,6 +162,9 @@ function KycDetailModal({
     const [selectedReasons, setSelectedReasons] = useState<string[]>([])
     const [additionalNote, setAdditionalNote] = useState("")
     const [showStartReviewConfirm, setShowStartReviewConfirm] = useState(false)
+    const [showApproveModal, setShowApproveModal] = useState(false)
+    const [approveNotes, setApproveNotes] = useState("")
+    const [approveRisk, setApproveRisk] = useState("low")
 
     const statusInfo = statusConfig[member.status as 0 | 1 | 2 | 3] ?? { label: t("kyc_member.status_unknown"), cls: "bg-gray-100 text-gray-500 border border-gray-200", icon: AlertCircle }
     const StatusIcon = statusInfo.icon
@@ -182,6 +185,12 @@ function KycDetailModal({
         const fullReason = [...selectedReasons, ...(additionalNote.trim() ? [additionalNote] : [])].join(". ")
         onReject(member.id, fullReason, additionalNote)
         setShowRejectModal(false)
+        onClose()
+    }
+
+    const handleConfirmApprove = () => {
+        onApprove(member.id, approveNotes, approveRisk)
+        setShowApproveModal(false)
         onClose()
     }
 
@@ -409,10 +418,6 @@ function KycDetailModal({
                         {t("kyc_member.detail_id")}: #{member.id}
                     </span>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium rounded-xl transition-colors">
-                            <Flag className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("kyc_member.detail_report")}</span>
-                        </button>
-
                         {/* Start Review */}
                         {member.status === 0 && (
                             <button
@@ -425,7 +430,7 @@ function KycDetailModal({
                         )}
 
                         {/* Reject */}
-                        {member.status !== 3 && (
+                        {(member.status === 0 || member.status === 1) && (
                             <button
                                 disabled={isProcessing}
                                 onClick={() => { setSelectedReasons([]); setAdditionalNote(""); setShowRejectModal(true) }}
@@ -436,10 +441,10 @@ function KycDetailModal({
                         )}
 
                         {/* Approve */}
-                        {member.status !== 2 && (
+                        {(member.status === 0 || member.status === 1) && (
                             <button
                                 disabled={isProcessing}
-                                onClick={() => { onApprove(member.id); onClose() }}
+                                onClick={() => { setApproveNotes(""); setApproveRisk("low"); setShowApproveModal(true) }}
                                 className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
                                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                                 <span className="hidden sm:inline">{t("kyc_member.action_approve")}</span>
@@ -469,6 +474,47 @@ function KycDetailModal({
                                 className="px-5 py-2 text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
                                 {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {t("kyc_member.btn_confirm")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approve Modal */}
+            {showApproveModal && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowApproveModal(false)} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-[520px] max-w-full animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Setujui Verifikasi?</h3>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 pl-11">Pilih tingkat risiko dan tambahkan catatan persetujuan.</p>
+                        <div className="space-y-3 mb-4">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1">Tingkat Risiko (Risk Level)</span>
+                            <div className="flex gap-3">
+                                {["low", "medium", "high"].map((risk) => (
+                                    <label key={risk} className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-xl border cursor-pointer transition-colors ${approveRisk === risk ? 'bg-emerald-50/50 border-emerald-300 dark:bg-emerald-900/20 dark:border-emerald-700' : 'border-gray-200 dark:border-gray-700 hover:border-emerald-200'}`}>
+                                        <input type="radio" name="risk" value={risk} checked={approveRisk === risk} onChange={(e) => setApproveRisk(e.target.value)} className="hidden" />
+                                        <span className={`text-sm font-medium capitalize ${approveRisk === risk ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300'}`}>{risk}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-1 mb-5">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1">Catatan Review (Opsional)</span>
+                            <textarea rows={3} value={approveNotes} onChange={e => setApproveNotes(e.target.value)}
+                                placeholder="Masukkan catatan persetujuan jika ada..."
+                                className="w-full px-4 py-3 text-sm border border-gray-100 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none placeholder:text-gray-400" />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowApproveModal(false)} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors">Batal</button>
+                            <button
+                                onClick={handleConfirmApprove}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-all">
+                                <CheckCircle2 className="w-4 h-4" />Konfirmasi Setujui
                             </button>
                         </div>
                     </div>
@@ -735,23 +781,23 @@ function KycMemberContent() {
         }
     }
 
-    const handleApprove = async (id: number) => {
+    const handleApprove = async (id: number, notes: string = "", riskLevel: string = "low") => {
         setIsProcessing(true)
         try {
             if (!isApiData) {
                 // Dummy mode: update local state only
                 const name = items.find(x => x.id === id)?.fullName || `#${id}`
                 await new Promise(r => setTimeout(r, 500))
-                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const } : x))
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const, reviewNotes: notes, riskLevel: riskLevel } : x))
                 addToast(t("kyc_member.toast_approve_ok").replace("{name}", name), "success")
                 return
             }
             const token = getClientToken()
-            const res = await reviewKyc(id, true, null, null, null, token || undefined)
+            const res = await reviewKyc(id, true, null, notes, riskLevel, token || undefined)
             const name = items.find(x => x.id === id)?.fullName || `#${id}`
             if (res.success) {
                 addToast(t("kyc_member.toast_approve_ok").replace("{name}", name), "success")
-                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const } : x))
+                setItems(prev => prev.map(x => x.id === id ? { ...x, status: 2 as const, reviewNotes: notes, riskLevel: riskLevel } : x))
             } else {
                 addToast(t("kyc_member.toast_approve_err").replace("{msg}", res.message), "error")
             }
@@ -1055,8 +1101,10 @@ function KycMemberContent() {
                                                             className="flex-1 py-1.5 text-xs font-medium border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-1">
                                                             <Eye className="w-3.5 h-3.5" />{t("kyc_member.action_view")}
                                                         </button>
-                                                        {member.status !== 2 && (
-                                                            <button onClick={() => handleApprove(member.id)} disabled={isProcessing}
+                                                        {(member.status === 0 || member.status === 1) && (
+                                                            <button onClick={() => { 
+                                                                handleApprove(member.id, "", "low") 
+                                                            }} disabled={isProcessing}
                                                                 className="flex-1 py-1.5 text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1">
                                                                 <CheckCircle2 className="w-3.5 h-3.5" />{t("kyc_member.action_approve")}
                                                             </button>

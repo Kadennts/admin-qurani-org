@@ -147,6 +147,11 @@ const getSidebarData = (
           title: t("navigation.manage_users", "Users"),
           url: "/users/manage",
           icon: UserCog,
+        },
+        {
+          title: t("navigation.roles", "Roles"),
+          url: "/admin/roles",
+          icon: Shield,
         }
       ],
     },
@@ -211,9 +216,14 @@ const getSidebarData = (
           icon: UserCheck,
         },
         {
-          title: t("navigation.trainers", "Guru"),
+          title: t("navigation.trainers", "Guru Aktif"),
           url: "/billing/guru",
           icon: GraduationCap,
+        },
+        {
+          title: t("navigation.trainer_applications", "Pengajuan Guru"),
+          url: "/billing/guru/pengajuan",
+          icon: UserCheck,
         },
         {
           title: t("navigation.packages", "Paket"),

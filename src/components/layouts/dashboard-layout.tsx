@@ -11,6 +11,7 @@ import { SidebarInset } from "@/components/ui/sidebar/custom-sidebar-inset"
 import { SidebarTrigger } from "@/components/ui/sidebar/custom-sidebar-trigger"
 import Image from "next/image"
 import Link from "next/link"
+import { RoleGuard } from "@/components/auth/role-guard"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -125,7 +126,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Content container - dengan padding top yang cukup untuk mobile header */}
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 pt-20 md:pt-7 p-4 lg:px-10 xl:px-10 overflow-hidden md:overflow-visible">
           <div className="h-full md:h-auto lg:pt-0 md:overflow-visible">
-            {children}
+            <RoleGuard>
+              {children}
+            </RoleGuard>
           </div>
         </div>
       </SidebarInset>

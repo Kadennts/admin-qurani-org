@@ -10,10 +10,10 @@ import {
     AlertTriangle, ShieldCheck, User, BadgeCheck, X,
     ExternalLink, Loader2, PlayCircle, LinkIcon, Coins,
     Award, Video, Monitor, MapPinned,
-    GraduationCap, Tag,
+    GraduationCap, Tag, Calendar, Clock,
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
-import pendingDummy from "@/data/pending-trainer-dummy.json"
+import pendingDummies from "@/data/pending-trainers-list.json"
 import { CATEGORY_LIST } from "@/data/categories-data"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ function getClientToken(): string | null {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type TrainerStatus = "verified" | "pending" | "suspended" | "rejected"
+type TrainerStatus = "verified" | "pending" | "suspended" | "rejected" | "seleksi"
 
 type Certification = {
     name: string
@@ -56,6 +56,7 @@ type TrainerDetail = {
     createdAt: string
     portfolioUrls: string[]
     certifications: Certification[]
+    rejectionReason?: string | null
 }
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ const STATUS_CFG: Record<TrainerStatus, { label: string; badge: string; dot: str
     pending:   { label: "Menunggu Verifikasi",   badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",       dot: "bg-amber-500"  },
     suspended: { label: "Nonaktif",              badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",               dot: "bg-red-500"    },
     rejected:  { label: "Ditolak",               badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",           dot: "bg-rose-500"   },
+    seleksi:   { label: "Seleksi",               badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",           dot: "bg-blue-500"   },
 }
 
 const NON_QURANI_PATTERN = /biologi|kimia|fisika|matematika|bahasa inggris|bahasa indonesia|sejarah|ekonomi|akuntansi|komputer|programming|koding/i
@@ -157,6 +159,15 @@ function GuruDetailContent() {
     const [rejectModalOpen, setRejectModalOpen] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
 
+    // ── Seleksi Modal State ────────────────────────────────────────────────────
+    const [seleksiModalOpen, setSeleksiModalOpen] = useState(false)
+    const [sDate, setSDate] = useState("")
+    const [sTime, setSTime] = useState("")
+    const [sMethod, setSMethod] = useState<"online" | "offline">("online")
+    const [sLink, setSLink] = useState("")
+    const [sPenguji, setSPenguji] = useState("")
+    const [sNotes, setSNotes] = useState("")
+
     // ── Fetch detail ──────────────────────────────────────────────────────────
     useEffect(() => {
         if (!id) return
@@ -174,11 +185,29 @@ function GuruDetailContent() {
             })
             .then((json) => {
                 const d = json?.data ?? json
-                const s = String(d.status ?? "pending").toLowerCase()
+                let s = String(d.status ?? "pending").toLowerCase()
+                let rr = d.rejectionReason ?? null
+                try {
+                    const stored = sessionStorage.getItem("pengajuanGuruStatuses")
+                    if (stored) {
+                        const parsed = JSON.parse(stored)
+                        if (parsed[d.id]) {
+                            const st = parsed[d.id]
+                            if (st === "seleksi" || st === "ditolak" || st === "diterima") s = st
+                        }
+                    }
+                    const storedReasons = sessionStorage.getItem("pengajuanGuruRejectReasons")
+                    if (storedReasons) {
+                        const parsed = JSON.parse(storedReasons)
+                        if (parsed[d.id]) rr = parsed[d.id]
+                    }
+                } catch {}
+
                 const validStatus: TrainerStatus =
-                    s === "active" || s === "verified" ? "verified"
+                    s === "active" || s === "verified" || s === "diterima" ? "verified"
                     : s === "suspended" ? "suspended"
-                    : s === "rejected" ? "rejected"
+                    : s === "rejected" || s === "ditolak" ? "rejected"
+                    : s === "seleksi" ? "seleksi"
                     : "pending"
 
                 setDetail({
@@ -201,31 +230,57 @@ function GuruDetailContent() {
                     createdAt: d.createdAt ?? new Date().toISOString(),
                     portfolioUrls: Array.isArray(d.portfolioUrls) ? d.portfolioUrls : [],
                     certifications: Array.isArray(d.certifications) ? d.certifications : [],
+                    rejectionReason: rr,
                 })
             })
             .catch(() => {
                 // Fallback to dummy data
-                if (id === pendingDummy.id) {
+                const dummy = pendingDummies.find(d => d.id === id)
+                if (dummy) {
+                    let ds = "pending"
+                    try {
+                        const stored = sessionStorage.getItem("pengajuanGuruStatuses")
+                        if (stored) {
+                            const parsed = JSON.parse(stored)
+                            if (parsed[dummy.id]) {
+                                const st = parsed[dummy.id]
+                                if (st === "seleksi" || st === "ditolak" || st === "diterima") ds = st
+                            }
+                        }
+                    } catch {}
+                    
+                    const dummyStatus = ds === "diterima" ? "verified" : ds === "ditolak" ? "rejected" : ds === "seleksi" ? "seleksi" : "pending"
+                    
+                    let rr = (dummy as any).rejectionReason ?? null
+                    try {
+                        const storedReasons = sessionStorage.getItem("pengajuanGuruRejectReasons")
+                        if (storedReasons) {
+                            const parsed = JSON.parse(storedReasons)
+                            if (parsed[dummy.id]) rr = parsed[dummy.id]
+                        }
+                    } catch {}
+                    
                     setDetail({
-                        id: pendingDummy.id,
-                        userId: pendingDummy.userId,
-                        userName: pendingDummy.userName,
-                        username: pendingDummy.username,
-                        email: pendingDummy.email,
-                        headline: pendingDummy.headline,
-                        bio: pendingDummy.bio,
-                        location: pendingDummy.location,
-                        experienceYears: pendingDummy.experienceYears,
-                        expertise: pendingDummy.expertise,
-                        categoryIds: pendingDummy.categoryIds ?? [],
-                        isOnline: !!pendingDummy.isOnline,
-                        isOffline: !!pendingDummy.isOffline,
-                        hourlyRate: pendingDummy.hourlyRate,
-                        currency: pendingDummy.currency,
-                        status: "pending",
-                        createdAt: pendingDummy.createdAt,
-                        portfolioUrls: pendingDummy.portfolioUrls,
-                        certifications: pendingDummy.certifications as Certification[],
+                        id: dummy.id,
+                        userId: dummy.userId,
+                        userName: dummy.userName,
+                        username: dummy.username,
+                        email: dummy.email,
+                        headline: dummy.headline,
+                        bio: dummy.bio,
+                        location: dummy.location,
+                        experienceYears: dummy.experienceYears,
+                        expertise: dummy.expertise,
+                        categoryIds: dummy.categoryIds ?? [],
+                        isOnline: !!dummy.isOnline,
+                        isOffline: !!dummy.isOffline,
+                        hourlyRate: dummy.hourlyRate,
+                        currency: dummy.currency,
+                        status: dummyStatus as TrainerStatus,
+                        createdAt: dummy.createdAt,
+                        portfolioUrls: dummy.portfolioUrls,
+                        certifications: dummy.certifications as Certification[],
+                        rejectionReason: rr,
                     })
                 }
             })
@@ -251,12 +306,12 @@ function GuruDetailContent() {
     }, [detail])
 
     // ── Actions ───────────────────────────────────────────────────────────────
-    async function runAction(action: "approve" | "reject") {
+    async function runReject() {
         if (!detail || actionLoading) return
         const token = getClientToken()
         const endpoint = `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
 
-        setActionLoading(action)
+        setActionLoading("reject")
         try {
             const res = await fetch(endpoint, {
                 method: "POST",
@@ -265,37 +320,71 @@ function GuruDetailContent() {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
                 body: JSON.stringify({
-                    approve: action === "approve" ? 1 : 0,
-                    rejectionReason: action === "reject" ? (rejectReason || "Ditolak oleh admin") : null,
+                    approve: 0,
+                    rejectionReason: rejectReason || "Ditolak oleh admin",
                 }),
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
         } catch { /* fallback mock */ } finally {
-            const titleMap = { approve: "Pendaftaran guru diterima", reject: "Pendaftaran guru ditolak" }
             showToast({
-                type: action === "approve" ? "success" : "info",
-                title: titleMap[action],
+                type: "info",
+                title: "Pendaftaran guru ditolak",
                 message: detail.userName,
                 endpoint: `POST /api/v1/Trainers/${detail.id}/review`,
             })
-            const statusMap: Record<typeof action, TrainerStatus> = { approve: "verified", reject: "rejected" }
-            const nextStatus = statusMap[action]
-            setDetail((prev) => prev ? { ...prev, status: nextStatus } : null)
+            setDetail((prev) => prev ? { ...prev, status: "rejected", rejectionReason: rejectReason || "Ditolak oleh admin" } : null)
             setActionLoading(null)
-            
-            // Simpan status ke sessionStorage agar perubahan terlihat di halaman list (terutama untuk data dummy)
             try {
-                const stored = sessionStorage.getItem("guruStatuses")
+                const stored = sessionStorage.getItem("pengajuanGuruStatuses")
                 const statuses = stored ? JSON.parse(stored) : {}
-                statuses[detail.id] = nextStatus
-                sessionStorage.setItem("guruStatuses", JSON.stringify(statuses))
-            } catch {}
+                statuses[detail.id] = "ditolak"
+                sessionStorage.setItem("pengajuanGuruStatuses", JSON.stringify(statuses))
 
-            // Redirect back to "Pendaftar Baru" tab after a short delay
-            setTimeout(() => {
-                router.push("/billing/guru?tab=pendaftar")
-            }, 1000)
+                const storedReasons = sessionStorage.getItem("pengajuanGuruRejectReasons")
+                const reasons = storedReasons ? JSON.parse(storedReasons) : {}
+                reasons[detail.id] = rejectReason || "Ditolak oleh admin"
+                sessionStorage.setItem("pengajuanGuruRejectReasons", JSON.stringify(reasons))
+            } catch {}
+            setTimeout(() => { router.push("/billing/guru/pengajuan") }, 1200)
         }
+    }
+
+    async function handleSubmitSeleksi(e: React.FormEvent) {
+        e.preventDefault()
+        if (!detail) return
+        const token = getClientToken()
+        // 1. Call review approve
+        try {
+            await fetch(`${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ approve: 1, rejectionReason: null }),
+            })
+        } catch { /* mock */ }
+        // 2. Save seleksi data
+        try {
+            const selData = { date: sDate, time: sTime, method: sMethod, link: sLink, penguji: sPenguji, notes: sNotes }
+            const stored = sessionStorage.getItem("pengajuanGuruSeleksi")
+            const selAll = stored ? JSON.parse(stored) : {}
+            selAll[detail.id] = selData
+            sessionStorage.setItem("pengajuanGuruSeleksi", JSON.stringify(selAll))
+        } catch {}
+        // 3. Update status in pengajuan list
+        try {
+            const stored = sessionStorage.getItem("pengajuanGuruStatuses")
+            const statuses = stored ? JSON.parse(stored) : {}
+            statuses[detail.id] = "seleksi"
+            sessionStorage.setItem("pengajuanGuruStatuses", JSON.stringify(statuses))
+        } catch {}
+
+        showToast({
+            type: "success",
+            title: "Diterima – Jadwal Seleksi Dikirim",
+            message: `Email undangan tes dikirim ke ${detail.userName}.`,
+            endpoint: `POST /api/v1/Trainers/${detail.id}/schedule-selection`,
+        })
+        setSeleksiModalOpen(false)
+        setTimeout(() => { router.push("/billing/guru/pengajuan") }, 1200)
     }
 
     async function handleVerifyCredential(cert: Certification) {
@@ -365,7 +454,7 @@ function GuruDetailContent() {
                                 Batal
                             </button>
                             <button
-                                onClick={() => { setRejectModalOpen(false); runAction("reject") }}
+                                onClick={() => { setRejectModalOpen(false); runReject() }}
                                 disabled={!rejectReason.trim()}
                                 className="px-4 py-2 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
                             >
@@ -381,7 +470,7 @@ function GuruDetailContent() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Link
-                            href="/billing/guru?tab=pendaftar"
+                            href="/billing/guru/pengajuan"
                             className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                         >
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -397,6 +486,16 @@ function GuruDetailContent() {
                         </span>
                     )}
                 </div>
+
+                {detail?.status === "rejected" && detail?.rejectionReason && (
+                    <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <h3 className="text-sm font-bold text-rose-800 dark:text-rose-300">Pendaftaran Ditolak</h3>
+                            <p className="text-sm text-rose-700 dark:text-rose-400 mt-1">{detail.rejectionReason}</p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Loading */}
                 {loading ? (
@@ -776,34 +875,133 @@ function GuruDetailContent() {
                             </div>
 
                             {/* Action buttons */}
-                            <div className="px-5 pb-5 flex gap-3">
-                                <button
-                                    onClick={() => runAction("approve")}
-                                    disabled={!!actionLoading}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-bold py-3 transition-colors shadow-sm"
-                                >
-                                    {actionLoading === "approve"
-                                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                                        : <BadgeCheck className="w-4 h-4" />
-                                    }
-                                    Terima Pendaftaran
-                                </button>
-                                <button
-                                    onClick={() => setRejectModalOpen(true)}
-                                    disabled={!!actionLoading}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white text-sm font-bold py-3 transition-colors shadow-sm"
-                                >
-                                    {actionLoading === "reject"
-                                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                                        : <XCircle className="w-4 h-4" />
-                                    }
-                                    Tolak
-                                </button>
-                            </div>
+                            {detail.status === "pending" && (
+                                <div className="px-5 pb-5 flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            // Terima → buka modal jadwal seleksi
+                                            setSDate(""); setSTime(""); setSLink(""); setSPenguji(""); setSNotes("")
+                                            setSMethod("online")
+                                            setSeleksiModalOpen(true)
+                                        }}
+                                        disabled={!!actionLoading}
+                                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-bold py-3 transition-colors shadow-sm"
+                                    >
+                                        {actionLoading === "approve"
+                                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                                            : <BadgeCheck className="w-4 h-4" />
+                                        }
+                                        Terima & Jadwalkan Seleksi
+                                    </button>
+                                    <button
+                                        onClick={() => setRejectModalOpen(true)}
+                                        disabled={!!actionLoading}
+                                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white text-sm font-bold py-3 transition-colors shadow-sm"
+                                    >
+                                        {actionLoading === "reject"
+                                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                                            : <XCircle className="w-4 h-4" />
+                                        }
+                                        Tolak
+                                    </button>
+                                </div>
+                            )}
+                            {detail.status !== "pending" && (
+                                <div className="px-5 pb-5">
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-center border border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Pendaftar ini sudah dalam status <span className="font-bold">{STATUS_CFG[detail.status]?.label}</span>.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
             </div>
+
+            {/* ── Modal Jadwal Seleksi ───────────────────────────────────── */}
+            {seleksiModalOpen && detail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 bg-emerald-50 dark:bg-emerald-900/20 rounded-t-2xl">
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-emerald-500" /> Jadwal Wawancara Seleksi
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-0.5">Pendaftar: <span className="font-bold text-emerald-600 dark:text-emerald-400">{detail.userName}</span></p>
+                                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">Status akan berubah ke <strong>Seleksi</strong> setelah disimpan, dan email dikirim ke pendaftar.</p>
+                            </div>
+                            <button onClick={() => setSeleksiModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-5 overflow-y-auto">
+                            <form id="formSeleksi" onSubmit={handleSubmitSeleksi} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Tanggal Seleksi</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                            <input required type="date" value={sDate} onChange={e => setSDate(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Jam Seleksi</label>
+                                        <div className="relative">
+                                            <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                            <input required type="time" value={sTime} onChange={e => setSTime(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Metode</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button type="button" onClick={() => setSMethod("online")}
+                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${sMethod === "online" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"}`}>
+                                            <Video className="w-4 h-4" /> Online
+                                        </button>
+                                        <button type="button" onClick={() => setSMethod("offline")}
+                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${sMethod === "offline" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"}`}>
+                                            <MapPin className="w-4 h-4" /> Offline
+                                        </button>
+                                    </div>
+                                </div>
+                                {sMethod === "online" ? (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Link Pertemuan (Zoom / Google Meet)</label>
+                                        <input required type="url" value={sLink} onChange={e => setSLink(e.target.value)} placeholder="https://meet.google.com/..."
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Lokasi / Alamat Pertemuan</label>
+                                        <input required type="text" value={sLink} onChange={e => setSLink(e.target.value)}
+                                            placeholder={detail.location || "Jl. Contoh No. 1..."}
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        <p className="text-[11px] text-gray-400 mt-1">Lokasi pendaftar: <span className="font-semibold">{detail.location || "-"}</span></p>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
+                                    <input required type="text" value={sPenguji} onChange={e => setSPenguji(e.target.value)} placeholder="Ustadz Hamid, Tim Qurani"
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Catatan Tambahan</label>
+                                    <textarea value={sNotes} onChange={e => setSNotes(e.target.value)} rows={3}
+                                        placeholder="Persiapkan hafalan surah pendek..."
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                                </div>
+                            </form>
+                        </div>
+                        <div className="flex justify-end gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
+                            <button onClick={() => setSeleksiModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">Batal</button>
+                            <button type="submit" form="formSeleksi" className="px-4 py-2 text-sm font-semibold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2">
+                                <Calendar className="w-4 h-4" /> Simpan & Kirim Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

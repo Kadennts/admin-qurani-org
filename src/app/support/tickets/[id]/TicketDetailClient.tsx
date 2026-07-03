@@ -44,7 +44,7 @@ import { createTicketReply } from "@/utils/api/tickets/insert"
 import { updateTicketStatus, updateTicketPriority, updateTicketDetails } from "@/utils/api/tickets/update"
 import { uploadMultipleAttachments } from "@/utils/api/tickets/upload"
 import { useAuth } from "@/hooks/use-auth"
-import { createClient } from "@/utils/supabase/client"
+// import { createClient } from "@/utils/supabase/client"
 import { type RegularUser } from "@/utils/api/users/fetch-users"
 import { cn } from "@/lib/utils"
 
@@ -274,7 +274,8 @@ export default function TicketDetailClient({
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
 
-    // Realtime subscription
+    // Realtime subscription (Supabase removed to fully use API)
+    /*
     useEffect(() => {
         let supabase
         try {
@@ -335,6 +336,7 @@ export default function TicketDetailClient({
             supabase?.removeChannel(channel)
         }
     }, [ticketId]) // Removed loadTicketon mount
+    */
 
     // Scroll to bottom on mount ONLY
     useEffect(() => {
