@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Edit, Eye, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check, Shield } from "lucide-react"
+import { Search, Edit, Eye, ChevronLeft, ChevronRight, X, User as UserIcon, Mail, Users as UsersIcon, Loader2, Filter, Calendar, Users2, Check, Shield, Wallet } from "lucide-react"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -33,6 +33,7 @@ import {
     usersApi,
     rolesApi,
     masterdataApi,
+    walletApi,
     API_BASE,
     UserData,
     CountryData,
@@ -196,6 +197,63 @@ export default function Users() {
             toast.error('Terjadi kesalahan')
         } finally {
             setIsManagingRole(false)
+        }
+    }
+
+    // Wallet Limits State
+    const [walletModal, setWalletModal] = useState<{ open: boolean; user: UserItem | null }>({ open: false, user: null })
+    const [isSavingWallet, setIsSavingWallet] = useState(false)
+    const [walletForm, setWalletForm] = useState({
+        dailyTopupLimit: 0,
+        dailyWithdrawLimit: 0,
+        dailyTransferLimit: 0,
+        minWithdrawAmount: 0,
+        maxBalance: 0,
+    })
+
+    const handleManageWallet = async (user: UserItem) => {
+        setWalletModal({ open: true, user })
+        try {
+            const result = await walletApi.getWalletByUserId(getUserId(user));
+            const data = result?.data || result;
+            if (data) {
+                setWalletForm({
+                    dailyTopupLimit: data.dailyTopupLimit || 0,
+                    dailyWithdrawLimit: data.dailyWithdrawLimit || 0,
+                    dailyTransferLimit: data.dailyTransferLimit || 0,
+                    minWithdrawAmount: data.minWithdrawAmount || 0,
+                    maxBalance: data.maxBalance || 0,
+                });
+            }
+        } catch (e) {
+            console.error("Error fetching wallet", e);
+            setWalletForm({
+                dailyTopupLimit: 0,
+                dailyWithdrawLimit: 0,
+                dailyTransferLimit: 0,
+                minWithdrawAmount: 0,
+                maxBalance: 0,
+            });
+        }
+    }
+
+    const submitWalletLimits = async () => {
+        if (!walletModal.user) return;
+        setIsSavingWallet(true);
+        try {
+            const result = await walletApi.getWalletByUserId(getUserId(walletModal.user));
+            const data = result?.data || result;
+            if (!data?.id) {
+                toast.error("Wallet not found for this user");
+                return;
+            }
+            await walletApi.updateWalletLimits(data.id, walletForm);
+            toast.success("Wallet limits updated successfully");
+            setWalletModal({ open: false, user: null });
+        } catch (e) {
+            toast.error("Failed to update wallet limits");
+        } finally {
+            setIsSavingWallet(false);
         }
     }
 
@@ -1005,6 +1063,15 @@ export default function Users() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={() => handleManageWallet(user)}
+                                                        title="Limit Wallet"
+                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                                    >
+                                                        <Wallet className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() => handleEdit(getUserId(user))}
                                                         className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                                     >
@@ -1617,6 +1684,96 @@ export default function Users() {
                                 </>
                             ) : (
                                 "Simpan Role"
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manage Wallet Limits Modal */}
+            <Dialog open={walletModal.open} onOpenChange={(open) => !open && setWalletModal({ open: false, user: null })}>
+                <DialogContent className="sm:max-w-md dark:bg-gray-800">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+                            Kelola Limit Wallet
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <Avatar className="w-10 h-10">
+                                <AvatarImage src={walletModal.user ? getAvatarSrc(walletModal.user) || undefined : undefined} />
+                                <AvatarFallback className="bg-blue-100 text-blue-600">
+                                    {walletModal.user?.name ? walletModal.user.name.charAt(0) : 'U'}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="font-semibold text-sm text-gray-900 dark:text-white">{walletModal.user?.name}</p>
+                                <p className="text-xs text-gray-500">{walletModal.user?.username}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Limit Topup Harian</Label>
+                                <Input 
+                                    type="number" 
+                                    value={walletForm.dailyTopupLimit}
+                                    onChange={(e) => setWalletForm({...walletForm, dailyTopupLimit: Number(e.target.value)})}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Limit Withdraw Harian</Label>
+                                <Input 
+                                    type="number" 
+                                    value={walletForm.dailyWithdrawLimit}
+                                    onChange={(e) => setWalletForm({...walletForm, dailyWithdrawLimit: Number(e.target.value)})}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Limit Transfer Harian</Label>
+                                <Input 
+                                    type="number" 
+                                    value={walletForm.dailyTransferLimit}
+                                    onChange={(e) => setWalletForm({...walletForm, dailyTransferLimit: Number(e.target.value)})}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Min. Withdraw Amount</Label>
+                                <Input 
+                                    type="number" 
+                                    value={walletForm.minWithdrawAmount}
+                                    onChange={(e) => setWalletForm({...walletForm, minWithdrawAmount: Number(e.target.value)})}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Maksimal Saldo (Max Balance)</Label>
+                                <Input 
+                                    type="number" 
+                                    value={walletForm.maxBalance}
+                                    onChange={(e) => setWalletForm({...walletForm, maxBalance: Number(e.target.value)})}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <Button
+                            variant="outline"
+                            onClick={() => setWalletModal({ open: false, user: null })}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            onClick={submitWalletLimits}
+                            disabled={isSavingWallet}
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            {isSavingWallet ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Menyimpan...
+                                </>
+                            ) : (
+                                "Simpan Limit"
                             )}
                         </Button>
                     </div>

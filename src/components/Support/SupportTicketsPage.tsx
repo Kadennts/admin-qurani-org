@@ -329,40 +329,56 @@ export default function SupportTicketsPage() {
     };
   }, [statusFilters, priorityFilters, departmentFilters, searchQuery, currentPage, dateRange, loadTickets]);
 
-  // Load stats via client-side API (sama seperti loadTickets agar konsisten)
+  // Load stats by querying the total count for each status
   const loadStats = useCallback(async () => {
     try {
-      const { getStoredAuth } = await import('@/lib/api');
+      const { ticketsApi, getStoredAuth } = await import('@/lib/api');
       const auth = getStoredAuth();
       if (!auth?.accessToken) return;
 
-      const API = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
-      const res = await fetch(`${API}/api/v1/tickets/statuses`, {
-        headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' }
-      });
-      if (!res.ok) return;
+      const statusMap = {
+        open: 1,
+        in_progress: 2,
+        answered: 3,
+        on_hold: 4,
+        closed: 5
+      };
 
-      const json = await res.json();
-      const statusData = json?.data || json || [];
-
-      let totalAll = 0;
       const stats = { all: 0, open: 0, in_progress: 0, answered: 0, on_hold: 0, closed: 0 };
+      
+      // Fetch all status counts concurrently
+      const promises = Object.entries(statusMap).map(async ([key, statusId]) => {
+        try {
+          const result = await ticketsApi.getTickets(
+            { page: 1, pageSize: 1, status: statusId },
+            auth.accessToken
+          );
+          const responseData = result?.data || result;
+          const total = responseData?.pagination?.totalCount || responseData?.totalCount || 0;
+          return { key, total };
+        } catch (e) {
+          return { key, total: 0 };
+        }
+      });
 
-      if (Array.isArray(statusData)) {
-        statusData.forEach((s: any) => {
-          const name = (s.name || '').toLowerCase();
-          const count = s.count || s.total || s.totalCount || s.ticketCount || 0;
-          totalAll += count;
-          if (name === 'open') stats.open = count;
-          else if (name === 'in progress') stats.in_progress = count;
-          else if (name === 'answered') stats.answered = count;
-          else if (name === 'on hold') stats.on_hold = count;
-          else if (name === 'closed') stats.closed = count;
-        });
-        stats.all = totalAll;
-      }
+      // Also get the total count for all tickets
+      const allPromise = ticketsApi.getTickets({ page: 1, pageSize: 1 }, auth.accessToken)
+        .then(result => {
+          const responseData = result?.data || result;
+          return responseData?.pagination?.totalCount || responseData?.totalCount || 0;
+        }).catch(() => 0);
 
-      console.log('[Tickets] Stats (client):', stats);
+      const [statusResults, allCount] = await Promise.all([
+        Promise.all(promises),
+        allPromise
+      ]);
+
+      statusResults.forEach(({ key, total }) => {
+        (stats as any)[key] = total;
+      });
+      stats.all = allCount;
+
+      console.log('[Tickets] Stats (calculated from API):', stats);
       setStatusCounts(stats);
     } catch (e) {
       console.error('[Tickets] loadStats error:', e);

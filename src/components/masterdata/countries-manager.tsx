@@ -324,6 +324,50 @@ export function CountriesManager() {
     const goToPrevPage = () => goToPage(currentPage - 1)
     const goToNextPage = () => goToPage(currentPage + 1)
 
+    // Enrich displayed countries with region and counts
+    useEffect(() => {
+        const enrichDisplayedCountries = async () => {
+            const toEnrich = displayedCountries.filter(c => c.region === undefined || c.statesCount === undefined);
+            if (toEnrich.length === 0) return;
+
+            // Fetch details for countries lacking them
+            const enrichPromises = toEnrich.map(async (country) => {
+                try {
+                    const [detailRes, countsRes] = await Promise.all([
+                        masterdataApi.countries.getById(country.id),
+                        fetch(`/api/masterdata/counts/entities?countryId=${country.id}`)
+                    ]);
+
+                    let region = country.region;
+                    if ('data' in detailRes && detailRes.data) {
+                         const cData = Array.isArray(detailRes.data) ? detailRes.data[0] : detailRes.data;
+                         region = cData?.region || "Unknown";
+                    }
+
+                    const countsJson = countsRes.ok ? await countsRes.json() : null;
+                    const statesCount = countsJson?.data?.states || 0;
+                    const citiesCount = countsJson?.data?.cities || 0;
+
+                    return { id: country.id, region, statesCount, citiesCount };
+                } catch (e) {
+                    return { id: country.id, region: "Unknown", statesCount: 0, citiesCount: 0 };
+                }
+            });
+
+            const enriched = await Promise.all(enrichPromises);
+
+            setCountries(prev => prev.map(c => {
+                const update = enriched.find(e => e.id === c.id);
+                if (update) {
+                    return { ...c, ...update };
+                }
+                return c;
+            }));
+        };
+
+        enrichDisplayedCountries();
+    }, [displayedCountries]);
+
     // Toggle country expansion
     const toggleCountryExpand = useCallback((countryId: number) => {
         setExpandedCountries(prev => {

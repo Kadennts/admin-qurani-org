@@ -27,6 +27,7 @@ import {
   Receipt,
   Wallet,
   MessageSquare,
+  Globe,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -196,6 +197,11 @@ const getSidebarData = (
           icon: Languages,
         },
         {
+          title: t("navigation.timezones", "Timezones"),
+          url: "/master/timezones",
+          icon: Globe,
+        },
+        {
           title: t("navigation.manage_categories", "Group Categories"),
           url: "/groups/categories",
           icon: Tags,
@@ -215,19 +221,26 @@ const getSidebarData = (
           url: "/billing/member-subscription",
           icon: UserCheck,
         },
+      ],
+    },
+    {
+      title: t("navigation.trainers_management", "Trainer Management"),
+      url: "/trainers",
+      icon: GraduationCap,
+      items: [
         {
-          title: t("navigation.trainers", "Guru Aktif"),
-          url: "/billing/guru",
+          title: t("navigation.trainers", "Active Trainers"),
+          url: "/trainers",
           icon: GraduationCap,
         },
         {
-          title: t("navigation.trainer_applications", "Pengajuan Guru"),
-          url: "/billing/guru/pengajuan",
+          title: t("navigation.trainer_applications", "Trainer Applications"),
+          url: "/trainers/applications",
           icon: UserCheck,
         },
         {
-          title: t("navigation.packages", "Paket"),
-          url: "/billing/paket",
+          title: t("navigation.packages", "Packages"),
+          url: "/trainers/packages",
           icon: Package,
         },
       ],

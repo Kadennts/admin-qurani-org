@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/utils/supabase/server";
+
+const QURANI_API_BASE = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,48 +12,50 @@ export async function GET(request: NextRequest) {
         const stateId = searchParams.get('stateId')?.trim() || '';
         const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500);
 
-        if (!q || q.length < 2) {
-            return NextResponse.json({ success: false, error: "Query must be at least 2 characters" }, { status: 400 });
+        if ((!q || q.length < 2) && !stateId && (!countryCode || countryCode === 'All')) {
+            return NextResponse.json({ success: false, error: "Query must be at least 2 characters if no country/state filter is applied" }, { status: 400 });
         }
 
-        const supabase = await createAdminClient();
-
-        let query = supabase
-            .from("cities")
-            .select("*")
-            .ilike("name", `%${q}%`)
-            .limit(limit);
-
+        // Build Qurani API search URL
+        const params = new URLSearchParams({ q, limit: limit.toString() });
         if (stateId && stateId !== 'all') {
-            query = query.eq("state_id", parseInt(stateId));
+            params.set('stateId', stateId);
         } else if (countryCode && countryCode !== 'All') {
-            query = query.eq("country_code", countryCode.toUpperCase());
+            params.set('countryCode', countryCode.toUpperCase());
         }
 
-        const { data, error } = await query.order("name");
+        const res = await fetch(`${QURANI_API_BASE}/api/v1/Cities/search?${params.toString()}`, {
+            headers: { 'Accept': 'application/json' },
+        });
 
-        if (error) throw error;
+        if (!res.ok) throw new Error(`Qurani API error: ${res.status}`);
 
-        // Map snake_case → camelCase to match CityData interface
-        const mapped = (data || []).map((c: any) => ({
+        const json = await res.json();
+        const rawData: any[] = Array.isArray(json?.data) ? json.data : [];
+
+        // Map to CityData interface
+        const mapped = rawData.map((c: any) => ({
             id: c.id,
             name: c.name,
-            stateId: c.state_id,
-            state: c.state_name,
-            stateCode: c.state_code,
-            countryId: c.country_id,
-            country: c.country_name,
-            countryCode: c.country_code,
-            latitude: c.latitude,
-            longitude: c.longitude,
-            native: c.native,
-            timezone: c.timezone,
+            stateId: c.stateId,
+            state: c.state ?? null,
+            stateCode: c.stateCode ?? null,
+            countryId: c.countryId,
+            country: c.country ?? null,
+            countryCode: c.countryCode ?? null,
+            latitude: c.latitude ?? null,
+            longitude: c.longitude ?? null,
+            native: c.native ?? null,
+            timezone: c.timezone ?? null,
         }));
+
+        const totalCount = json?.pagination?.totalCount || json?.data?.pagination?.totalCount || json?.totalCount || mapped.length;
 
         return NextResponse.json({
             success: true,
             data: mapped,
             count: mapped.length,
+            totalCount: totalCount,
         });
 
     } catch (error) {

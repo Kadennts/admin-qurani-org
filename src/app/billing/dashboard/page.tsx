@@ -18,7 +18,7 @@ import {
     ChevronDown,
     Check,
 } from "lucide-react"
-import rawData from "@/data/billing-dummy.json"
+import { paymentsApi, bookingsApi, walletApi } from "@/lib/api"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Payment = {
@@ -67,8 +67,6 @@ type Booking = {
     paymentGateway: string
 }
 
-const allPayments: Payment[] = (rawData as { payments?: Payment[] }).payments ?? []
-const allBookings: Booking[] = (rawData as { bookings?: Booking[] }).bookings ?? []
 
 // ─── Filter Config ────────────────────────────────────────────────────────────
 type FilterKey =
@@ -111,66 +109,70 @@ function getFilterLabel(filter: FilterKey): string {
     }
 }
 
-// ── Slice dummy data differently per filter so data always changes ─────────────
-const FILTER_SLICES: Record<FilterKey, { paymentIdx: number[]; bookingIdx: number[] }> = {
-    all: { paymentIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], bookingIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
-    today: { paymentIdx: [10, 11], bookingIdx: [0] },
-    yesterday: { paymentIdx: [12, 13], bookingIdx: [1] },
-    this_week: { paymentIdx: [10, 11, 12, 13, 14, 15], bookingIdx: [0, 1, 2] },
-    this_month: { paymentIdx: [10, 11, 12, 13, 14, 15], bookingIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
-    this_year: { paymentIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], bookingIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
-    last_week: { paymentIdx: [6, 7, 8, 9], bookingIdx: [3, 4] },
-    last_month: { paymentIdx: [2, 3, 4, 5, 6, 7, 8, 9], bookingIdx: [4, 5, 6, 7] },
-    last_year: { paymentIdx: [4, 5, 9, 16, 17, 18, 19], bookingIdx: [4, 5] },
-    last_7_days: { paymentIdx: [10, 11, 12, 13, 14], bookingIdx: [0, 1, 2] },
-    last_30_days: { paymentIdx: [0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 15], bookingIdx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
-}
 
-function getFilteredData(filter: FilterKey) {
-    const { paymentIdx, bookingIdx } = FILTER_SLICES[filter]
-    return {
-        payments: paymentIdx.map(i => allPayments[i]).filter(Boolean),
-        bookings: bookingIdx.map(i => allBookings[i]).filter(Boolean),
+function getFilterDates(filter: FilterKey) {
+    const now = new Date()
+    let fromDate: Date | undefined
+    let toDate: Date | undefined = new Date()
+
+    switch (filter) {
+        case "all": 
+            fromDate = undefined; 
+            toDate = undefined; 
+            break;
+        case "today": 
+            fromDate = new Date(now.setHours(0,0,0,0)); 
+            break;
+        case "yesterday": 
+            const y = new Date(now); y.setDate(y.getDate() - 1); 
+            fromDate = new Date(y.setHours(0,0,0,0)); 
+            toDate = new Date(y.setHours(23,59,59,999)); 
+            break;
+        case "this_week": {
+            const day = now.getDay(); 
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            fromDate = new Date(now.setDate(diff)); 
+            fromDate.setHours(0,0,0,0);
+            break;
+        }
+        case "this_month": 
+            fromDate = new Date(now.getFullYear(), now.getMonth(), 1); 
+            break;
+        case "this_year": 
+            fromDate = new Date(now.getFullYear(), 0, 1); 
+            break;
+        case "last_week": {
+            const lw = new Date(now);
+            const lwDay = lw.getDay();
+            const lwDiff = lw.getDate() - lwDay - 6;
+            fromDate = new Date(lw.setDate(lwDiff));
+            fromDate.setHours(0,0,0,0);
+            toDate = new Date(fromDate);
+            toDate.setDate(toDate.getDate() + 6);
+            toDate.setHours(23,59,59,999);
+            break;
+        }
+        case "last_month": 
+            fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            toDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+            break;
+        case "last_year": 
+            fromDate = new Date(now.getFullYear() - 1, 0, 1);
+            toDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+            break;
+        case "last_7_days": 
+            fromDate = new Date(now); fromDate.setDate(fromDate.getDate() - 6); fromDate.setHours(0,0,0,0);
+            break;
+        case "last_30_days": 
+            fromDate = new Date(now); fromDate.setDate(fromDate.getDate() - 29); fromDate.setHours(0,0,0,0);
+            break;
+    }
+
+    return { 
+        FromDate: fromDate ? fromDate.toISOString() : undefined, 
+        ToDate: toDate ? toDate.toISOString() : undefined 
     }
 }
-
-// ── Chart groupings per filter ────────────────────────────────────────────────
-function buildChartData(filter: FilterKey, payments: Payment[]) {
-    const completed = payments.filter(p => p.status === "completed")
-    const completed2 = [...completed]
-
-    if (["today", "yesterday"].includes(filter)) {
-        const labels = ["06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]
-        const buckets = labels.map((label, i) => ({
-            label,
-            revenue: completed2[i] ? completed2[i % completed2.length].amount * (0.4 + i * 0.15) : 0
-        }))
-        return buckets
-    }
-    if (["this_week", "last_7_days", "last_week"].includes(filter)) {
-        const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
-        return days.map((label, i) => ({
-            label,
-            revenue: completed2[i % Math.max(completed2.length, 1)]
-                ? completed2[i % completed2.length].amount * (0.5 + i * 0.1)
-                : 0
-        }))
-    }
-    if (["this_month", "last_30_days", "last_month"].includes(filter)) {
-        const weeks = ["W1", "W2", "W3", "W4"]
-        return weeks.map((label, i) => ({
-            label,
-            revenue: completed2.slice(i * 2, i * 2 + 2).reduce((s, p) => s + p.amount, 0)
-        }))
-    }
-    // Year / last_year / all → by month
-    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-    const yearRev = filter === "last_year"
-        ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => completed2[i % Math.max(completed2.length, 1)]?.amount * (0.6 + i * 0.05) || 0)
-        : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => completed2[i % Math.max(completed2.length, 1)]?.amount * (0.8 + i * 0.03) || 0)
-    return months.map((label, i) => ({ label, revenue: Math.round(yearRev[i] || 0) }))
-}
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatRupiah(amount: number) {
@@ -310,52 +312,106 @@ function CircularGauge({ value, max, label, sublabel, color, displayValue }: {
 // ─── Main Content ─────────────────────────────────────────────────────────────
 function BillingDashboardContent() {
     const [activeFilter, setActiveFilter] = useState<FilterKey>("this_month")
-
-    // Get different data slice per filter — data always changes when filter changes
-    const { payments: filteredPayments, bookings: filteredBookings } = useMemo(
-        () => getFilteredData(activeFilter),
-        [activeFilter]
-    )
+    const [loading, setLoading] = useState(false)
+    const [stats, setStats] = useState<any>({
+        totalRevenue: 0,
+        totalPayments: 0,
+        successfulPayments: 0,
+        pendingPayments: 0,
+        failedPayments: 0,
+        pendingRefunds: 0,
+        activeBookings: 0,
+        totalBookings: 0,
+        pendingPayouts: 0,
+        avgTransaction: 0,
+        methodBreakdown: []
+    })
+    const [chartData, setChartData] = useState<Array<{ label: string; revenue: number }>>([])
+    const [filteredPayments, setFilteredPayments] = useState<Payment[]>([])
 
     const label = useMemo(() => getFilterLabel(activeFilter), [activeFilter])
 
-    // Compute stats from filtered slice
-    const stats = useMemo(() => {
-        const completed = filteredPayments.filter(p => p.status === "completed")
-        const pending = filteredPayments.filter(p => p.status === "pending")
-        const failed = filteredPayments.filter(p => p.status === "failed")
-        const refundReq = filteredPayments.filter(p => p.refundRequested)
-        const totalRev = completed.reduce((s, p) => s + p.amount, 0)
-        const activeBook = filteredBookings.filter(b => b.status === "active")
-        const pendingOut = filteredPayments.filter(p => p.status === "completed" && !p.isPaidOut).length
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true)
+            try {
+                const dates = getFilterDates(activeFilter);
+                const params = {
+                    fromDate: dates.FromDate,
+                    toDate: dates.ToDate
+                };
 
-        const methodMap: Record<string, number> = {}
-        completed.forEach(p => { methodMap[p.paymentMethod] = (methodMap[p.paymentMethod] || 0) + p.amount })
-        const totalMethodRev = Object.values(methodMap).reduce((s, v) => s + v, 0) || 1
-        const methodBreakdown = Object.entries(methodMap)
-            .sort((a, b) => b[1] - a[1]).slice(0, 4)
-            .map(([method, amount]) => ({ method, percentage: Math.round((amount / totalMethodRev) * 100), amount }))
+                // Fetch real data from APIs in parallel
+                const [statsRes, analyticsRes, paymentsRes, bookingsStatsRes] = await Promise.allSettled([
+                    paymentsApi.getStats(params),
+                    paymentsApi.getRevenueAnalytics(params),
+                    paymentsApi.search({ ...params, PageSize: 50 }),
+                    bookingsApi.stats({ FromDate: dates.FromDate, ToDate: dates.ToDate })
+                ]);
 
-        return {
-            totalRevenue: totalRev,
-            totalPayments: filteredPayments.length,
-            successfulPayments: completed.length,
-            pendingPayments: pending.length,
-            failedPayments: failed.length,
-            pendingRefunds: refundReq.length,
-            activeBookings: activeBook.length,
-            totalBookings: filteredBookings.length,
-            pendingPayouts: pendingOut,
-            avgTransaction: completed.length > 0 ? Math.round(totalRev / completed.length) : 0,
-            methodBreakdown,
+                let newStats = {
+                    totalRevenue: 0,
+                    totalPayments: 0,
+                    successfulPayments: 0,
+                    pendingPayments: 0,
+                    failedPayments: 0,
+                    pendingRefunds: 0,
+                    activeBookings: 0,
+                    totalBookings: 0,
+                    pendingPayouts: 0,
+                    avgTransaction: 0,
+                    methodBreakdown: []
+                };
+
+                // Map stats
+                if (statsRes.status === 'fulfilled' && statsRes.value) {
+                    const data = statsRes.value.data || statsRes.value;
+                    newStats = {
+                        ...newStats,
+                        totalRevenue: data.totalRevenue || 0,
+                        totalPayments: data.totalPayments || 0,
+                        successfulPayments: data.successfulPayments || 0,
+                        pendingPayments: data.pendingPayments || 0,
+                        failedPayments: data.failedPayments || 0,
+                        pendingRefunds: data.pendingRefunds || 0,
+                        pendingPayouts: data.pendingPayouts || 0,
+                        avgTransaction: data.avgTransaction || 0,
+                        methodBreakdown: data.methodBreakdown || []
+                    };
+                }
+
+                if (bookingsStatsRes.status === 'fulfilled' && bookingsStatsRes.value) {
+                    const data = bookingsStatsRes.value.data || bookingsStatsRes.value;
+                    newStats.activeBookings = data.activeBookings || 0;
+                    newStats.totalBookings = data.totalBookings || 0;
+                }
+                setStats(newStats);
+
+                // Map Chart
+                if (analyticsRes.status === 'fulfilled' && analyticsRes.value) {
+                    const data = analyticsRes.value.data || analyticsRes.value;
+                    setChartData(Array.isArray(data) ? data : []);
+                } else {
+                    setChartData([]);
+                }
+
+                // Map Recent Payments
+                if (paymentsRes.status === 'fulfilled' && paymentsRes.value) {
+                    const data = paymentsRes.value.data?.items || paymentsRes.value.items || paymentsRes.value.data || paymentsRes.value || [];
+                    setFilteredPayments(Array.isArray(data) ? data : []);
+                } else {
+                    setFilteredPayments([]);
+                }
+
+            } catch (e) {
+                console.error("Failed to fetch dashboard data", e);
+            } finally {
+                setLoading(false)
+            }
         }
-    }, [filteredPayments, filteredBookings])
 
-    // Build chart — different grouping per filter period
-    const chartData = useMemo(
-        () => buildChartData(activeFilter, filteredPayments),
-        [activeFilter, filteredPayments]
-    )
+        fetchData();
+    }, [activeFilter])
 
     const successRate = stats.totalPayments > 0
         ? Math.round((stats.successfulPayments / stats.totalPayments) * 100) : 0
@@ -391,7 +447,7 @@ function BillingDashboardContent() {
         : ""
 
     // Recent payments (latest 5)
-    const recentPayments = [...filteredPayments]
+    const recentPayments = [...(filteredPayments || [])]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5)
 
@@ -498,7 +554,7 @@ function BillingDashboardContent() {
                                 </div>
                                 <div className="space-y-2">
                                     {stats.methodBreakdown.length > 0
-                                        ? stats.methodBreakdown.map(m => (
+                                        ? stats.methodBreakdown.map((m: any) => (
                                             <div key={m.method}>
                                                 <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-0.5">
                                                     <span>{m.method}</span>

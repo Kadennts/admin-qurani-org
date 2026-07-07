@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/utils/supabase/server";
 
+const QURANI_API_BASE = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.myqurani.com';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 let _cache: { data: any[]; timestamp: number } | null = null;
 
@@ -25,48 +25,50 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        const supabase = await createAdminClient();
+        // Fetch from Qurani API
+        const res = await fetch(`${QURANI_API_BASE}/api/v1/Countries`, {
+            headers: { 'Accept': 'application/json' },
+            next: { revalidate: 86400 } // 24h revalidate
+        });
 
-        // Fetch from Supabase directly for speed and to get states/cities counts natively
-        const { data: dbData, error } = await supabase
-            .from("countries")
-            .select("*, states(count), cities(count)");
+        if (!res.ok) throw new Error(`Qurani API error: ${res.status}`);
 
-        if (error) throw error;
+        const json = await res.json();
+        const rawData: any[] = json?.data || [];
 
-        // Map snake_case from DB to camelCase for the frontend CountryData interface
-        const mappedData = dbData.map(c => ({
+        // Map API response fields to CountryData interface
+        const mappedData = rawData.map((c: any) => ({
             id: c.id,
             name: c.name,
-            iso3: c.iso3,
-            iso2: c.iso2,
-            numericCode: c.numeric_code,
-            phoneCode: c.phonecode, // notice db is phonecode
-            capital: c.capital,
-            currency: c.currency,
-            currencyName: c.currency_name,
-            currencySymbol: c.currency_symbol,
-            tld: c.tld,
-            native: c.native,
-            population: c.population,
-            gdp: c.gdp,
-            region: c.region,
-            regionId: c.region_id,
-            subregion: c.subregion,
-            subregionId: c.subregion_id,
-            nationality: c.nationality,
-            timezones: c.timezones,
-            latitude: c.latitude,
-            longitude: c.longitude,
-            emoji: c.emoji,
-            emojiU: c.emojiU,
-            flag: c.flag,
-            wikiDataId: c.wikiDataId,
-            statesCount: Array.isArray(c.states) && c.states.length > 0 ? c.states[0].count : 0,
-            citiesCount: Array.isArray(c.cities) && c.cities.length > 0 ? c.cities[0].count : 0,
+            iso3: c.iso3 ?? null,
+            iso2: c.iso2 ?? null,
+            numericCode: c.numericCode ?? null,
+            phoneCode: c.phoneCode ?? null,
+            capital: c.capital ?? null,
+            currency: c.currency ?? null,
+            currencyName: c.currencyName ?? null,
+            currencySymbol: c.currencySymbol ?? null,
+            tld: c.tld ?? null,
+            native: c.native ?? null,
+            population: c.population ?? null,
+            gdp: c.gdp ?? null,
+            region: c.region ?? null,
+            regionId: c.regionId ?? null,
+            subregion: c.subregion ?? null,
+            subregionId: c.subregionId ?? null,
+            nationality: c.nationality ?? null,
+            timezones: c.timezones ?? null,
+            latitude: c.latitude ?? null,
+            longitude: c.longitude ?? null,
+            emoji: c.emoji ?? null,
+            emojiU: c.emojiU ?? null,
+            flag: c.flag ?? 1,
+            // statesCount and citiesCount are not available from this API endpoint
+            statesCount: undefined,
+            citiesCount: undefined,
         }));
 
-        // Sort by ID naturally
+        // Sort by ID
         mappedData.sort((a, b) => a.id - b.id);
 
         // Save to cache

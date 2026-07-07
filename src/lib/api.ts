@@ -1239,12 +1239,6 @@ export interface CitiesApiResponse {
     data: CityData[];
 }
 
-export interface TimezoneData {
-    id: number | string;
-    name: string;
-    offset?: string;
-}
-
 export interface CurrencyData {
     id: number;
     name: string;
@@ -1342,6 +1336,62 @@ export interface LanguageRequest {
     notes?: string | null;
 }
 
+export interface TimezoneData {
+    id: number;
+    code: string;
+    name: string;
+    abbreviation?: string | null;
+    abbreviationDst?: string | null;
+    utcOffset: number;
+    utcOffsetStr: string;
+    dstOffset: number;
+    observesDst: number;
+    currentlyInDst: number;
+    dstStart?: string | null;
+    dstEnd?: string | null;
+    countryCode?: string | null;
+    countries?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    linkedTimezone?: string | null;
+    isActive: number;
+    displayOrder: number;
+    notes?: string | null;
+}
+
+export interface TimezoneRequest {
+    code: string;
+    name: string;
+    abbreviation?: string | null;
+    abbreviationDst?: string | null;
+    utcOffset: number;
+    utcOffsetStr: string;
+    dstOffset: number;
+    observesDst: number;
+    currentlyInDst: number;
+    dstStart?: string | null;
+    dstEnd?: string | null;
+    countryCode?: string | null;
+    countries?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    linkedTimezone?: string | null;
+    isActive: number;
+    displayOrder: number;
+    notes?: string | null;
+}
+
+export interface TimezoneApiResponse {
+    success: boolean;
+    message?: string;
+    data: TimezoneData;
+}
+
+export interface TimezonesApiResponse {
+    success: boolean;
+    message?: string;
+    data: TimezoneData[];
+}
 
 export const masterdataApi = {
     // ========== Countries ==========
@@ -1467,6 +1517,38 @@ export const masterdataApi = {
 
             return json.data as CountryData[];
         },
+    },
+
+    // ========== Timezones ==========
+    timezones: {
+        getAll: (token?: string, signal?: AbortSignal) =>
+            apiRequest<TimezonesApiResponse>('/api/v1/Timezones', { token, signal }),
+        
+        getById: (id: number | string, token?: string, signal?: AbortSignal) =>
+            apiRequest<TimezoneApiResponse>(`/api/v1/Timezones/${id}`, { token, signal }),
+
+        create: (data: TimezoneRequest, token?: string) =>
+            apiRequest<TimezoneApiResponse>('/api/v1/Timezones', {
+                method: 'POST',
+                body: data,
+                token
+            }),
+
+        update: (id: number | string, data: TimezoneRequest, token?: string) =>
+            apiRequest<TimezoneApiResponse>(`/api/v1/Timezones/${id}`, {
+                method: 'PUT',
+                body: data,
+                token
+            }),
+
+        delete: (id: number | string, token?: string) =>
+            apiRequest<{ success: boolean; message: string }>(`/api/v1/Timezones/${id}`, {
+                method: 'DELETE',
+                token
+            }),
+
+        getByCode: (code: string, token?: string, signal?: AbortSignal) =>
+            apiRequest<TimezoneApiResponse>(`/api/v1/Timezones/code/${code}`, { token, signal }),
     },
 
     // ========== States/Provinces ==========
@@ -1643,16 +1725,6 @@ export const masterdataApi = {
         },
     },
 
-    // ========== Timezones ==========
-    timezones: {
-        // Get all timezones
-        getAll: (token?: string) =>
-            apiRequest<TimezoneData[]>('/api/v1/Timezones', { token }),
-
-        // Get timezone by ID
-        getById: (id: number | string, token?: string) =>
-            apiRequest<TimezoneData>(`/api/v1/Timezones/${id}`, { token }),
-    },
 
     // ========== Locales ==========
     locales: {
@@ -2119,6 +2191,44 @@ export const auditApi = {
     // Get audit logs for a specific user
     getUserLogs: (userId: number | string, token?: string, signal?: AbortSignal) =>
         apiRequest<any>(`/api/v1/audit-logs/user/${userId}`, { token, signal }),
+};
+
+// ============================================
+// Bookings API
+// ============================================
+
+export interface BookingSearchParams {
+    UserId?: number | string;
+    TrainerId?: number | string;
+    PackageId?: number | string;
+    Status?: string;
+    FromDate?: string;
+    ToDate?: string;
+    Page?: number | string;
+    PageSize?: number | string;
+}
+
+export const bookingsApi = {
+    // Get booking stats
+    stats: (params: { FromDate?: string; ToDate?: string } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.FromDate) searchParams.append('FromDate', params.FromDate);
+        if (params.ToDate) searchParams.append('ToDate', params.ToDate);
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Bookings/stats${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Search bookings
+    search: (params: BookingSearchParams = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                searchParams.append(key, String(value));
+            }
+        });
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Bookings${query ? `?${query}` : ''}`, { token, signal });
+    }
 };
 
 export { API_BASE };
