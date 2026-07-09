@@ -1679,7 +1679,7 @@ function PaketContent() {
                                             </td>
                                             <td className="min-w-[170px] px-4 py-4">
                                                 {course.trainerId ? (
-                                                    <Link href={`/billing/guru/${course.trainerId}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg transition-colors hover:text-emerald-600">
+                                                    <Link href={`/trainers/${course.trainerId}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg transition-colors hover:text-emerald-600">
                                                         <TrainerAvatar src={course.trainerAvatar} name={course.trainerName} size={32} />
                                                         <span className="truncate text-xs font-bold text-gray-900 hover:underline dark:text-white">{course.trainerName}</span>
                                                     </Link>

@@ -21,7 +21,7 @@ export default function DynamicTitle() {
         "/teman": `Teman | ${APP}`,
         "/tentang": `Tentang | ${APP}`,
         "/billing": `Billing | ${APP}`,
-        "/billing/guru": `Guru | ${APP}`,
+        "/trainers": `Guru | ${APP}`,
         "/billing/paket": `Paket | ${APP}`,
         "/billing/payout": `Payout | ${APP}`,
         "/groups/categories": `Group Categories | ${APP}`,

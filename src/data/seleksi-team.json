@@ -1,0 +1,57 @@
+[
+  {
+    "id": 1,
+    "name": "Ustadz Hamid Al-Hafidz",
+    "role": "Kepala Tim Seleksi",
+    "email": "hamid@qurani.com",
+    "zoomLink": "https://us05web.zoom.us/j/8286064247?pwd=CWNog9Kh0E96B6LYRS0NMerOuOqPQW.1",
+    "specialty": "Tahfidz & Tajwid",
+    "avatar": "HA",
+    "totalSeleksi": 42,
+    "rating": 4.9
+  },
+  {
+    "id": 2,
+    "name": "Ustadzah Siti Aisyah",
+    "role": "Penguji Senior",
+    "email": "siti@qurani.com",
+    "zoomLink": "https://zoom.us/j/85623456789?pwd=def456ghi789",
+    "specialty": "Tartil & Makhraj",
+    "avatar": "SA",
+    "totalSeleksi": 38,
+    "rating": 4.8
+  },
+  {
+    "id": 3,
+    "name": "Ustadz Farid Yusuf",
+    "role": "Penguji",
+    "email": "farid@qurani.com",
+    "zoomLink": "https://meet.google.com/abc-defg-hij",
+    "specialty": "Fiqih & Tafsir",
+    "avatar": "FY",
+    "totalSeleksi": 27,
+    "rating": 4.7
+  },
+  {
+    "id": 4,
+    "name": "Ustadzah Nurul Hidayah",
+    "role": "Penguji",
+    "email": "nurul@qurani.com",
+    "zoomLink": "https://zoom.us/j/76734567890?pwd=ghi789jkl012",
+    "specialty": "Tahsin & Tajwid Dasar",
+    "avatar": "NH",
+    "totalSeleksi": 31,
+    "rating": 4.8
+  },
+  {
+    "id": 5,
+    "name": "Ustadz Bilal Ramadhan",
+    "role": "Penguji Junior",
+    "email": "bilal@qurani.com",
+    "zoomLink": "https://meet.google.com/xyz-uvwx-yz1",
+    "specialty": "Qiroat & Tahfidz",
+    "avatar": "BR",
+    "totalSeleksi": 15,
+    "rating": 4.6
+  }
+]

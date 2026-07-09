@@ -951,7 +951,7 @@ function GuruDetailContent() {
             <div className="max-w-[1320px] mx-auto space-y-4">
                 <div className="flex items-center gap-2">
                     <Link
-                        href="/billing/guru"
+                        href="/trainers"
                         className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />

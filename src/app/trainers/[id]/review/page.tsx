@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
@@ -10,10 +10,11 @@ import {
     AlertTriangle, ShieldCheck, User, BadgeCheck, X,
     ExternalLink, Loader2, PlayCircle, LinkIcon, Coins,
     Award, Video, Monitor, MapPinned,
-    GraduationCap, Tag, Calendar, Clock,
+    GraduationCap, Tag, Calendar, Clock, Search, ChevronDown, Mail, Star, Send, Info
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import pendingDummies from "@/data/pending-trainers-list.json"
+import seleksiTeam from "@/data/seleksi-team.json"
 import { CATEGORY_LIST } from "@/data/categories-data"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -61,11 +62,108 @@ type TrainerDetail = {
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<TrainerStatus, { label: string; badge: string; dot: string }> = {
-    verified:  { label: "Terverifikasi",        badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" },
-    pending:   { label: "Menunggu Verifikasi",   badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",       dot: "bg-amber-500"  },
-    suspended: { label: "Nonaktif",              badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",               dot: "bg-red-500"    },
-    rejected:  { label: "Ditolak",               badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",           dot: "bg-rose-500"   },
-    seleksi:   { label: "Seleksi",               badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",           dot: "bg-blue-500"   },
+    verified: { label: "Terverifikasi", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" },
+    pending: { label: "Menunggu Verifikasi", badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", dot: "bg-amber-500" },
+    suspended: { label: "Nonaktif", badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", dot: "bg-red-500" },
+    rejected: { label: "Ditolak", badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400", dot: "bg-rose-500" },
+    seleksi: { label: "Seleksi", badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", dot: "bg-blue-500" },
+}
+
+// ── Penguji Dropdown ──────────────────────────────────────────────────────────
+type PengujiItem = {
+    id: number; name: string; role: string; email: string;
+    zoomLink: string; specialty: string; avatar: string
+    totalSeleksi: number; rating: number
+}
+
+function PengujiDropdown({
+    value, onSelect
+}: {
+    value: PengujiItem | null
+    onSelect: (p: PengujiItem) => void
+}) {
+    const [open, setOpen] = useState(false)
+    const [search, setSearch] = useState("")
+    const ref = useRef<HTMLDivElement>(null)
+
+    const filtered = useMemo(() => {
+        const q = search.toLowerCase()
+        return (seleksiTeam as PengujiItem[]).filter(p =>
+            !q || p.name.toLowerCase().includes(q) || p.specialty.toLowerCase().includes(q) || p.role.toLowerCase().includes(q)
+        )
+    }, [search])
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener("mousedown", handler)
+        return () => document.removeEventListener("mousedown", handler)
+    }, [])
+
+    return (
+        <div ref={ref} className="relative">
+            <button type="button" onClick={() => setOpen(o => !o)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border rounded-lg transition-all
+                    ${value
+                        ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200"
+                        : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-400"
+                    } focus:ring-2 focus:ring-emerald-500 outline-none`}>
+                {value ? (
+                    <span className="flex items-center gap-2 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                            {value.avatar}
+                        </span>
+                        <span className="font-semibold truncate">{value.name}</span>
+                    </span>
+                ) : (
+                    <span className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>Pilih tim penyeleksi...</span>
+                    </span>
+                )}
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                            <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+                                placeholder="Cari nama atau spesialisasi..."
+                                className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        </div>
+                    </div>
+                    <div className="max-h-52 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                        {filtered.length === 0 ? (
+                            <div className="py-6 text-center text-xs text-gray-400">Tidak ada penyeleksi ditemukan</div>
+                        ) : filtered.map(p => (
+                            <button key={p.id} type="button"
+                                onClick={() => { onSelect(p); setOpen(false); setSearch("") }}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left
+                                    ${value?.id === p.id ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}>
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                    {p.avatar}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{p.name}</p>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{p.role} · {p.specialty}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <div className="flex items-center gap-0.5 text-amber-500">
+                                        <Star className="w-3 h-3 fill-amber-400" />
+                                        <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400">{p.rating}</span>
+                                    </div>
+                                </div>
+                                {value?.id === p.id && <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
 }
 
 const NON_QURANI_PATTERN = /biologi|kimia|fisika|matematika|bahasa inggris|bahasa indonesia|sejarah|ekonomi|akuntansi|komputer|programming|koding/i
@@ -162,11 +260,27 @@ function GuruDetailContent() {
     // ── Seleksi Modal State ────────────────────────────────────────────────────
     const [seleksiModalOpen, setSeleksiModalOpen] = useState(false)
     const [sDate, setSDate] = useState("")
-    const [sTime, setSTime] = useState("")
+    const [sTimeStart, setSTimeStart] = useState("")
+    const [sTimeEnd, setSTimeEnd] = useState("")
     const [sMethod, setSMethod] = useState<"online" | "offline">("online")
     const [sLink, setSLink] = useState("")
-    const [sPenguji, setSPenguji] = useState("")
+    const [sPengujiObj, setSPengujiObj] = useState<PengujiItem | null>(null)
     const [sNotes, setSNotes] = useState("")
+    const [isSendingEmail, setIsSendingEmail] = useState(false)
+    const [emailPreview, setEmailPreview] = useState<{ open: boolean; data: any | null }>({ open: false, data: null })
+
+    // Close modals on ESC
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setRejectModalOpen(false)
+                setSeleksiModalOpen(false)
+                setEmailPreview({ open: false, data: null })
+            }
+        }
+        window.addEventListener("keydown", handleEsc)
+        return () => window.removeEventListener("keydown", handleEsc)
+    }, [])
 
     // ── Fetch detail ──────────────────────────────────────────────────────────
     useEffect(() => {
@@ -201,14 +315,14 @@ function GuruDetailContent() {
                         const parsed = JSON.parse(storedReasons)
                         if (parsed[d.id]) rr = parsed[d.id]
                     }
-                } catch {}
+                } catch { }
 
                 const validStatus: TrainerStatus =
                     s === "active" || s === "verified" || s === "diterima" ? "verified"
-                    : s === "suspended" ? "suspended"
-                    : s === "rejected" || s === "ditolak" ? "rejected"
-                    : s === "seleksi" ? "seleksi"
-                    : "pending"
+                        : s === "suspended" ? "suspended"
+                            : s === "rejected" || s === "ditolak" ? "rejected"
+                                : s === "seleksi" ? "seleksi"
+                                    : "pending"
 
                 setDetail({
                     id: d.id,
@@ -247,10 +361,10 @@ function GuruDetailContent() {
                                 if (st === "seleksi" || st === "ditolak" || st === "diterima") ds = st
                             }
                         }
-                    } catch {}
-                    
+                    } catch { }
+
                     const dummyStatus = ds === "diterima" ? "verified" : ds === "ditolak" ? "rejected" : ds === "seleksi" ? "seleksi" : "pending"
-                    
+
                     let rr = (dummy as any).rejectionReason ?? null
                     try {
                         const storedReasons = sessionStorage.getItem("pengajuanGuruRejectReasons")
@@ -258,8 +372,8 @@ function GuruDetailContent() {
                             const parsed = JSON.parse(storedReasons)
                             if (parsed[dummy.id]) rr = parsed[dummy.id]
                         }
-                    } catch {}
-                    
+                    } catch { }
+
                     setDetail({
                         id: dummy.id,
                         userId: dummy.userId,
@@ -344,14 +458,18 @@ function GuruDetailContent() {
                 const reasons = storedReasons ? JSON.parse(storedReasons) : {}
                 reasons[detail.id] = rejectReason || "Ditolak oleh admin"
                 sessionStorage.setItem("pengajuanGuruRejectReasons", JSON.stringify(reasons))
-            } catch {}
-            setTimeout(() => { router.push("/billing/guru/pengajuan") }, 1200)
+            } catch { }
+            setTimeout(() => { router.push("/trainers/applications") }, 1200)
         }
     }
 
     async function handleSubmitSeleksi(e: React.FormEvent) {
         e.preventDefault()
         if (!detail) return
+        if (!sPengujiObj) {
+            showToast({ type: "error", title: "Pilih Tim Penyeleksi", message: "Harap pilih penguji dari dropdown." })
+            return
+        }
         const token = getClientToken()
         // 1. Call review approve
         try {
@@ -362,29 +480,95 @@ function GuruDetailContent() {
             })
         } catch { /* mock */ }
         // 2. Save seleksi data
+        const selData = {
+            id: `session-${detail.id}`,
+            trainerId: detail.id,
+            trainerName: detail.userName,
+            trainerEmail: detail.email,
+            pengujiId: sPengujiObj.id,
+            pengujiName: sPengujiObj.name,
+            pengujiSpecialty: sPengujiObj.specialty,
+            date: sDate,
+            time: sTimeStart,
+            timeEnd: sTimeEnd,
+            method: sMethod,
+            link: sLink,
+            notes: sNotes,
+            status: "scheduled" as const,
+            trainerResponse: null
+        }
         try {
-            const selData = { date: sDate, time: sTime, method: sMethod, link: sLink, penguji: sPenguji, notes: sNotes }
             const stored = sessionStorage.getItem("pengajuanGuruSeleksi")
             const selAll = stored ? JSON.parse(stored) : {}
             selAll[detail.id] = selData
             sessionStorage.setItem("pengajuanGuruSeleksi", JSON.stringify(selAll))
-        } catch {}
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("sessionStorageChanged"))
+            }
+        } catch { }
         // 3. Update status in pengajuan list
         try {
             const stored = sessionStorage.getItem("pengajuanGuruStatuses")
             const statuses = stored ? JSON.parse(stored) : {}
             statuses[detail.id] = "seleksi"
             sessionStorage.setItem("pengajuanGuruStatuses", JSON.stringify(statuses))
-        } catch {}
+        } catch { }
 
-        showToast({
-            type: "success",
-            title: "Diterima – Jadwal Seleksi Dikirim",
-            message: `Email undangan tes dikirim ke ${detail.userName}.`,
-            endpoint: `POST /api/v1/Trainers/${detail.id}/schedule-selection`,
-        })
         setSeleksiModalOpen(false)
-        setTimeout(() => { router.push("/billing/guru/pengajuan") }, 1200)
+        // Show email preview
+        setEmailPreview({
+            open: true,
+            data: {
+                ...selData,
+                trainerName: detail.userName,
+                trainerEmail: detail.email,
+                trainerId: detail.id,
+            }
+        })
+    }
+
+    async function handleSendEmail() {
+        if (!emailPreview.data || !detail) return
+        setIsSendingEmail(true)
+        try {
+            const res = await fetch("/api/send-selection-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    trainerName: emailPreview.data.trainerName,
+                    trainerEmail: emailPreview.data.trainerEmail,
+                    date: emailPreview.data.date,
+                    time: emailPreview.data.time,
+                    timeEnd: emailPreview.data.timeEnd,
+                    duration: emailPreview.data.duration || "-",
+                    method: emailPreview.data.method,
+                    link: emailPreview.data.link,
+                    pengujiName: emailPreview.data.pengujiName,
+                    pengujiSpecialty: emailPreview.data.pengujiSpecialty,
+                    notes: emailPreview.data.notes,
+                    trainerId: emailPreview.data.trainerId,
+                }),
+            })
+            const result = await res.json()
+            if (result.success) {
+                showToast({
+                    type: "success",
+                    title: result.mock ? "Jadwal Tersimpan (Email Disimulasi)" : "📧 Email Terkirim!",
+                    message: result.mock
+                        ? `Data tersimpan. Email ke ${emailPreview.data.trainerEmail} akan aktif setelah Gmail dikonfigurasi.`
+                        : `Email undangan seleksi dikirim ke ${result.recipient}.`,
+                    endpoint: `POST /api/send-selection-email`,
+                })
+            } else {
+                showToast({ type: "error", title: "Gagal Kirim Email", message: result.error || "Terjadi kesalahan." })
+            }
+        } catch {
+            showToast({ type: "error", title: "Gagal Kirim Email", message: "Network error." })
+        } finally {
+            setIsSendingEmail(false)
+            setEmailPreview({ open: false, data: null })
+            setTimeout(() => { router.push("/trainers/applications") }, 1200)
+        }
     }
 
     async function handleVerifyCredential(cert: Certification) {
@@ -470,7 +654,7 @@ function GuruDetailContent() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Link
-                            href="/billing/guru/pengajuan"
+                            href="/trainers/applications"
                             className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                         >
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -618,17 +802,15 @@ function GuruDetailContent() {
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         {/* Online Card */}
-                                        <div className={`rounded-xl border-2 p-3.5 transition-colors ${
-                                            detail.isOnline
+                                        <div className={`rounded-xl border-2 p-3.5 transition-colors ${detail.isOnline
                                                 ? "border-emerald-400 bg-emerald-50/70 dark:bg-emerald-900/15 dark:border-emerald-700"
                                                 : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/30 opacity-50"
-                                        }`}>
+                                            }`}>
                                             <div className="flex items-start gap-2">
-                                                <div className={`w-4 h-4 mt-0.5 flex-shrink-0 border flex items-center justify-center rounded ${
-                                                    detail.isOnline
+                                                <div className={`w-4 h-4 mt-0.5 flex-shrink-0 border flex items-center justify-center rounded ${detail.isOnline
                                                         ? "border-emerald-500 bg-emerald-500"
                                                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                                                }`}>
+                                                    }`}>
                                                     {detail.isOnline && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                                 </div>
                                                 <div>
@@ -642,17 +824,15 @@ function GuruDetailContent() {
                                         </div>
 
                                         {/* Offline Card */}
-                                        <div className={`rounded-xl border-2 p-3.5 transition-colors ${
-                                            detail.isOffline
+                                        <div className={`rounded-xl border-2 p-3.5 transition-colors ${detail.isOffline
                                                 ? "border-emerald-400 bg-emerald-50/70 dark:bg-emerald-900/15 dark:border-emerald-700"
                                                 : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/30 opacity-50"
-                                        }`}>
+                                            }`}>
                                             <div className="flex items-start gap-2">
-                                                <div className={`w-4 h-4 mt-0.5 flex-shrink-0 border flex items-center justify-center rounded ${
-                                                    detail.isOffline
+                                                <div className={`w-4 h-4 mt-0.5 flex-shrink-0 border flex items-center justify-center rounded ${detail.isOffline
                                                         ? "border-emerald-500 bg-emerald-500"
                                                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                                                }`}>
+                                                    }`}>
                                                     {detail.isOffline && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                                 </div>
                                                 <div>
@@ -842,7 +1022,7 @@ function GuruDetailContent() {
                             <div className={`px-5 py-4 border-b ${allRequiredOk
                                 ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-900/15 dark:border-emerald-900/30"
                                 : "bg-amber-50 border-amber-100 dark:bg-amber-900/15 dark:border-amber-900/30"
-                            }`}>
+                                }`}>
                                 <h3 className={`text-sm font-bold ${allRequiredOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>
                                     Keputusan Verifikasi
                                 </h3>
@@ -880,7 +1060,7 @@ function GuruDetailContent() {
                                     <button
                                         onClick={() => {
                                             // Terima → buka modal jadwal seleksi
-                                            setSDate(""); setSTime(""); setSLink(""); setSPenguji(""); setSNotes("")
+                                            setSDate(""); setSTimeStart(""); setSTimeEnd(""); setSLink(""); setSPengujiObj(null); setSNotes("")
                                             setSMethod("online")
                                             setSeleksiModalOpen(true)
                                         }}
@@ -927,64 +1107,101 @@ function GuruDetailContent() {
                                 <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <Calendar className="w-5 h-5 text-emerald-500" /> Jadwal Wawancara Seleksi
                                 </h2>
-                                <p className="text-xs text-gray-500 mt-0.5">Pendaftar: <span className="font-bold text-emerald-600 dark:text-emerald-400">{detail.userName}</span></p>
-                                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">Status akan berubah ke <strong>Seleksi</strong> setelah disimpan, dan email dikirim ke pendaftar.</p>
                             </div>
                             <button onClick={() => setSeleksiModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="p-5 overflow-y-auto">
+                        <div className="p-5 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
                             <form id="formSeleksi" onSubmit={handleSubmitSeleksi} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Tanggal Seleksi</label>
-                                        <div className="relative">
-                                            <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                                            <input required type="date" value={sDate} onChange={e => setSDate(e.target.value)}
-                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                        </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Tanggal Seleksi</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                        <input required type="date" value={sDate} onChange={e => setSDate(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Jam Seleksi</label>
-                                        <div className="relative">
+                                </div>
+                                {/* Waktu Seleksi – range */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Waktu Seleksi</label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex-1">
                                             <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                                            <input required type="time" value={sTime} onChange={e => setSTime(e.target.value)}
+                                            <input required type="time" value={sTimeStart} onChange={e => setSTimeStart(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        </div>
+                                        <span className="text-gray-400 font-bold flex-shrink-0 text-base">—</span>
+                                        <div className="relative flex-1">
+                                            <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                            <input required type="time" value={sTimeEnd} onChange={e => setSTimeEnd(e.target.value)}
                                                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
                                         </div>
                                     </div>
+                                    {sTimeStart && sTimeEnd && (() => {
+                                        const [h1, m1] = sTimeStart.split(":").map(Number)
+                                        const [h2, m2] = sTimeEnd.split(":").map(Number)
+                                        const total = (h2 * 60 + m2) - (h1 * 60 + m1)
+                                        if (total <= 0) return null
+                                        const hrs = Math.floor(total / 60); const mins = total % 60
+                                        const label = hrs > 0 ? `${hrs} jam${mins > 0 ? ` ${mins} menit` : ""}` : `${mins} menit`
+                                        return <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Durasi: {label}</p>
+                                    })()}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Metode</label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button type="button" onClick={() => setSMethod("online")}
+                                        <button type="button" onClick={() => {
+                                            setSMethod("online");
+                                            if (sPengujiObj) setSLink(sPengujiObj.zoomLink);
+                                        }}
                                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${sMethod === "online" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"}`}>
                                             <Video className="w-4 h-4" /> Online
                                         </button>
-                                        <button type="button" onClick={() => setSMethod("offline")}
+                                        <button type="button" onClick={() => {
+                                            setSMethod("offline");
+                                            setSLink("");
+                                        }}
                                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${sMethod === "offline" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"}`}>
                                             <MapPin className="w-4 h-4" /> Offline
                                         </button>
                                     </div>
                                 </div>
+                                {/* Penguji */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
+                                    <PengujiDropdown value={sPengujiObj} onSelect={(p) => {
+                                        setSPengujiObj(p);
+                                        if (sMethod === "online") setSLink(p.zoomLink);
+                                    }} />
+                                    {sPengujiObj && (
+                                        <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                            <Mail className="w-3 h-3" />
+                                            <span>{sPengujiObj.email}</span>
+                                            <span>·</span>
+                                            <span>{sPengujiObj.specialty}</span>
+                                        </div>
+                                    )}
+                                </div>
                                 {sMethod === "online" ? (
                                     <div>
                                         <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Link Pertemuan (Zoom / Google Meet)</label>
-                                        <input required type="url" value={sLink} onChange={e => setSLink(e.target.value)} placeholder="https://meet.google.com/..."
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        <div className="relative">
+                                            <Video className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                            <input required type="url" value={sLink} onChange={e => setSLink(e.target.value)} placeholder="https://zoom.us/j/..."
+                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        </div>
                                     </div>
                                 ) : (
                                     <div>
                                         <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Lokasi / Alamat Pertemuan</label>
-                                        <input required type="text" value={sLink} onChange={e => setSLink(e.target.value)}
-                                            placeholder={detail.location || "Jl. Contoh No. 1..."}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                            <input required type="text" value={sLink} onChange={e => setSLink(e.target.value)}
+                                                placeholder={detail.location || "Jl. Contoh No. 1..."}
+                                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        </div>
                                         <p className="text-[11px] text-gray-400 mt-1">Lokasi pendaftar: <span className="font-semibold">{detail.location || "-"}</span></p>
                                     </div>
                                 )}
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
-                                    <input required type="text" value={sPenguji} onChange={e => setSPenguji(e.target.value)} placeholder="Ustadz Hamid, Tim Qurani"
-                                        className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Catatan Tambahan</label>
                                     <textarea value={sNotes} onChange={e => setSNotes(e.target.value)} rows={3}
@@ -996,7 +1213,94 @@ function GuruDetailContent() {
                         <div className="flex justify-end gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
                             <button onClick={() => setSeleksiModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">Batal</button>
                             <button type="submit" form="formSeleksi" className="px-4 py-2 text-sm font-semibold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> Simpan & Kirim Email
+                                <Send className="w-4 h-4" /> Lanjut & Kirim Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Modal: Preview Email Konfirmasi ───────────────────────── */}
+            {emailPreview.open && emailPreview.data && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 bg-emerald-50 dark:bg-emerald-900/20 rounded-t-2xl">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center">
+                                    <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">Konfirmasi Kirim Email</h2>
+                                    <p className="text-[11px] text-gray-500">Notifikasi ke calon guru</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setEmailPreview({ open: false, data: null })} className="text-gray-400 hover:text-gray-600 p-1">
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-5 overflow-y-auto space-y-4">
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 space-y-2.5">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ringkasan Email yang Akan Dikirim</p>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex items-start gap-2">
+                                        <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <span className="text-[10px] text-gray-400 block">Penerima</span>
+                                            <span className="font-semibold text-gray-800 dark:text-white">{emailPreview.data.trainerName}</span>
+                                            <span className="text-gray-500 dark:text-gray-400 ml-1 text-xs">({emailPreview.data.trainerEmail})</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <Calendar className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <span className="text-[10px] text-gray-400 block">Jadwal</span>
+                                            <span className="font-semibold text-gray-800 dark:text-white">
+                                                {emailPreview.data.date} · {emailPreview.data.time}
+                                                {emailPreview.data.duration && <span className="text-gray-500 ml-1">({emailPreview.data.duration})</span>}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        {emailPreview.data.method === "online"
+                                            ? <Video className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                            : <MapPin className="w-3.5 h-3.5 text-rose-400 mt-0.5 flex-shrink-0" />
+                                        }
+                                        <div>
+                                            <span className="text-[10px] text-gray-400 block">Metode & Link</span>
+                                            <span className="font-semibold text-gray-800 dark:text-white capitalize">{emailPreview.data.method}</span>
+                                            <span className="text-emerald-600 dark:text-emerald-400 ml-1 text-xs break-all">{emailPreview.data.link}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <Star className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <span className="text-[10px] text-gray-400 block">Penguji</span>
+                                            <span className="font-semibold text-gray-800 dark:text-white">{emailPreview.data.pengujiName}</span>
+                                            <span className="text-gray-500 dark:text-gray-400 ml-1 text-xs">({emailPreview.data.pengujiSpecialty})</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+                                <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                                    Email akan berisi tombol <strong>Konfirmasi Hadir</strong> dan <strong>Minta Reschedule</strong> untuk calon guru.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
+                            <button onClick={() => setEmailPreview({ open: false, data: null })}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">
+                                Lewati
+                            </button>
+                            <button onClick={handleSendEmail} disabled={isSendingEmail}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors disabled:opacity-60">
+                                {isSendingEmail
+                                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengirim...</>
+                                    : <><Send className="w-4 h-4" /> Kirim Email Sekarang</>
+                                }
                             </button>
                         </div>
                     </div>

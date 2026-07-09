@@ -4,10 +4,14 @@
     "userId": 8888,
     "userName": "Ustadz irwan",
     "username": "ustadzpercobaan",
-    "email": "ustadzpercobaan@example.com",
+    "email": "elshoegaze@gmail.com",
     "headline": "Pengajar Tahsin & Tajwid Bersertifikat",
     "bio": "Lulusan Universitas Islam dengan pengalaman mengajar 5 tahun. Spesialisasi dalam perbaikan makhraj dan tajwid.",
-    "expertise": ["Tahsin", "Tajwid", "Tafsir"],
+    "expertise": [
+      "Tahsin",
+      "Tajwid",
+      "Tafsir"
+    ],
     "certifications": [
       {
         "name": "Sertifikasi Pengajar Al-Qur'an Metode Qiroati",
@@ -28,7 +32,10 @@
     "isOnline": 1,
     "isOffline": 1,
     "location": "Jakarta Selatan, Indonesia",
-    "categoryIds": [1, 2],
+    "categoryIds": [
+      1,
+      2
+    ],
     "status": "pending",
     "createdAt": "2026-06-16T10:00:00Z"
   },
@@ -40,7 +47,10 @@
     "email": "syarif@example.com",
     "headline": "Pengajar Tahfidz Al-Qur'an",
     "bio": "Berpengalaman mengajar Tahfidz Al-Qur'an selama lebih dari 10 tahun.",
-    "expertise": ["Tahfidz", "Tahsin"],
+    "expertise": [
+      "Tahfidz",
+      "Tahsin"
+    ],
     "certifications": [
       {
         "name": "Syahadah Tahfidz 30 Juz",
@@ -60,7 +70,9 @@
     "isOnline": 1,
     "isOffline": 0,
     "location": "Bandung, Jawa Barat",
-    "categoryIds": [1],
+    "categoryIds": [
+      1
+    ],
     "status": "pending",
     "createdAt": "2026-06-22T09:15:00Z"
   },
@@ -69,10 +81,13 @@
     "userId": 7002,
     "userName": "Ustadzah Fatimah Azzahra",
     "username": "fatimahaqlam",
-    "email": "fatimah@example.com",
+    "email": "alvia.rpl2@gmail.com",
     "headline": "Pengajar Tartil & Makhraj",
     "bio": "Fokus pada pengajaran Tartil dan perbaikan Makharijul Huruf untuk pemula.",
-    "expertise": ["Tartil", "Makhraj"],
+    "expertise": [
+      "Tartil",
+      "Makhraj"
+    ],
     "certifications": [
       {
         "name": "Sertifikasi Metode Ummi",
@@ -90,7 +105,10 @@
     "isOnline": 0,
     "isOffline": 1,
     "location": "Surabaya, Jawa Timur",
-    "categoryIds": [2, 3],
+    "categoryIds": [
+      2,
+      3
+    ],
     "status": "pending",
     "createdAt": "2026-06-20T13:00:00Z"
   },
@@ -102,7 +120,10 @@
     "email": "rizal@example.com",
     "headline": "Pengajar Tajwid Metode Ummi",
     "bio": "Lulusan S1 Pendidikan Agama Islam. Spesialisasi mengajar dengan metode Ummi yang menyenangkan.",
-    "expertise": ["Tajwid", "Fiqih"],
+    "expertise": [
+      "Tajwid",
+      "Fiqih"
+    ],
     "certifications": [
       {
         "name": "Pelatihan Guru Al-Qur'an Tersertifikasi",
@@ -122,7 +143,10 @@
     "isOnline": 1,
     "isOffline": 1,
     "location": "Yogyakarta, DIY",
-    "categoryIds": [2, 4],
+    "categoryIds": [
+      2,
+      4
+    ],
     "status": "batal",
     "createdAt": "2026-06-18T10:30:00Z"
   }

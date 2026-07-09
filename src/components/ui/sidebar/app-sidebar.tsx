@@ -28,6 +28,7 @@ import {
   Wallet,
   MessageSquare,
   Globe,
+  CalendarDays,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -234,9 +235,14 @@ const getSidebarData = (
           icon: GraduationCap,
         },
         {
-          title: t("navigation.trainer_applications", "Trainer Applications"),
+          title: t("navigation.trainer_applications", "Pengajuan Guru"),
           url: "/trainers/applications",
           icon: UserCheck,
+        },
+        {
+          title: t("navigation.trainer_calendar", "Kalender Seleksi"),
+          url: "/trainers/calendar",
+          icon: CalendarDays,
         },
         {
           title: t("navigation.packages", "Packages"),
