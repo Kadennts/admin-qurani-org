@@ -22,7 +22,7 @@ import { Tooltip } from "@/components/ui/sidebar/custom-tooltip"
 import { useSidebar } from "@/components/ui/sidebar/custom-sidebar"
 import { NotificationIconWrapper } from "@/components/ui/notification-badge"
 import { useAuth } from "@/hooks/use-auth"
-import { useNotifications } from "@/hooks/use-notifications"
+import { useUnreadCount } from "@/hooks/use-notifications"
 import { usePWAInstall } from "@/hooks/use-pwa-install"
 
 type NavItem = {
@@ -47,8 +47,7 @@ export const NavMain = React.memo(function NavMain({
   const [mounted, setMounted] = useState(false)
   const isCollapsed = mounted ? (state === "collapsed" && !isMobile) : false // Di mobile, tidak pernah collapsed
   const { user, userId } = useAuth()
-  const { notifications } = useNotifications(userId)
-  const unreadCount = notifications?.filter((n: { is_read: boolean }) => !n.is_read)?.length || 0
+  const { unreadCount } = useUnreadCount(userId)
   const [hasVisitedNotifications, setHasVisitedNotifications] = useState(false)
 
   // PWA Install hook

@@ -1046,6 +1046,160 @@ export const rolesApi = {
 };
 
 // ============================================
+// Permissions API (/api/v1/permissions)
+// ============================================
+
+export interface PermissionData {
+    id: number;
+    name: string;
+    displayName?: string | null;
+    description?: string | null;
+    category: string;
+}
+
+export const permissionsApi = {
+    // GET /api/v1/permissions — Ambil semua permissions
+    getAll: (token?: string) =>
+        apiRequest<any>('/api/v1/permissions', { token }),
+
+    // POST /api/v1/permissions — Buat permission baru (Admin only)
+    create: (data: { name: string; displayName?: string | null; description?: string | null; category?: string | null }, token?: string) =>
+        apiRequest<any>('/api/v1/permissions', {
+            method: 'POST',
+            body: data,
+            token,
+        }),
+
+    // GET /api/v1/permissions/by-category — Permission dikelompokkan per kategori
+    getByCategory: (token?: string) =>
+        apiRequest<any>('/api/v1/permissions/by-category', { token }),
+
+    // GET /api/v1/permissions/categories — Daftar semua kategori
+    getCategories: (token?: string) =>
+        apiRequest<any>('/api/v1/permissions/categories', { token }),
+
+    // GET /api/v1/permissions/check/{permissionName} — Cek apakah user punya permission
+    check: (permissionName: string, token?: string) =>
+        apiRequest<any>(`/api/v1/permissions/check/${permissionName}`, { token }),
+
+    // GET /api/v1/permissions/me — Permission milik user saat ini
+    getMine: (token?: string) =>
+        apiRequest<any>('/api/v1/permissions/me', { token }),
+
+    // GET /api/v1/permissions/role/{roleId} — Permission untuk role tertentu
+    getForRole: (roleId: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/permissions/role/${roleId}`, { token }),
+
+    // POST /api/v1/permissions/role/{roleId} — Assign permission ke role
+    assignToRole: (roleId: number | string, permissionId: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/permissions/role/${roleId}`, {
+            method: 'POST',
+            body: { permissionId },
+            token,
+        }),
+
+    // DELETE /api/v1/permissions/role/{roleId} — Hapus permission dari role
+    removeFromRole: (roleId: number | string, permissionId: number | string, token?: string) =>
+        apiRequest<any>(`/api/v1/permissions/role/${roleId}`, {
+            method: 'DELETE',
+            body: { permissionId },
+            token,
+        }),
+};
+
+// ============================================
+// Notifications API (from Swagger screenshots)
+// ============================================
+
+export const notificationsApi = {
+    // GET /api/v1/Notifications/searchCursor
+    getWithCursor: (params: { cursor?: string, pageSize?: number, type?: string, category?: string, isRead?: boolean } = {}, token?: string) => {
+        const queryParams = new URLSearchParams();
+        if (params.cursor) queryParams.append('Cursor', params.cursor);
+        if (params.pageSize) queryParams.append('PageSize', params.pageSize.toString());
+        if (params.type) queryParams.append('Type', params.type);
+        if (params.category) queryParams.append('Category', params.category);
+        if (params.isRead !== undefined) queryParams.append('IsRead', String(params.isRead));
+        const qs = queryParams.toString();
+        return apiRequest<any>(`/api/v1/Notifications/searchCursor${qs ? `?${qs}` : ''}`, { token });
+    },
+
+    // GET /api/v1/Notifications/unread-count
+    getUnreadCount: (token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/unread-count', { token }),
+
+    // POST /api/v1/Notifications/{id}/read
+    markAsRead: (id: string | number, token?: string) =>
+        apiRequest<any>(`/api/v1/Notifications/${id}/read`, { method: 'POST', token }),
+
+    // POST /api/v1/Notifications/read-all
+    markAllAsRead: (token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/read-all', { method: 'POST', token }),
+
+    // DELETE /api/v1/Notifications/{id}
+    delete: (id: string | number, token?: string) =>
+        apiRequest<any>(`/api/v1/Notifications/${id}`, { method: 'DELETE', token }),
+
+    // DELETE /api/v1/Notifications (Clear all or delete multiple)
+    deleteMultiple: (ids?: (string | number)[], token?: string) => {
+        return apiRequest<any>('/api/v1/Notifications', { 
+            method: 'DELETE', 
+            body: ids ? { notificationIds: ids } : undefined,
+            token 
+        })
+    },
+
+    // DELETE /api/v1/Notifications/clear-all
+    // Menghapus SEMUA notifikasi milik user yang sedang login
+    clearAll: (token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/clear-all', { method: 'DELETE', token }),
+
+    // POST /api/v1/Notifications/send (Admin only)
+    // Mengirim notifikasi ke user tertentu atau secara broadcast
+    send: (payload: {
+        userIds?: number[] | null;
+        targetFilter?: {
+            platform?: string | null;
+            countryCode?: string | null;
+            locale?: string | null;
+            minAppVersion?: string | null;
+            topic?: string | null;
+        } | null;
+        title: string;
+        message: string;
+        type?: string;
+        priority?: string;
+        category?: string;
+        imageUrl?: string | null;
+        actionUrl?: string | null;
+        actionData?: string | null;
+        actionButtons?: {
+            id: string;
+            title: string;
+            url?: string | null;
+            action?: string | null;
+        }[];
+        channels?: string[];
+        scheduledAt?: string | null;
+        expiresAt?: string | null;
+    }, token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/send', {
+            method: 'POST',
+            body: payload,
+            token,
+        }),
+
+    // POST /api/v1/Notifications/test-push (Admin only)
+    testPush: (token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/test-push', { method: 'POST', token }),
+
+    // GET /api/v1/Notifications/preferences
+    getPreferences: (token?: string) =>
+        apiRequest<any>('/api/v1/Notifications/preferences', { token }),
+};
+
+
+// ============================================
 // Masterdata API (from /openapi/masterdata.json)
 // ============================================
 

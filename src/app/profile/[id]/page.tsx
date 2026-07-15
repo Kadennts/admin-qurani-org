@@ -85,6 +85,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { generateId } from "@/lib/generateId"
 import { createReport } from "@/utils/api/reports/insert"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
 
 type FriendStatus = "friends" | "pending_sent" | "pending_received" | "not_friends" | null;
 
@@ -2904,16 +2905,7 @@ function UserProfileContent() {
 }
 
 function LoadingFallback() {
-  const { t } = useI18n()
-
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-slate-600 dark:text-slate-400">{t('common.loading', 'Loading...')}</p>
-      </div>
-    </div>
-  )
+  return <SkeletonDetailPage showAvatar infoRows={6} />
 }
 
 export default function UserProfilePage() {

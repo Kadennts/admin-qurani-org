@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
-import { useNotifications } from "@/hooks/use-notifications"
+import { useUnreadCount } from "@/hooks/use-notifications"
 import { AppSidebar } from "@/components/ui/sidebar/app-sidebar"
 import { SidebarProvider } from "@/components/ui/sidebar/custom-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar/custom-sidebar-inset"
@@ -21,8 +21,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { loading, isAuthenticated, userId } = useAuth()
-  const { notifications } = useNotifications(isAuthenticated ? userId : undefined)
-  const unreadCount = notifications?.filter((n: { is_read: boolean }) => !n.is_read)?.length || 0
+  const { unreadCount } = useUnreadCount(isAuthenticated ? userId : undefined)
   const [hasVisitedNotifications, setHasVisitedNotifications] = useState(false)
 
   // Cek apakah user sedang di halaman notifikasi

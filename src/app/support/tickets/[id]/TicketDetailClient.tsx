@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     ArrowLeft,
     Send,
@@ -1031,12 +1032,7 @@ export default function TicketDetailClient({
     if (!ticket) {
         if (isTicketLoading) {
             return (
-                <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading Ticket...</p>
-                    </div>
-                </div>
+                <SkeletonDetailPage infoRows={4} />
             )
         }
 
@@ -1458,9 +1454,14 @@ export default function TicketDetailClient({
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {isLoadingRelated ? (
-                                            <div className="col-span-2 py-8 text-center text-gray-500 flex flex-col items-center">
-                                                <Loader2 className="w-6 h-6 animate-spin mb-2" />
-                                                <p className="text-sm">Finding related tickets...</p>
+                                            <div className="col-span-2 space-y-3 py-4">
+                                                {[...Array(2)].map((_, i) => (
+                                                    <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 animate-pulse">
+                                                        <Skeleton className="h-3 w-24" />
+                                                        <Skeleton className="h-4 w-full" />
+                                                        <Skeleton className="h-3 w-3/4" />
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : relatedTickets.length > 0 ? (
                                             relatedTickets.map(t => (

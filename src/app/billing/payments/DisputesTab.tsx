@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useI18n } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import { paymentsApi } from "@/lib/api"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import { Search, ChevronLeft, ChevronRight, Eye, MoreHorizontal, CheckCircle2, XCircle, AlertCircle, ChevronDown, MessageSquare } from "lucide-react"
@@ -332,7 +333,14 @@ export default function DisputesTab() {
                 {/* MOBILE CARD VIEW (<640px) */}
                 <div className="space-y-3 sm:hidden p-4">
                     {loading ? (
-                        <div className="text-center py-8 text-gray-500">Memuat data sengketa...</div>
+                        <div className="space-y-3">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
+                                    <div className="flex justify-between items-start"><Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                                    <div className="grid grid-cols-2 gap-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /></div>
+                                </div>
+                            ))}
+                        </div>
                     ) : disputes.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">Tidak ada sengketa ditemukan.</div>
                     ) : (
@@ -407,7 +415,20 @@ export default function DisputesTab() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Memuat data sengketa...</td>
+                                    <td colSpan={6}>
+                                        <div className="space-y-3 py-4 px-6">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div key={i} className="flex items-center gap-4 animate-pulse">
+                                                    <Skeleton className="h-3 w-full max-w-[120px]" />
+                                                    <Skeleton className="h-3 w-full max-w-[80px]" />
+                                                    <Skeleton className="h-3 w-full max-w-[100px]" />
+                                                    <Skeleton className="h-3 w-full max-w-[60px]" />
+                                                    <Skeleton className="h-3 w-full max-w-[90px]" />
+                                                    <Skeleton className="h-3 w-full max-w-[50px]" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </td>
                                 </tr>
                             ) : disputes.length === 0 ? (
                                 <tr>

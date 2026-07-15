@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import {
     Loader2, Shield, CreditCard, Users, Headphones, Star, ShieldCheck,
     RefreshCw, Edit, X, Check, Eye, ChevronRight, ChevronLeft,
-    ToggleLeft, ToggleRight, Save, ArrowUpRight, Search,
+    ToggleLeft, ToggleRight, Save, ArrowUpRight, Search, KeyRound,
 } from "lucide-react"
 import { rolesApi, usersApi } from "@/lib/api"
 import { toast } from "sonner"
@@ -654,7 +654,6 @@ export default function Roles() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Manajemen Role</h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Kelola hak akses dan izin halaman untuk setiap role pengguna.</p>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                         <span className="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold text-gray-800 dark:text-gray-200 shadow-sm">
@@ -666,6 +665,13 @@ export default function Roles() {
                         <span className="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold text-blue-600 dark:text-blue-400 shadow-sm">
                             {customRoles.length} Custom
                         </span>
+                        <a
+                            href="/admin/permissions"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-semibold text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
+                        >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            Permissions
+                        </a>
                         <button
                             onClick={fetchRoles}
                             disabled={isLoading}

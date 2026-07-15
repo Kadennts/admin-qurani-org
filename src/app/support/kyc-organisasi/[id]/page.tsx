@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation"
 import { useKycOrganisasi, ApiOrg, OrgMember } from "@/hooks/use-kyc-organisasi"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     ChevronLeft, CheckCircle2, MapPin, Calendar, Users, Building2,
     CheckCircle, Mail, Phone, Globe, FileText, XCircle, Clock,
@@ -232,10 +234,7 @@ function ProfileContent() {
 
     if (detailLoading && !org) {
         return (
-            <div className="flex h-[80vh] items-center justify-center text-emerald-500 font-medium gap-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-emerald-500" />
-                Memuat data organisasi...
-            </div>
+            <SkeletonDetailPage showAvatar infoRows={6} />
         )
     }
 
@@ -619,9 +618,13 @@ function ProfileContent() {
                     <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[400px]">
                         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-6">Daftar Pengajar</h3>
                         {orgMembersLoading ? (
-                            <div className="flex justify-center py-20 text-emerald-500 gap-2 text-sm">
-                                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-emerald-500" />
-                                Memuat data pengajar...
+                            <div className="space-y-3 py-4">
+                                {[...Array(4)].map((_, i) => (
+                                    <div key={i} className="flex items-center gap-3 animate-pulse">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="space-y-2 flex-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div>
+                                    </div>
+                                ))}
                             </div>
                         ) : orgMembers.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">

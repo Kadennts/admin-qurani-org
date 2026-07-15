@@ -36,6 +36,7 @@ import { ImageCropDialog } from "@/components/profile/dialogs/image-crop-dialog"
 import { useUsernameValidation } from "@/hooks/use-username-validation"
 import { useImageCrop } from "@/hooks/use-image-crop"
 import { useLocationData, resolveIndonesiaTimezone } from "@/hooks/use-location-data"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
 
 function ProfilePageContent() {
   const { userId, refreshProfile } = useAuth()
@@ -617,14 +618,7 @@ function ProfilePageContent() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">{t('common.loading', 'Loading...')}</p>
-        </div>
-      </div>
-    )
+    return <SkeletonDetailPage showAvatar infoRows={6} />
   }
 
   return (
@@ -869,14 +863,7 @@ export default function ProfilePage() {
   return (
     <DashboardLayout>
       <I18nProvider namespaces={["common", "profile", "verse_word_error"]}>
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-600 dark:text-slate-400">{t('common.loading', 'Loading...')}</p>
-            </div>
-          </div>
-        }>
+        <Suspense fallback={<SkeletonDetailPage showAvatar infoRows={6} />}>
           <ProfilePageContent />
         </Suspense>
       </I18nProvider>

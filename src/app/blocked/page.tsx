@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { I18nProvider, useI18n } from '@/components/providers/i18n-provider'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
@@ -103,7 +104,11 @@ function BlockedPageContent() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <LoadingSpinner message={t('common.loading', 'Loading...')} />
+        <div className="text-center space-y-4 animate-pulse">
+          <Skeleton className="h-16 w-16 rounded-full mx-auto" />
+          <Skeleton className="h-5 w-40 mx-auto" />
+          <Skeleton className="h-4 w-56 mx-auto" />
+        </div>
       </div>
     )
   }

@@ -1,9 +1,9 @@
 [
   {
-    "id": 8888,
-    "userId": 8888,
-    "userName": "Ustadz irwan",
-    "username": "ustadzpercobaan",
+    "id": 8888111,
+    "userId": 8888111,
+    "userName": "irwan",
+    "username": "irwandi",
     "email": "elshoegaze@gmail.com",
     "headline": "Pengajar Tahsin & Tajwid Bersertifikat",
     "bio": "Lulusan Universitas Islam dengan pengalaman mengajar 5 tahun. Spesialisasi dalam perbaikan makhraj dan tajwid.",
@@ -32,6 +32,7 @@
     "isOnline": 1,
     "isOffline": 1,
     "location": "Jakarta Selatan, Indonesia",
+    "timezone": "Asia/Jakarta",
     "categoryIds": [
       1,
       2
@@ -40,9 +41,9 @@
     "createdAt": "2026-06-16T10:00:00Z"
   },
   {
-    "id": 7001,
-    "userId": 7001,
-    "userName": "Ustadz Ahmad Syarif",
+    "id": 7002132,
+    "userId": 7002132,
+    "userName": "Ahmad Syarif",
     "username": "syarif_q",
     "email": "syarif@example.com",
     "headline": "Pengajar Tahfidz Al-Qur'an",
@@ -70,6 +71,7 @@
     "isOnline": 1,
     "isOffline": 0,
     "location": "Bandung, Jawa Barat",
+    "timezone": "Asia/Jakarta",
     "categoryIds": [
       1
     ],
@@ -77,9 +79,9 @@
     "createdAt": "2026-06-22T09:15:00Z"
   },
   {
-    "id": 7002,
-    "userId": 7002,
-    "userName": "Ustadzah Fatimah Azzahra",
+    "id": 70025499,
+    "userId": 70025499,
+    "userName": "Fatimah Azzahra",
     "username": "fatimahaqlam",
     "email": "alvia.rpl2@gmail.com",
     "headline": "Pengajar Tartil & Makhraj",
@@ -105,6 +107,7 @@
     "isOnline": 0,
     "isOffline": 1,
     "location": "Surabaya, Jawa Timur",
+    "timezone": "Asia/Riyadh",
     "categoryIds": [
       2,
       3
@@ -113,9 +116,9 @@
     "createdAt": "2026-06-20T13:00:00Z"
   },
   {
-    "id": 7003,
-    "userId": 7003,
-    "userName": "Ustadz Rizal Hakim",
+    "id": 70025423,
+    "userId": 70025423,
+    "userName": "Rizal Hakim",
     "username": "rizalqurani",
     "email": "rizal@example.com",
     "headline": "Pengajar Tajwid Metode Ummi",
@@ -143,6 +146,7 @@
     "isOnline": 1,
     "isOffline": 1,
     "location": "Yogyakarta, DIY",
+    "timezone": "Asia/Makassar",
     "categoryIds": [
       2,
       4

@@ -8,6 +8,7 @@ import { SkeletonUserList } from "@/components/ui/skeleton-user-card"
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
 } from "@/components/ui/dialog"
 import {
     DropdownMenu,
@@ -19,10 +20,8 @@ import { getUserAvatar } from "@/utils/get-user-avatar"
 import { UserPlus, Users, X, Bell, Loader2, Trash2, MoreVertical, Trash, BookOpen, Search, MessageSquare } from "lucide-react"
 import { toast } from "sonner"
 import { acceptGroupInvitation, rejectGroupInvitation } from "@/utils/api/grup/invitations"
-import { updateNotificationStatus, markAllNotificationsAsRead } from "@/utils/api/notifikasi/update"
-// import { getNotifications } from "@/utils/api/notifikasi/fetch"
 import { acceptFriendRequest, rejectOrCancelFriendRequest } from "@/utils/api/friends"
-import { createClient } from "@/utils/supabase/client"
+import { notificationsApi } from "@/lib/api"
 import { useI18n } from "../providers/i18n-provider"
 import { ClientCache } from "@/utils/cache/client-cache"
 import { useRealtime } from "@/hooks/use-realtime"
@@ -550,8 +549,37 @@ export function Notifikasi({ userId }: NotifikasiProps) {
     const [searchValue, setSearchValue] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Fetch notifications for current user
-    const { notifications: hookNotifications, loading, error, refresh } = useNotifications(userId)
+    // State untuk modal Send Notification
+    const [sendNotifDialog, setSendNotifDialog] = useState(false)
+    const [sendNotifLoading, setSendNotifLoading] = useState(false)
+    const [sendNotifForm, setSendNotifForm] = useState({
+        // Penerima
+        targetMode: 'broadcast' as 'broadcast' | 'specific', // 'broadcast' = semua, 'specific' = ID tertentu
+        userIds: '' as string, // dipisah koma jika multiple
+        platform: '' as string,
+        countryCode: '' as string,
+        locale: '' as string,
+        topic: '' as string,
+        // Konten
+        title: '',
+        message: '',
+        type: '',
+        priority: '',
+        category: '',
+        imageUrl: '',
+        // Aksi
+        actionUrl: '',
+        actionData: '',
+        channels: 'push,in-app',
+        // Waktu
+        scheduledAt: '',
+        expiresAt: '',
+        // Tombol Aksi (max 2)
+        actionButtons: [] as { id: string; title: string; url: string; action: string }[],
+    })
+
+    // Fetch notifications for current user from API Qurani
+    const { notifications: hookNotifications, loading, error, refresh, loadMore, hasNext } = useNotifications(userId)
 
     const parseReminderDueAt = useCallback((reminder: StoredTicketReminder): Date | null => {
         if (reminder?.dueAt) {
@@ -725,8 +753,6 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         }
     }, [error, hookNotifications, t])
 
-    // Removed manual load function: use SWR hook above
-
     // Detect mobile device
     useEffect(() => {
         const checkMobile = () => {
@@ -738,22 +764,23 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         return () => window.removeEventListener('resize', checkMobile)
     }, [])
 
-    // Initial fetch is handled by SWR hook automatically
-
     // Mark all notifications as read when component mounts (user visited notifications page)
     useEffect(() => {
         const markAsRead = async () => {
-            if (userId) {
-                try {
-                    console.log('Marking all notifications as read for user:', userId)
-                    await markAllNotificationsAsRead(userId)
-                    // Update local state without reload to prevent refresh
-                    setNotifications(prevNotifications =>
-                        prevNotifications.map(notification => ({ ...notification, is_read: true }))
-                    )
-                } catch (error) {
-                    console.error('Error marking notifications as read:', error)
-                }
+            if (!userId) return
+
+            try {
+                // Mark all notifications as read when component mounts (user visited notifications page)
+                // We use the new API Qurani endpoint for this
+                await notificationsApi.markAllAsRead()
+                console.log('Marking all notifications as read for user:', userId)
+                
+                // Update local state without reload to prevent refresh
+                setNotifications(prevNotifications =>
+                    prevNotifications.map(notification => ({ ...notification, is_read: true }))
+                )
+            } catch (error) {
+                console.error('Error marking notifications as read:', error)
             }
         }
 
@@ -764,7 +791,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
     const debouncedMarkAsRead = useMemo(
         () => debounce(async (notificationId: string) => {
             try {
-                await updateNotificationStatus(notificationId, { is_read: true })
+                await notificationsApi.markAsRead(notificationId)
             } catch (error) {
                 console.error('Error marking notification as read:', error)
             }
@@ -885,11 +912,12 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         debounce(handleRealtimeNotificationUpdate, 500)()
     }, [handleRealtimeNotificationUpdate])
 
-    // Re-enable realtime subscription dengan safe pattern
+    // Supabase Realtime dinonaktifkan - menunggu WebSocket API Qurani (SignalR)
+    // Error: wss://supabase-qurani.ubig.web.id koneksi gagal karena tidak ada keys
     const { isConnected: realtimeConnected } = useRealtime({
         userId,
         onDataChange: debouncedRealtimeHandler,
-        enabled: !!userId && !loading,
+        enabled: false, // Disabled: migrasi ke API Qurani, Supabase Realtime tidak digunakan
         tables: ['notifications', 'friend_requests']
     })
 
@@ -1306,13 +1334,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         }
 
         try {
-            const supabase = createClient()
-            const { error } = await supabase
-                .from("notifications")
-                .delete()
-                .eq("id", notificationId)
-
-            if (error) throw error
+            await notificationsApi.delete(notificationId)
 
             // Remove from local state
             setNotifications(prevNotifications =>
@@ -1334,62 +1356,92 @@ export function Notifikasi({ userId }: NotifikasiProps) {
         }
     }
 
-    // Delete all confirmed notifications function
+    // Delete ALL notifications using clear-all endpoint
     const handleDeleteAllNotifications = async () => {
         setDeleteAllLoading(true)
-
         try {
-            // Get IDs of confirmed notifications (is_action_taken = true OR in clickedNotifications OR is recap_notification)
-            const confirmedNotificationIds = notifications
-                .filter(n => n.is_action_taken || clickedNotifications.has(n.id) || n.type === "recap_notification")
+            // Hapus local reminder notifications dulu
+            const localReminderIds = notifications
                 .map(n => n.id)
+                .filter((id) => id.startsWith("ticket_reminder_due_"))
+            localReminderIds.forEach((id) => removeLocalReminderNotificationById(id))
 
-            const localReminderNotificationIds = confirmedNotificationIds.filter((id) =>
-                id.startsWith("ticket_reminder_due_")
-            )
-            const remoteNotificationIds = confirmedNotificationIds.filter((id) =>
-                !id.startsWith("ticket_reminder_due_")
-            )
+            // Panggil clear-all API untuk hapus semua notifikasi di server
+            await notificationsApi.clearAll()
 
-            if (confirmedNotificationIds.length === 0) {
-                toast.info(t('notifikasi.tidak_ada_notifikasi_terkonfirmasi', 'No confirmed notifications to delete'))
-                setDeleteAllLoading(false)
-                setDeleteAllDialog(false)
-                return
-            }
+            // Kosongkan semua local state
+            setNotifications([])
+            setClickedNotifications(new Set())
 
-            if (remoteNotificationIds.length > 0) {
-                const supabase = createClient()
-                const { error } = await supabase
-                    .from("notifications")
-                    .delete()
-                    .in("id", remoteNotificationIds)
-
-                if (error) throw error
-            }
-
-            localReminderNotificationIds.forEach((id) => removeLocalReminderNotificationById(id))
-
-            // Remove only confirmed notifications from local state
-            setNotifications(prevNotifications =>
-                prevNotifications.filter(n => !confirmedNotificationIds.includes(n.id))
-            )
-
-            // Clear clicked notifications that were deleted
-            setClickedNotifications(prev => {
-                const newSet = new Set(prev)
-                confirmedNotificationIds.forEach(id => newSet.delete(id))
-                return newSet
-            })
-
-            toast.success(`${confirmedNotificationIds.length} ${t('notifikasi.notifikasi_terkonfirmasi_dihapus', 'confirmed notifications deleted successfully')}`)
+            toast.success(t('notifikasi.semua_notifikasi_dihapus', 'All notifications deleted successfully'))
 
         } catch (error) {
-            console.error('Error deleting confirmed notifications:', error)
+            console.error('Error clearing all notifications:', error)
             toast.error(t('notifikasi.gagal_menghapus_semua', 'Failed to delete notifications'))
         } finally {
             setDeleteAllLoading(false)
             setDeleteAllDialog(false)
+        }
+    }
+
+    // Kirim Notifikasi (Admin only)
+    const handleSendNotification = async () => {
+        if (!sendNotifForm.title.trim() || !sendNotifForm.message.trim()) {
+            toast.error('Judul dan Pesan wajib diisi')
+            return
+        }
+        setSendNotifLoading(true)
+        try {
+            const payload: Parameters<typeof notificationsApi.send>[0] = {
+                title: sendNotifForm.title,
+                message: sendNotifForm.message,
+                type: sendNotifForm.type || undefined,
+                priority: sendNotifForm.priority || undefined,
+                category: sendNotifForm.category || undefined,
+                imageUrl: sendNotifForm.imageUrl || null,
+                actionUrl: sendNotifForm.actionUrl || null,
+                actionData: sendNotifForm.actionData || null,
+                channels: sendNotifForm.channels ? sendNotifForm.channels.split(',').map(c => c.trim()).filter(Boolean) : ['push', 'in-app'],
+                scheduledAt: sendNotifForm.scheduledAt || null,
+                expiresAt: sendNotifForm.expiresAt || null,
+                actionButtons: sendNotifForm.actionButtons.length > 0 ? sendNotifForm.actionButtons : undefined,
+            }
+
+            // Penerima: Spesifik atau Broadcast
+            if (sendNotifForm.targetMode === 'specific' && sendNotifForm.userIds.trim()) {
+                const rawIds = sendNotifForm.userIds.split(',').map(id => id.trim()).filter(id => id !== '');
+                const parsedIds = rawIds.map(id => Number(id));
+                
+                // Cek apakah ada ID yang bukan angka valid (misal: user memasukkan email atau UUID)
+                if (parsedIds.some(id => !Number.isInteger(id) || id <= 0 || id > Number.MAX_SAFE_INTEGER)) {
+                    toast.error('Format User IDs tidak valid. Harus berupa angka (contoh: 1, 2, 3). Jangan masukkan email atau UUID.')
+                    setSendNotifLoading(false)
+                    return
+                }
+                payload.userIds = parsedIds
+            } else {
+                // Broadcast dengan target filter (opsional)
+                payload.targetFilter = {
+                    platform: sendNotifForm.platform || null,
+                    countryCode: sendNotifForm.countryCode || null,
+                    locale: sendNotifForm.locale || null,
+                    topic: sendNotifForm.topic || null,
+                    minAppVersion: null,
+                }
+            }
+
+            const result = await notificationsApi.send(payload)
+            const sent = result?.data?.successfullySent ?? result?.successfullySent ?? '?'
+            const failed = result?.data?.failed ?? result?.failed ?? 0
+            toast.success(`Notifikasi terkirim ke ${sent} penerima${failed > 0 ? `, ${failed} gagal` : ''}`)
+            setSendNotifDialog(false)
+            // Reset form
+            setSendNotifForm(prev => ({ ...prev, title: '', message: '', userIds: '', actionButtons: [] }))
+        } catch (error: any) {
+            console.error('Error sending notification:', error)
+            toast.error(error?.message || 'Gagal mengirim notifikasi')
+        } finally {
+            setSendNotifLoading(false)
         }
     }
 
@@ -1453,10 +1505,16 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem
+                                onClick={() => setSendNotifDialog(true)}
+                                className="flex items-center gap-2"
+                            >
+                                <MessageSquare className="h-4 w-4" />
+                                <span>Kirim Notifikasi</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                                 onClick={() => {
-                                    const confirmedCount = notifications.filter(n => n.is_action_taken || clickedNotifications.has(n.id) || n.type === "recap_notification").length
-                                    if (confirmedCount === 0) {
-                                        toast.info(t('notifikasi.tidak_ada_notifikasi_terkonfirmasi', 'No confirmed notifications to delete'))
+                                    if (notifications.length === 0) {
+                                        toast.info('Tidak ada notifikasi untuk dihapus')
                                         return
                                     }
                                     setDeleteAllDialog(true)
@@ -1473,26 +1531,32 @@ export function Notifikasi({ userId }: NotifikasiProps) {
             </div>
             <div className="flex-1 md:flex-none w-full p-4 sm:p-4 md:p-6 bg-white dark:bg-gray-800 rounded-lg md:rounded-3xl border md:border border-gray-200 md:border-gray-300 dark:border-gray-700 shadow-none sm:shadow-sm md:shadow-xl dark:shadow-gray-800/25 space-y-3 sm:space-y-4 md:space-y-7 overflow-hidden md:overflow-visible">
 
-                <div className="relative">
-                    <Search className={cn(
-                        "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200",
-                    )} />
+                <div className="relative flex items-center">
+                    <button
+                        className="absolute left-3 top-1/2 -translate-y-1/2 p-0 bg-transparent border-0"
+                        aria-label="Cari notifikasi"
+                        onClick={() => setSearchQuery(searchValue)}
+                    >
+                        <Search className="h-4 w-4 text-gray-400 hover:text-emerald-500 transition-colors duration-200 cursor-pointer" />
+                    </button>
                     <Input
                         value={searchValue}
                         onChange={e => setSearchValue(e.target.value)}
                         onKeyDown={e => {
                             if (e.key === "Enter") setSearchQuery(searchValue);
                         }}
-                        placeholder={t('notifikasi.filter_placeholder')}
-                        className="pl-10 pr-10 h-10 text-sm rounded-lg border-2 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 bg-gray-50/80 dark:bg-gray-800/20"
+                        placeholder={t('notifikasi.filter_placeholder', 'Cari notifikasi...')}
+                        className="pl-9 pr-8 h-9 text-sm rounded-lg border border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 bg-gray-50/80 dark:bg-gray-800/20 w-64 sm:w-80"
                     />
-                    <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-                        aria-label={t('friends.search_clear', 'Clear filter')}
-                        onClick={() => { setSearchValue(""); setSearchQuery(""); }}
-                    >
-                        <X className="h-3 w-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
-                    </button>
+                    {searchValue && (
+                        <button
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+                            aria-label="Hapus pencarian"
+                            onClick={() => { setSearchValue(""); setSearchQuery(""); }}
+                        >
+                            <X className="h-3 w-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                        </button>
+                    )}
                 </div>
                 <div className="grid grid-cols-3 sm:flex gap-2 md:gap-3 lg:gap-3 xl:gap-3">
                     {/* All tab - reactivated */}
@@ -1724,6 +1788,258 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                                         <>
                                             <Trash className="h-4 w-4 mr-1" />
                                             {t('notifikasi.hapus', 'Delete')}
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* =============================================
+                    DIALOG: KIRIM NOTIFIKASI (ADMIN ONLY)
+                ============================================= */}
+                <Dialog open={sendNotifDialog} onOpenChange={setSendNotifDialog}>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        {/* DialogTitle required for screen reader accessibility */}
+                        <DialogTitle className="sr-only">Kirim Notifikasi ke Pengguna</DialogTitle>
+                        <div className="space-y-5 p-1">
+                            {/* Header */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                                    <MessageSquare className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Kirim Notifikasi</h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Admin only — kirim notifikasi ke pengguna tertentu atau broadcast ke semua</p>
+                                </div>
+                            </div>
+
+                            {/* ─── PENERIMA ─── */}
+                            <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Penerima</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSendNotifForm(p => ({ ...p, targetMode: 'broadcast' }))}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${sendNotifForm.targetMode === 'broadcast' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400'}`}
+                                    >
+                                        📢 Broadcast (Semua)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSendNotifForm(p => ({ ...p, targetMode: 'specific' }))}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${sendNotifForm.targetMode === 'specific' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400'}`}
+                                    >
+                                        👤 User Spesifik
+                                    </button>
+                                </div>
+                                {sendNotifForm.targetMode === 'specific' ? (
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">User IDs <span className="text-red-500">*</span> <span className="font-normal">(pisah dengan koma)</span></label>
+                                        <input
+                                            type="text"
+                                            value={sendNotifForm.userIds}
+                                            onChange={e => setSendNotifForm(p => ({ ...p, userIds: e.target.value }))}
+                                            placeholder="1, 2, 3"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Platform <span className="font-normal text-slate-400">(opsional)</span></label>
+                                            <select
+                                                value={sendNotifForm.platform}
+                                                onChange={e => setSendNotifForm(p => ({ ...p, platform: e.target.value }))}
+                                                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            >
+                                                <option value="">Semua Platform</option>
+                                                <option value="android">Android</option>
+                                                <option value="ios">iOS</option>
+                                                <option value="web">Web</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Kode Negara <span className="font-normal text-slate-400">(opsional)</span></label>
+                                            <input
+                                                type="text"
+                                                value={sendNotifForm.countryCode}
+                                                onChange={e => setSendNotifForm(p => ({ ...p, countryCode: e.target.value }))}
+                                                placeholder="ID, MY, SG"
+                                                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ─── KONTEN ─── */}
+                            <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Konten</p>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Judul <span className="text-red-500">*</span> <span className="font-normal">(maks. 200 karakter)</span></label>
+                                    <input
+                                        type="text"
+                                        maxLength={200}
+                                        value={sendNotifForm.title}
+                                        onChange={e => setSendNotifForm(p => ({ ...p, title: e.target.value }))}
+                                        placeholder="Judul notifikasi..."
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Pesan <span className="text-red-500">*</span> <span className="font-normal">(maks. 1000 karakter)</span></label>
+                                    <textarea
+                                        maxLength={1000}
+                                        rows={3}
+                                        value={sendNotifForm.message}
+                                        onChange={e => setSendNotifForm(p => ({ ...p, message: e.target.value }))}
+                                        placeholder="Isi pesan notifikasi..."
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Type</label>
+                                        <input type="text" value={sendNotifForm.type} onChange={e => setSendNotifForm(p => ({ ...p, type: e.target.value }))} placeholder="general" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Priority</label>
+                                        <select value={sendNotifForm.priority} onChange={e => setSendNotifForm(p => ({ ...p, priority: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                            <option value="">Default</option>
+                                            <option value="low">Low</option>
+                                            <option value="normal">Normal</option>
+                                            <option value="high">High</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Category</label>
+                                        <input type="text" value={sendNotifForm.category} onChange={e => setSendNotifForm(p => ({ ...p, category: e.target.value }))} placeholder="marketing" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Image URL <span className="font-normal">(opsional)</span></label>
+                                    <input type="url" value={sendNotifForm.imageUrl} onChange={e => setSendNotifForm(p => ({ ...p, imageUrl: e.target.value }))} placeholder="https://..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                            </div>
+
+                            {/* ─── AKSI ─── */}
+                            <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Aksi</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Action URL <span className="font-normal">(opsional)</span></label>
+                                        <input type="text" value={sendNotifForm.actionUrl} onChange={e => setSendNotifForm(p => ({ ...p, actionUrl: e.target.value }))} placeholder="/dashboard" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Channels</label>
+                                        <input type="text" value={sendNotifForm.channels} onChange={e => setSendNotifForm(p => ({ ...p, channels: e.target.value }))} placeholder="push,in-app" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs text-slate-500 dark:text-slate-400">Action Buttons <span className="font-normal">(maks. 2)</span></label>
+                                        {sendNotifForm.actionButtons.length < 2 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSendNotifForm(p => ({
+                                                    ...p,
+                                                    actionButtons: [...p.actionButtons, { id: `btn_${Date.now()}`, title: '', url: '', action: '' }]
+                                                }))}
+                                                className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-medium"
+                                            >
+                                                + Tambah Tombol
+                                            </button>
+                                        )}
+                                    </div>
+                                    {sendNotifForm.actionButtons.map((btn, idx) => (
+                                        <div key={btn.id} className="flex gap-2 mb-2 items-center">
+                                            <input
+                                                type="text"
+                                                value={btn.title}
+                                                onChange={e => setSendNotifForm(p => {
+                                                    const abs = [...p.actionButtons]
+                                                    abs[idx] = { ...abs[idx], title: e.target.value }
+                                                    return { ...p, actionButtons: abs }
+                                                })}
+                                                placeholder="Label tombol"
+                                                className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={btn.url}
+                                                onChange={e => setSendNotifForm(p => {
+                                                    const abs = [...p.actionButtons]
+                                                    abs[idx] = { ...abs[idx], url: e.target.value }
+                                                    return { ...p, actionButtons: abs }
+                                                })}
+                                                placeholder="URL"
+                                                className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setSendNotifForm(p => ({ ...p, actionButtons: p.actionButtons.filter((_, i) => i !== idx) }))}
+                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ─── PENJADWALAN ─── */}
+                            <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Penjadwalan <span className="font-normal normal-case text-slate-400">(opsional)</span></p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Kirim Pada</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={sendNotifForm.scheduledAt}
+                                            onChange={e => setSendNotifForm(p => ({ ...p, scheduledAt: e.target.value }))}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Kedaluwarsa Pada</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={sendNotifForm.expiresAt}
+                                            onChange={e => setSendNotifForm(p => ({ ...p, expiresAt: e.target.value }))}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ─── TOMBOL AKSI ─── */}
+                            <div className="flex gap-3 pt-1">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => setSendNotifDialog(false)}
+                                    disabled={sendNotifLoading}
+                                >
+                                    Batal
+                                </Button>
+                                <Button
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleSendNotification}
+                                    disabled={sendNotifLoading || !sendNotifForm.title.trim() || !sendNotifForm.message.trim()}
+                                >
+                                    {sendNotifLoading ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Mengirim...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <MessageSquare className="h-4 w-4 mr-2" />
+                                            Kirim Notifikasi
                                         </>
                                     )}
                                 </Button>

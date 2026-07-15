@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import {
     BadgeCheck,
@@ -1642,9 +1643,22 @@ function PaketContent() {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={9} className="py-16 text-center text-gray-500">
-                                            <Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin text-emerald-500" />
-                                            {t("billing.courses.loading", "Loading courses...")}
+                                        <td colSpan={9}>
+                                            <div className="space-y-3 py-4 px-6">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="flex items-center gap-4 animate-pulse">
+                                                        <Skeleton className="h-4 w-48" />
+                                                        <Skeleton className="h-4 w-32" />
+                                                        <Skeleton className="h-5 w-16 rounded-full" />
+                                                        <Skeleton className="h-4 w-20" />
+                                                        <Skeleton className="h-4 w-24" />
+                                                        <Skeleton className="h-4 w-16" />
+                                                        <Skeleton className="h-4 w-20" />
+                                                        <Skeleton className="h-4 w-16" />
+                                                        <Skeleton className="h-8 w-8 rounded-lg" />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : paged.length === 0 ? (
@@ -1679,7 +1693,7 @@ function PaketContent() {
                                             </td>
                                             <td className="min-w-[170px] px-4 py-4">
                                                 {course.trainerId ? (
-                                                    <Link href={`/trainers/${course.trainerId}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg transition-colors hover:text-emerald-600">
+                                                    <Link href={`/teachers/${course.trainerId}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg transition-colors hover:text-emerald-600">
                                                         <TrainerAvatar src={course.trainerAvatar} name={course.trainerName} size={32} />
                                                         <span className="truncate text-xs font-bold text-gray-900 hover:underline dark:text-white">{course.trainerName}</span>
                                                     </Link>

@@ -7,8 +7,7 @@ import { Toaster } from "sonner";
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { I18nProvider } from "@/components/providers/i18n-provider";
 import { PresenceProvider } from "@/components/providers/presence-provider";
-import TopLoadingBar from "@/components/TopLoadingBar";
-import { Suspense } from "react";
+import NextTopLoader from "nextjs-toploader";
 import DynamicTitle from "@/components/dinamicTitle";
 import { UnifiedNotificationToast } from "@/components/UnifiedNotificationToast";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -27,7 +26,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Qurani Admin",
+  title: "Admin Qurani",
   description: "Modern Quran application - Read, listen, and learn the Holy Quran with advanced features and beautiful interface",
   manifest: "/manifest.json",
   icons: {
@@ -57,9 +56,13 @@ export default function RootLayout({
         cz-shortcut-listen="true"
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Suspense fallback={null}>
-          <TopLoadingBar />
-        </Suspense>
+        <NextTopLoader
+          color="#059669"
+          height={4}
+          showSpinner={false}
+          crawlSpeed={200}
+          speed={200}
+        />
         <Toaster position="top-right" richColors />
         <DevServiceWorkerCleanup />
         <ThemeProvider

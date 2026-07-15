@@ -6,6 +6,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     ArrowLeft, MapPin, Clock3, BookOpen, Star, CheckCircle2, XCircle,
     AlertTriangle, ShieldCheck, ShieldOff, Image as ImageIcon, MessageSquare,
@@ -951,7 +952,7 @@ function GuruDetailContent() {
             <div className="max-w-[1320px] mx-auto space-y-4">
                 <div className="flex items-center gap-2">
                     <Link
-                        href="/trainers"
+                        href="/teachers"
                         className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -964,9 +965,16 @@ function GuruDetailContent() {
                 {/* Removed error alert banner */}
 
                 {loading ? (
-                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 py-16 text-center text-gray-400">
-                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
-                        <p>Memuat detail guru...</p>
+                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-6 space-y-4 animate-pulse">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-16 w-16 rounded-full" />
+                            <div className="space-y-2"><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-24" /></div>
+                        </div>
+                        <div className="space-y-3">
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="flex justify-between"><Skeleton className="h-3 w-28" /><Skeleton className="h-4 w-36" /></div>
+                            ))}
+                        </div>
                     </div>
                 ) : !detail ? (
                     <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 py-16 text-center text-gray-400">
@@ -1141,9 +1149,14 @@ function GuruDetailContent() {
                                                 </div>
                                             </div>
                                             {coursesLoading ? (
-                                                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                                                    <Loader2 className="w-7 h-7 animate-spin mb-2" />
-                                                    <p className="text-sm">Memuat paket...</p>
+                                                <div className="space-y-3">
+                                                    {[...Array(3)].map((_, i) => (
+                                                        <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3 animate-pulse">
+                                                            <Skeleton className="h-4 w-48" />
+                                                            <Skeleton className="h-3 w-full" />
+                                                            <div className="flex gap-2"><Skeleton className="h-5 w-16 rounded-full" /><Skeleton className="h-5 w-20 rounded-full" /></div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ) : coursesError ? (
                                                 <div className="flex items-start gap-3 px-4 py-4 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30">
@@ -1253,9 +1266,14 @@ function GuruDetailContent() {
                                     {tab === "ulasan" && (
                                         <div className="p-4 sm:p-5">
                                             {reviewsLoading ? (
-                                                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                                                    <Loader2 className="w-7 h-7 animate-spin mb-2" />
-                                                    <p className="text-sm">Memuat ulasan...</p>
+                                                <div className="space-y-3">
+                                                    {[...Array(3)].map((_, i) => (
+                                                        <div key={i} className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-2 animate-pulse">
+                                                            <div className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-3 w-24" /></div>
+                                                            <Skeleton className="h-3 w-full" />
+                                                            <Skeleton className="h-3 w-3/4" />
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ) : reviews.length === 0 ? (
                                                 <div className="rounded-xl border border-gray-100 dark:border-gray-800 py-12 text-center text-gray-400">

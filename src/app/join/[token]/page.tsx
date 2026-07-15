@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -131,9 +132,12 @@ export default function JoinGroupPage({ params }: PageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-8">
         <Card className="max-w-2xl w-full dark:bg-gray-800 dark:border-gray-700 dark:shadow-gray-800/25">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
-            <p className="text-muted-foreground dark:text-slate-400 text-base">{t('join grup.loading.title', 'Memuat undangan...')}</p>
+          <CardContent className="space-y-4 py-12">
+            <div className="flex items-center gap-4 animate-pulse">
+              <Skeleton className="h-14 w-14 rounded-full" />
+              <div className="space-y-2 flex-1"><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32" /></div>
+            </div>
+            <div className="space-y-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-3/4" /></div>
           </CardContent>
         </Card>
       </div>

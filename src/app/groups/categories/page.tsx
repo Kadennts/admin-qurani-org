@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     Search, Plus, Pencil, Trash2, Tags, Loader2, RefreshCw,
     CheckCircle2, XCircle, ChevronLeft, ChevronRight, X,
@@ -388,9 +389,17 @@ function GroupCategoriesContent() {
             {/* ── Table ────────────────────────────────────────────────────── */}
             <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                        <span className="ml-3 text-gray-500 dark:text-gray-400">Memuat data...</span>
+                    <div className="p-6 space-y-3">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="flex items-center gap-4 animate-pulse">
+                                <Skeleton className="h-4 w-16" />
+                                <Skeleton className="h-4 w-40" />
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-5 w-16 rounded-full" />
+                                <Skeleton className="h-4 w-20" />
+                                <Skeleton className="h-8 w-8 rounded-lg" />
+                            </div>
+                        ))}
                     </div>
                 ) : categories.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600">
@@ -777,9 +786,13 @@ function GroupCategoriesContent() {
                         {/* Content */}
                         <div className="p-6 overflow-y-auto flex-1">
                             {translationsLoading ? (
-                                <div className="flex items-center justify-center py-10">
-                                    <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
-                                    <span className="ml-2 text-gray-500 dark:text-gray-400 text-sm">Memuat terjemahan...</span>
+                                <div className="space-y-3 py-4">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="flex items-center gap-3 animate-pulse">
+                                            <Skeleton className="h-6 w-16 rounded-full" />
+                                            <Skeleton className="h-4 w-48" />
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="space-y-4">

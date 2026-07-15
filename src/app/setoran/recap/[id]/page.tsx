@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { I18nProvider } from "@/components/providers/i18n-provider";
+import { SkeletonDetailPage } from "@/components/ui/skeletons";
 import { setoranApi } from "@/lib/api";
 import { ArrowLeft, Loader2, User, Calendar, CheckCircle, AlertTriangle, BookOpen } from "lucide-react";
 import { toast } from "sonner";
@@ -99,10 +100,7 @@ export default function SetoranDetailPage() {
                     </div>
 
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                            <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mb-4" />
-                            <p className="text-slate-500">Memuat detail setoran...</p>
-                        </div>
+                        <SkeletonDetailPage showAvatar infoRows={4} />
                     ) : detail ? (
                         <div className="space-y-6">
                             {/* Reciter Card */}

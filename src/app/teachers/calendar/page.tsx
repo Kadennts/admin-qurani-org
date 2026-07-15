@@ -18,6 +18,7 @@ import { id as idLocale } from "date-fns/locale"
 
 import scheduleDataRaw from "@/data/seleksi-schedule-dummy.json"
 import seleksiTeam from "@/data/seleksi-team.json"
+import { CustomSelect } from "@/components/ui/custom-select"
 
 type ScheduleStatus = "scheduled" | "ongoing" | "done" | "cancelled" | "reschedule"
 
@@ -263,98 +264,108 @@ function CalendarContent() {
         <div className="bg-gray-50 dark:bg-gray-950 p-4 min-h-screen">
             <div className="max-w-[1600px] mx-auto space-y-4">
 
-                {/* ── Header (No Subtitle) ── */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* ── Header with inline Filter ── */}
+                <div className="flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <CalendarIcon className="w-6 h-6 text-emerald-500" />
-                        Kalender Seleksi Guru
+                        Kalender
                     </h1>
-                </div>
 
-                {/* ── Beautiful Filter Bar (integrated filters) ── */}
-                <div className="flex items-center gap-3 relative">
-                    <button 
-                        onClick={() => setShowFilterPopup(!showFilterPopup)}
-                        className="flex items-center gap-2 bg-white dark:bg-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                        <Filter className="w-4 h-4 text-emerald-500" />
-                        Filter Jadwal
-                        {(selectedPenguji !== "all" || selectedStatus !== "all" || selectedMetode !== "all" || selectedWaktu !== "all") && (
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border-2 border-white dark:border-gray-900 absolute -top-1 -right-1" />
-                        )}
-                    </button>
-
-                    {/* Filter Popup */}
-                    {showFilterPopup && (
-                        <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 z-40">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-gray-900 dark:text-white">Filter</h3>
-                                <button onClick={() => setShowFilterPopup(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                            
-                            <div className="space-y-4">
-                                {/* Filter Penguji */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /> Penguji</label>
-                                    <select value={selectedPenguji} onChange={e => setSelectedPenguji(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 focus:outline-none">
-                                        <option value="all">Semua Penguji</option>
-                                        {(seleksiTeam as any[]).map(t => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Filter Status */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Status</label>
-                                    <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 focus:outline-none">
-                                        <option value="all">Semua Status</option>
-                                        <option value="scheduled">Terjadwal</option>
-                                        <option value="ongoing">Berlangsung</option>
-                                        <option value="done">Selesai</option>
-                                        <option value="reschedule">Reschedule</option>
-                                        <option value="cancelled">Dibatalkan</option>
-                                    </select>
-                                </div>
-
-                                {/* Filter Metode */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><Video className="w-3.5 h-3.5" /> Metode</label>
-                                    <select value={selectedMetode} onChange={e => setSelectedMetode(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 focus:outline-none">
-                                        <option value="all">Semua Metode</option>
-                                        <option value="online">Online</option>
-                                        <option value="offline">Offline</option>
-                                    </select>
-                                </div>
-
-                                {/* Filter Waktu */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Waktu</label>
-                                    <select value={selectedWaktu} onChange={e => setSelectedWaktu(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 focus:outline-none">
-                                        <option value="all">Semua Waktu</option>
-                                        <option value="pagi">Pagi (&lt; 12:00)</option>
-                                        <option value="siang-sore">Siang/Sore (&gt;= 12:00)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Clear Filters */}
+                    {/* Filter Jadwal - sejajar header di kanan */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowFilterPopup(!showFilterPopup)}
+                            className="flex items-center gap-2 bg-white dark:bg-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative"
+                        >
+                            <Filter className="w-4 h-4 text-emerald-500" />
+                            Filter Jadwal
                             {(selectedPenguji !== "all" || selectedStatus !== "all" || selectedMetode !== "all" || selectedWaktu !== "all") && (
-                                <button onClick={() => {
-                                    setSelectedPenguji("all"); setSelectedStatus("all"); setSelectedMetode("all"); setSelectedWaktu("all")
-                                }}
-                                    className="w-full mt-4 py-2 text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 rounded-xl transition-colors">
-                                    Reset Filter
-                                </button>
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border-2 border-white dark:border-gray-900 absolute -top-1 -right-1" />
                             )}
-                        </div>
-                    )}
+                        </button>
+
+                        {/* Filter Popup */}
+                        {showFilterPopup && (
+                            <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 z-40">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-gray-900 dark:text-white">Filter</h3>
+                                    <button onClick={() => setShowFilterPopup(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    {/* Filter Penguji */}
+                                    <div className="space-y-1.5 z-[60] relative">
+                                        <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /> Penguji</label>
+                                        <CustomSelect
+                                            value={selectedPenguji}
+                                            onChange={setSelectedPenguji}
+                                            options={[
+                                                { value: "all", label: "Semua Penguji" },
+                                                ...(seleksiTeam as any[]).map(t => ({ value: t.id.toString(), label: t.name }))
+                                            ]}
+                                        />
+                                    </div>
+
+                                    {/* Filter Status */}
+                                    <div className="space-y-1.5 z-[50] relative">
+                                        <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Status</label>
+                                        <CustomSelect
+                                            value={selectedStatus}
+                                            onChange={setSelectedStatus}
+                                            options={[
+                                                { value: "all", label: "Semua Status" },
+                                                { value: "scheduled", label: "Terjadwal" },
+                                                { value: "ongoing", label: "Berlangsung" },
+                                                { value: "done", label: "Selesai" },
+                                                { value: "reschedule", label: "Reschedule" },
+                                                { value: "cancelled", label: "Dibatalkan" }
+                                            ]}
+                                        />
+                                    </div>
+
+                                    {/* Filter Metode */}
+                                    <div className="space-y-1.5 z-[40] relative">
+                                        <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><Video className="w-3.5 h-3.5" /> Metode</label>
+                                        <CustomSelect
+                                            value={selectedMetode}
+                                            onChange={setSelectedMetode}
+                                            options={[
+                                                { value: "all", label: "Semua Metode" },
+                                                { value: "online", label: "Online" },
+                                                { value: "offline", label: "Offline" }
+                                            ]}
+                                        />
+                                    </div>
+
+                                    {/* Filter Waktu */}
+                                    <div className="space-y-1.5 z-[30] relative">
+                                        <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Waktu</label>
+                                        <CustomSelect
+                                            value={selectedWaktu}
+                                            onChange={setSelectedWaktu}
+                                            options={[
+                                                { value: "all", label: "Semua Waktu" },
+                                                { value: "pagi", label: "Pagi (< 12:00)" },
+                                                { value: "siang-sore", label: "Siang/Sore (>= 12:00)" }
+                                            ]}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Clear Filters */}
+                                {(selectedPenguji !== "all" || selectedStatus !== "all" || selectedMetode !== "all" || selectedWaktu !== "all") && (
+                                    <button onClick={() => {
+                                        setSelectedPenguji("all"); setSelectedStatus("all"); setSelectedMetode("all"); setSelectedWaktu("all")
+                                    }}
+                                        className="w-full mt-4 py-2 text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 rounded-xl transition-colors">
+                                        Reset Filter
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -470,58 +481,6 @@ function CalendarContent() {
                             </div>
                         </div>
 
-                        {/* ── Performa Tim Penyeleksi ── */}
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-                            <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                                <h3 className="font-bold text-gray-900 dark:text-white">Performa Tim Penyeleksi</h3>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
-                                            <th className="text-left text-xs font-bold text-gray-500 px-4 py-3">Nama Penyeleksi</th>
-                                            <th className="text-center text-xs font-bold text-gray-500 px-4 py-3">Bulan Ini</th>
-                                            <th className="text-center text-xs font-bold text-gray-500 px-4 py-3">Selesai</th>
-                                            <th className="text-center text-xs font-bold text-gray-500 px-4 py-3">Reschedule</th>
-                                            <th className="text-center text-xs font-bold text-gray-500 px-4 py-3">Rating</th>
-                                            <th className="text-left text-xs font-bold text-gray-500 px-4 py-3">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {teamPerformance.map(t => (
-                                            <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                                            {t.avatar}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-gray-900 dark:text-white text-xs">{t.name}</p>
-                                                            <p className="text-[10px] text-gray-500">{t.role} · {t.specialty}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center font-bold text-blue-600">{t.stats.scheduled + t.stats.done}</td>
-                                                <td className="px-4 py-3 text-center font-bold text-emerald-600">{t.stats.done}</td>
-                                                <td className="px-4 py-3 text-center font-bold text-orange-500">{t.stats.reschedule}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{t.rating}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${t.statusColor}`}>
-                                                        {t.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
                     </div>
 
                     {/* ── Kolom Kanan: Detail Tanggal ── */}
@@ -597,7 +556,7 @@ function CalendarContent() {
                                                     {/* Call to click detail */}
                                                     <div className="mt-2 text-right">
                                                         <span className="text-[9px] font-bold hover:underline opacity-80 flex items-center justify-end gap-1">
-                                                            <FileText className="w-3 h-3" /> Lihat Bukti Seleksi &rarr;
+                                                            <FileText className="w-3 h-3" /> Detail &rarr;
                                                         </span>
                                                     </div>
                                                 </div>

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     Search, ChevronLeft, ChevronRight, Receipt, Plus, Pencil, Trash2,
     CheckCircle2, XCircle, ChevronsUpDown, Globe, Percent,
@@ -660,7 +661,7 @@ function TaxRatesContent() {
                     {/* Pagination */}
                     <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {loading ? "Memuat data..." : `Menampilkan ${filtered.length === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} data`}
+                            {loading ? <Skeleton className="h-3 w-32" /> : `Menampilkan ${filtered.length === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} data`}
                         </span>
                         <div className="flex items-center gap-1">
                             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}

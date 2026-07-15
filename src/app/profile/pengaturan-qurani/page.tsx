@@ -7,6 +7,7 @@ import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { SkeletonFormPage } from '@/components/ui/skeletons'
 
 export default function QuraniSettingProfilePage() {
   const { t } = useI18n()
@@ -19,14 +20,7 @@ export default function QuraniSettingProfilePage() {
   return (
     <DashboardLayout>
       <I18nProvider namespaces={["common", "profile", "verse_word_error"]}>
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-600 dark:text-slate-400">{t('common.loading', 'Loading...')}</p>
-            </div>
-          </div>
-        }>
+        <Suspense fallback={<SkeletonFormPage fields={4} />}>
           <div className='space-y-4 w-full md:max-w-7xl mx-auto'>
             <div className="flex items-center gap-3 mb-6">
               <button

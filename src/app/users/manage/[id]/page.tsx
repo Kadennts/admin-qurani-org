@@ -6,6 +6,8 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
@@ -206,10 +208,7 @@ export default function UserDetailPage() {
     if (loadingProfile) {
         return (
             <DashboardLayout>
-                <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mb-4" />
-                    <p className="text-gray-500">Memuat profil pengguna...</p>
-                </div>
+                <SkeletonDetailPage showAvatar infoRows={6} />
             </DashboardLayout>
         )
     }
@@ -327,9 +326,10 @@ export default function UserDetailPage() {
                                 {/* KYC TAB */}
                                 <TabsContent value="kyc" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     {loadingKyc ? (
-                                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-3">
-                                            <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                                            <p className="text-sm">Memuat data KYC...</p>
+                                        <div className="space-y-3 py-4">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div key={i} className="flex justify-between animate-pulse"><Skeleton className="h-3 w-28" /><Skeleton className="h-4 w-36" /></div>
+                                            ))}
                                         </div>
                                     ) : kycData ? (
                                         <div className="space-y-4 max-w-2xl">
@@ -383,9 +383,9 @@ export default function UserDetailPage() {
                                 {/* WALLET TAB */}
                                 <TabsContent value="wallet" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     {loadingWallet ? (
-                                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-3">
-                                            <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                                            <p className="text-sm">Memuat data Dompet...</p>
+                                        <div className="space-y-3 py-4">
+                                            <Skeleton className="h-40 w-full rounded-2xl" />
+                                            <div className="flex gap-3"><Skeleton className="h-10 w-24 rounded-lg" /><Skeleton className="h-10 w-24 rounded-lg" /></div>
                                         </div>
                                     ) : walletData ? (
                                         <div className="max-w-md">
@@ -458,9 +458,13 @@ export default function UserDetailPage() {
                                 {/* ACTIVITY TAB */}
                                 <TabsContent value="aktivitas" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     {loadingLogs ? (
-                                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-3">
-                                            <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                                            <p className="text-sm">Memuat riwayat log aktivitas...</p>
+                                        <div className="space-y-4 py-4">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div key={i} className="flex items-start gap-3 animate-pulse">
+                                                    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                                                    <div className="space-y-2 flex-1"><Skeleton className="h-4 w-48" /><Skeleton className="h-3 w-32" /></div>
+                                                </div>
+                                            ))}
                                         </div>
                                     ) : activityLogs && activityLogs.length > 0 ? (
                                         <div className="space-y-4 max-w-3xl">

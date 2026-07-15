@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, Suspense, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
 import {
     Search, ChevronLeft, ChevronRight, Users,
@@ -96,8 +97,8 @@ function ScoreInput({ label, value, onChange }: { label: string; value: number; 
 
 // ---------- Penguji Dropdown ----------
 type PengujiItem = {
-    id: number; name: string; role: string; email: string;
-    zoomLink: string; specialty: string; avatar: string
+    id: number; username: string; name: string; role: string; email: string;
+    zoomLink: string; skills: string[]; avatar: string
     totalSeleksi: number; rating: number
 }
 
@@ -115,7 +116,7 @@ function PengujiDropdown({
     const filtered = useMemo(() => {
         const q = appliedSearch.toLowerCase()
         return (seleksiTeam as PengujiItem[]).filter(p =>
-            !q || p.name.toLowerCase().includes(q) || p.specialty.toLowerCase().includes(q) || p.role.toLowerCase().includes(q)
+            !q || p.name.toLowerCase().includes(q) || p.skills.some(s => s.toLowerCase().includes(q)) || p.role.toLowerCase().includes(q)
         )
     }, [appliedSearch])
 
@@ -188,7 +189,7 @@ function PengujiDropdown({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{p.name}</p>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{p.role} · {p.specialty}</p>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{p.role} · {p.skills.join(", ")}</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                     <div className="flex items-center gap-0.5 text-amber-500">
@@ -228,6 +229,7 @@ function mapPendingTrainer(d: any) {
         username: d.username || d.userUsername || "",
         specialization: d.headline || d.expertise?.join?.(" | ") || "Pengajar Al-Qur'an",
         location: d.location || "",
+        timezone: d.timezone || "Asia/Jakarta", // fallback if missing
         teachingMethod: d.isOnline && d.isOffline ? "Online / Offline" : d.isOnline ? "Online" : "Offline",
         createdAtRaw: d.createdAt || d.appliedAt || new Date().toISOString(),
     }
@@ -304,8 +306,8 @@ function PengajuanContent() {
 
     // ---------- Modal: Seleksi ----------
     const [seleksiModal, setSeleksiModal] = useState<{
-        open: boolean; guruId: number | null; name: string; email: string; location: string; isReschedule: boolean
-    }>({ open: false, guruId: null, name: "", email: "", location: "", isReschedule: false })
+        open: boolean; guruId: number | null; name: string; email: string; location: string; timezone: string; isReschedule: boolean
+    }>({ open: false, guruId: null, name: "", email: "", location: "", timezone: "", isReschedule: false })
 
     const [sDate, setSDate] = useState("")
     const [sTimeStart, setSTimeStart] = useState("")
@@ -333,7 +335,7 @@ function PengajuanContent() {
     const openSeleksiModal = (guru: any, isReschedule = false) => {
         const existing = seleksiData[guru.id]
         const detectedTz = guru.timezone || inferTimezone(guru.location || "")
-        setSeleksiModal({ open: true, guruId: guru.id, name: guru.name, email: guru.email, location: guru.location || "", isReschedule })
+        setSeleksiModal({ open: true, guruId: guru.id, name: guru.name, email: guru.email, location: guru.location || "", timezone: detectedTz, isReschedule })
         if (existing) {
             setSDate(existing.date || "")
             setSTimeStart(existing.time || "")
@@ -353,7 +355,7 @@ function PengajuanContent() {
     }
 
     const closeSeleksiModal = () =>
-        setSeleksiModal({ open: false, guruId: null, name: "", email: "", location: "", isReschedule: false })
+        setSeleksiModal({ open: false, guruId: null, name: "", email: "", location: "", timezone: "", isReschedule: false })
 
     const handleSelectPenguji = (p: PengujiItem) => {
         setSPengujiObj(p)
@@ -367,6 +369,22 @@ function PengajuanContent() {
         if (m === "online" && sPengujiObj) setSLink(sPengujiObj.zoomLink)
         else if (m === "offline") setSLink("")
     }
+
+    const convertedTime = useMemo(() => {
+        if (!sDate || !sTimeStart || !seleksiModal.timezone) return null
+        try {
+            const offset = sTimezone === "WIB" ? "+07:00" : sTimezone === "WITA" ? "+08:00" : sTimezone === "WIT" ? "+09:00" : "+07:00"
+            const dateObj = new Date(`${sDate}T${sTimeStart}:00${offset}`)
+            if (isNaN(dateObj.getTime())) return null
+            const formatter = new Intl.DateTimeFormat('en-GB', {
+                timeZone: seleksiModal.timezone,
+                hour: '2-digit', minute: '2-digit', hour12: false
+            })
+            return formatter.format(dateObj)
+        } catch (e) {
+            return null
+        }
+    }, [sDate, sTimeStart, sTimezone, seleksiModal.timezone])
 
     const handleSubmitSeleksi = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -383,11 +401,11 @@ function PengajuanContent() {
             trainerEmail: seleksiModal.email,
             pengujiId: sPengujiObj.id,
             pengujiName: sPengujiObj.name,
-            pengujiSpecialty: sPengujiObj.specialty,
+            pengujiSpecialty: sPengujiObj.skills.join(", "),
             date: sDate,
-            time: sTimeStart,
+            time: sTimeStart, // Admin time for Calendar
             timeEnd: sTimeEnd,
-            timezone: sTimezone,
+            timezone: sTimezone, // Admin timezone for Calendar
             method: sMethod,
             link: sLink,
             notes: sNotes,
@@ -414,6 +432,10 @@ function PengajuanContent() {
             open: true,
             data: {
                 ...data,
+                // Override for Email payload:
+                time: convertedTime || sTimeStart, 
+                timezone: seleksiModal.timezone || sTimezone,
+                
                 trainerName: seleksiModal.name,
                 trainerEmail: seleksiModal.email,
                 trainerId: seleksiModal.guruId,
@@ -463,13 +485,23 @@ function PengajuanContent() {
         }
     }
 
+    const handleEditUlang = () => {
+        if (!emailPreview.data) return
+        const prevData = emailPreview.data
+        setEmailPreview({ open: false, data: null })
+        openSeleksiModal(
+            { id: prevData.trainerId, name: prevData.trainerName, email: prevData.trainerEmail },
+            prevData.isReschedule
+        )
+    }
+
     // ---------- Modal: Penilaian ----------
     const [penilaianModal, setPenilaianModal] = useState<{ open: boolean; guruId: number | null; name: string }>({ open: false, guruId: null, name: "" })
 
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
-                setSeleksiModal({ open: false, guruId: null, name: "", email: "", location: "", isReschedule: false })
+                setSeleksiModal({ open: false, guruId: null, name: "", email: "", location: "", timezone: "", isReschedule: false })
                 setEmailPreview({ open: false, data: null })
                 setPenilaianModal({ open: false, guruId: null, name: "" })
             }
@@ -574,9 +606,16 @@ function PengajuanContent() {
 
                     {/* Loading state */}
                     {isFetchingList ? (
-                        <div className="flex flex-col items-center justify-center py-20 space-y-3">
-                            <Loader2 className="w-7 h-7 animate-spin text-emerald-500" />
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Memuat data pengajuan guru dari API...</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="space-y-2 flex-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div>
+                                    </div>
+                                    <div className="space-y-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-3/4" /></div>
+                                </div>
+                            ))}
                         </div>
                     ) : fetchError ? (
                         <div className="flex flex-col items-center justify-center py-16 space-y-3 text-center">
@@ -649,7 +688,7 @@ function PengajuanContent() {
                                                 <tr key={guru.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group">
                                                     {/* Pendaftar – nama & avatar bisa diklik */}
                                                     <td className="px-4 py-3">
-                                                        <Link href={`/trainers/${guru.id}/review`} className="flex items-center gap-3 group/name">
+                                                        <Link href={`/teachers/${guru.id}/review`} className="flex items-center gap-3 group/name">
                                                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0 text-sm ring-2 ring-transparent group-hover/name:ring-emerald-300 transition-all">
                                                                 {guru.name.charAt(0).toUpperCase()}
                                                             </div>
@@ -687,7 +726,7 @@ function PengajuanContent() {
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity flex-wrap">
                                                             {/* Detail button – selalu tampil */}
-                                                            <Link href={`/trainers/${guru.id}/review`}
+                                                            <Link href={`/teachers/${guru.id}/review`}
                                                                 className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors">
                                                                 <Eye className="w-3.5 h-3.5" /> Detail
                                                             </Link>
@@ -730,7 +769,7 @@ function PengajuanContent() {
                                     <div key={guru.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3 shadow-sm">
                                         {/* Header: Avatar + Nama + Status – bisa diklik */}
                                         <div className="flex items-start justify-between gap-3">
-                                            <Link href={`/trainers/${guru.id}/review`} className="flex items-center gap-3 min-w-0 group/name">
+                                            <Link href={`/teachers/${guru.id}/review`} className="flex items-center gap-3 min-w-0 group/name">
                                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0 text-sm ring-2 ring-transparent group-hover/name:ring-emerald-300 transition-all">
                                                     {guru.name.charAt(0).toUpperCase()}
                                                 </div>
@@ -772,7 +811,7 @@ function PengajuanContent() {
 
                                         {/* Aksi */}
                                         <div className="flex items-center gap-2 flex-wrap pt-1">
-                                            <Link href={`/trainers/${guru.id}/review`}
+                                            <Link href={`/teachers/${guru.id}/review`}
                                                 className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg transition-colors">
                                                 <Eye className="w-3.5 h-3.5" /> Detail
                                             </Link>
@@ -907,8 +946,33 @@ function PengajuanContent() {
                                             const label = hrs > 0 ? `${hrs} jam${mins > 0 ? ` ${mins} menit` : ""}` : `${mins} menit`
                                             return <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Durasi: {label}</p>
                                         })()}
+                                        {convertedTime && seleksiModal.timezone && (
+                                            <div className="mt-3 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-xs">
+                                                <p className="text-gray-600 dark:text-gray-400">
+                                                    Zona waktu calon guru terdeteksi: <strong className="text-blue-700 dark:text-blue-400">{seleksiModal.timezone}</strong>
+                                                </p>
+                                                <p className="text-gray-600 dark:text-gray-400 mt-0.5">
+                                                    Waktu seleksi di lokasi calon guru adalah <strong className="text-blue-700 dark:text-blue-400">{convertedTime} {seleksiModal.timezone}</strong>
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
 
+                                    {/* Penguji Dropdown - dipindah setelah Waktu Seleksi */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
+                                        <PengujiDropdown value={sPengujiObj} onSelect={handleSelectPenguji} />
+                                        {sPengujiObj && (
+                                            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                                <Mail className="w-3 h-3" />
+                                                <span>{sPengujiObj.email}</span>
+                                                <span>·</span>
+                                                <span>{sPengujiObj.skills.join(", ")}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Metode - dipindah setelah Penguji */}
                                     <div>
                                         <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Metode</label>
                                         <div className="grid grid-cols-2 gap-2">
@@ -921,20 +985,6 @@ function PengajuanContent() {
                                                 <MapPin className="w-4 h-4" /> Offline
                                             </button>
                                         </div>
-                                    </div>
-
-                                    {/* Penguji Dropdown */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
-                                        <PengujiDropdown value={sPengujiObj} onSelect={handleSelectPenguji} />
-                                        {sPengujiObj && (
-                                            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                                                <Mail className="w-3 h-3" />
-                                                <span>{sPengujiObj.email}</span>
-                                                <span>·</span>
-                                                <span>{sPengujiObj.specialty}</span>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Link pertemuan / Lokasi */}
@@ -981,7 +1031,7 @@ function PengajuanContent() {
                                     className={`px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors flex items-center gap-2 ${seleksiModal.isReschedule ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-500 hover:bg-blue-600"}`}>
                                     {seleksiModal.isReschedule
                                         ? <><RefreshCw className="w-4 h-4" /> Simpan Jadwal Baru</>
-                                        : <><Send className="w-4 h-4" /> Simpan & Kirim Email</>
+                                        : <><Send className="w-4 h-4" /> Simpan</>
                                     }
                                 </button>
                             </div>
@@ -1063,15 +1113,15 @@ function PengajuanContent() {
                             </div>
 
                             <div className="flex gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
-                                <button onClick={() => setEmailPreview({ open: false, data: null })}
+                                <button onClick={handleEditUlang}
                                     className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">
-                                    Lewati
+                                    Edit
                                 </button>
                                 <button onClick={handleSendEmail} disabled={isSendingEmail}
                                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors disabled:opacity-60">
                                     {isSendingEmail
                                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengirim...</>
-                                        : <><Send className="w-4 h-4" /> Kirim Email Sekarang</>
+                                        : <><Send className="w-4 h-4" /> Kirim Email</>
                                     }
                                 </button>
                             </div>

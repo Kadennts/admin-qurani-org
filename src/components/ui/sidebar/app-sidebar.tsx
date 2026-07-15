@@ -29,6 +29,8 @@ import {
   MessageSquare,
   Globe,
   CalendarDays,
+  Star,
+  KeyRound,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -154,6 +156,11 @@ const getSidebarData = (
           title: t("navigation.roles", "Roles"),
           url: "/admin/roles",
           icon: Shield,
+        },
+        {
+          title: t("navigation.permissions", "Permissions"),
+          url: "/admin/permissions",
+          icon: KeyRound,
         }
       ],
     },
@@ -226,27 +233,32 @@ const getSidebarData = (
     },
     {
       title: t("navigation.trainers_management", "Trainer Management"),
-      url: "/trainers",
+      url: "/teachers",
       icon: GraduationCap,
       items: [
         {
           title: t("navigation.trainers", "Active Trainers"),
-          url: "/trainers",
+          url: "/teachers",
           icon: GraduationCap,
         },
         {
           title: t("navigation.trainer_applications", "Pengajuan Guru"),
-          url: "/trainers/applications",
+          url: "/teachers/applications",
           icon: UserCheck,
         },
         {
-          title: t("navigation.trainer_calendar", "Kalender Seleksi"),
-          url: "/trainers/calendar",
+          title: t("navigation.trainer_calendar", "Kalender"),
+          url: "/teachers/calendar",
           icon: CalendarDays,
         },
         {
+          title: t("navigation.trainer_performance", "Performa Penyeleksi"),
+          url: "/teachers/performance",
+          icon: Star,
+        },
+        {
           title: t("navigation.packages", "Packages"),
-          url: "/trainers/packages",
+          url: "/teachers/packages",
           icon: Package,
         },
       ],

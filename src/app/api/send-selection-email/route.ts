@@ -31,8 +31,8 @@ function buildEmailHtml(data: SelectionEmailPayload): string {
     ? `<a href="${data.link}" style="color:#059669;text-decoration:underline;">${data.link}</a>`
     : data.link
 
-  const confirmUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "https://quraniadmin.ubig.web.id"}/trainers/confirm?id=${data.trainerId}&response=hadir`
-  const rescheduleUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "https://quraniadmin.ubig.web.id"}/trainers/confirm?id=${data.trainerId}&response=reschedule`
+  const confirmUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "https://quraniadmin.ubig.web.id"}/teachers/confirm?id=${data.trainerId}&response=hadir`
+  const rescheduleUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "https://quraniadmin.ubig.web.id"}/teachers/confirm?id=${data.trainerId}&response=reschedule`
 
   return `
 <!DOCTYPE html>

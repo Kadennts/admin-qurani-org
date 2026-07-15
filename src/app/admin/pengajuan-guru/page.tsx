@@ -2,11 +2,11 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-// Halaman ini dipindahkan ke /trainers/applications
+// Halaman ini dipindahkan ke /teachers/applications
 export default function RedirectPage() {
     const router = useRouter()
     useEffect(() => {
-        router.replace("/trainers/applications")
+        router.replace("/teachers/applications")
     }, [router])
     return (
         <div className="flex items-center justify-center min-h-screen">

@@ -407,3 +407,8 @@
     height: calc(78px * 0.7);
   }
 }
+
+/* Top loading bar glow effect */
+#nprogress .bar {
+  box-shadow: 0 0 10px #059669, 0 0 5px #059669;
+}

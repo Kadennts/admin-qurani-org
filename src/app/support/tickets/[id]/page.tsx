@@ -2,6 +2,7 @@
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
 import TicketDetailClient from "./TicketDetailClient"
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
@@ -161,9 +162,7 @@ export default function TicketDetailRoute() {
     if (isLoading) {
         return (
             <DashboardLayout>
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                </div>
+                <SkeletonDetailPage infoRows={4} />
             </DashboardLayout>
         );
     }

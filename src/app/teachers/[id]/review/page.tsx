@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     ArrowLeft, MapPin, BookOpen, CheckCircle2, XCircle,
     AlertTriangle, ShieldCheck, User, BadgeCheck, X,
@@ -71,9 +72,9 @@ const STATUS_CFG: Record<TrainerStatus, { label: string; badge: string; dot: str
 
 // ── Penguji Dropdown ──────────────────────────────────────────────────────────
 type PengujiItem = {
-    id: number; name: string; role: string; email: string;
-    zoomLink: string; specialty: string; avatar: string
-    totalSeleksi: number; rating: number
+    id: number; username: string; name: string; role: string; email: string;
+    zoomLink: string; skills: string[]; avatar: string;
+    totalSeleksi: number; rating: number;
 }
 
 function PengujiDropdown({
@@ -89,7 +90,7 @@ function PengujiDropdown({
     const filtered = useMemo(() => {
         const q = search.toLowerCase()
         return (seleksiTeam as PengujiItem[]).filter(p =>
-            !q || p.name.toLowerCase().includes(q) || p.specialty.toLowerCase().includes(q) || p.role.toLowerCase().includes(q)
+            !q || p.name.toLowerCase().includes(q) || p.skills.join(", ").toLowerCase().includes(q) || p.role.toLowerCase().includes(q)
         )
     }, [search])
 
@@ -148,7 +149,7 @@ function PengujiDropdown({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{p.name}</p>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{p.role} · {p.specialty}</p>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{p.skills.join(", ")}</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                     <div className="flex items-center gap-0.5 text-amber-500">
@@ -459,7 +460,7 @@ function GuruDetailContent() {
                 reasons[detail.id] = rejectReason || "Ditolak oleh admin"
                 sessionStorage.setItem("pengajuanGuruRejectReasons", JSON.stringify(reasons))
             } catch { }
-            setTimeout(() => { router.push("/trainers/applications") }, 1200)
+            setTimeout(() => { router.push("/teachers/applications") }, 1200)
         }
     }
 
@@ -487,7 +488,7 @@ function GuruDetailContent() {
             trainerEmail: detail.email,
             pengujiId: sPengujiObj.id,
             pengujiName: sPengujiObj.name,
-            pengujiSpecialty: sPengujiObj.specialty,
+            pengujiSpecialty: sPengujiObj.skills.join(", "),
             date: sDate,
             time: sTimeStart,
             timeEnd: sTimeEnd,
@@ -567,8 +568,13 @@ function GuruDetailContent() {
         } finally {
             setIsSendingEmail(false)
             setEmailPreview({ open: false, data: null })
-            setTimeout(() => { router.push("/trainers/applications") }, 1200)
+            setTimeout(() => { router.push("/teachers/applications") }, 1200)
         }
+    }
+
+    function handleEditUlang() {
+        setEmailPreview({ open: false, data: null })
+        setSeleksiModalOpen(true)
     }
 
     async function handleVerifyCredential(cert: Certification) {
@@ -654,7 +660,7 @@ function GuruDetailContent() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Link
-                            href="/trainers/applications"
+                            href="/teachers/applications"
                             className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                         >
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -683,9 +689,16 @@ function GuruDetailContent() {
 
                 {/* Loading */}
                 {loading ? (
-                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 py-16 text-center text-gray-400">
-                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-emerald-500" />
-                        <p>Memuat data pendaftar...</p>
+                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-6 space-y-4 animate-pulse">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-16 w-16 rounded-full" />
+                            <div className="space-y-2"><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-24" /></div>
+                        </div>
+                        <div className="space-y-3">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="flex justify-between"><Skeleton className="h-3 w-28" /><Skeleton className="h-4 w-36" /></div>
+                            ))}
+                        </div>
                     </div>
                 ) : !detail ? (
                     <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 py-16 text-center text-gray-400">
@@ -1146,6 +1159,23 @@ function GuruDetailContent() {
                                         return <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Durasi: {label}</p>
                                     })()}
                                 </div>
+                                {/* Penguji - dipindah setelah Waktu Seleksi */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
+                                    <PengujiDropdown value={sPengujiObj} onSelect={(p) => {
+                                        setSPengujiObj(p);
+                                        if (sMethod === "online") setSLink(p.zoomLink);
+                                    }} />
+                                    {sPengujiObj && (
+                                        <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                            <Mail className="w-3 h-3" />
+                                            <span>{sPengujiObj.email}</span>
+                                            <span>&middot;</span>
+                                            <span>{sPengujiObj.skills.join(", ")}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Metode - dipindah setelah Penguji */}
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Metode</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -1164,22 +1194,6 @@ function GuruDetailContent() {
                                             <MapPin className="w-4 h-4" /> Offline
                                         </button>
                                     </div>
-                                </div>
-                                {/* Penguji */}
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5">Penguji / Tim Penyeleksi</label>
-                                    <PengujiDropdown value={sPengujiObj} onSelect={(p) => {
-                                        setSPengujiObj(p);
-                                        if (sMethod === "online") setSLink(p.zoomLink);
-                                    }} />
-                                    {sPengujiObj && (
-                                        <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                                            <Mail className="w-3 h-3" />
-                                            <span>{sPengujiObj.email}</span>
-                                            <span>·</span>
-                                            <span>{sPengujiObj.specialty}</span>
-                                        </div>
-                                    )}
                                 </div>
                                 {sMethod === "online" ? (
                                     <div>
@@ -1213,7 +1227,7 @@ function GuruDetailContent() {
                         <div className="flex justify-end gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
                             <button onClick={() => setSeleksiModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">Batal</button>
                             <button type="submit" form="formSeleksi" className="px-4 py-2 text-sm font-semibold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2">
-                                <Send className="w-4 h-4" /> Lanjut & Kirim Email
+                                <Send className="w-4 h-4" /> Simpan
                             </button>
                         </div>
                     </div>
@@ -1291,15 +1305,15 @@ function GuruDetailContent() {
                         </div>
 
                         <div className="flex gap-2 p-4 border-t border-gray-100 dark:border-gray-800">
-                            <button onClick={() => setEmailPreview({ open: false, data: null })}
+                            <button onClick={handleEditUlang}
                                 className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 transition-colors">
-                                Lewati
+                                Edit
                             </button>
                             <button onClick={handleSendEmail} disabled={isSendingEmail}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors disabled:opacity-60">
                                 {isSendingEmail
                                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengirim...</>
-                                    : <><Send className="w-4 h-4" /> Kirim Email Sekarang</>
+                                    : <><Send className="w-4 h-4" /> Kirim Email</>
                                 }
                             </button>
                         </div>

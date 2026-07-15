@@ -3,6 +3,7 @@
 import React, { use, useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { SkeletonDetailPage } from "@/components/ui/skeletons"
 import {
     ArrowLeft,
     User,
@@ -643,10 +644,11 @@ function BookingDetailContent({ id }: { id: number }) {
 
     if (apiLoading && !booking && !detail) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 flex flex-col items-center justify-center gap-3">
-                <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Memuat detail pesanan...</p>
-                <Link href={BACK_URL} className="text-sm text-emerald-600 hover:text-emerald-700">Kembali ke Pesanan</Link>
-            </div>
+            <DashboardLayout>
+                <I18nProvider>
+                    <SkeletonDetailPage showAvatar infoRows={6} />
+                </I18nProvider>
+            </DashboardLayout>
         )
     }
 

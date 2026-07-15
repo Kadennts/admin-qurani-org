@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import { paymentsApi, type PaymentSearchParams } from "@/lib/api"
 import { formatTooltipDate } from "@/lib/date-utils"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
@@ -754,8 +755,13 @@ function PaymentsContent() {
                     {/* MOBILE CARD VIEW (<640px) */}
                     <div className="space-y-3 sm:hidden p-4">
                         {loading ? (
-                            <div className="text-center py-8 text-gray-500">
-                                {t("billing.payments.loading", "Memuat data pembayaran...")}
+                            <div className="space-y-3">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
+                                        <div className="flex justify-between items-start"><Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                                        <div className="grid grid-cols-2 gap-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /></div>
+                                    </div>
+                                ))}
                             </div>
                         ) : payments.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
@@ -843,8 +849,22 @@ function PaymentsContent() {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                                            {t("billing.payments.loading", "Memuat data pembayaran...")}
+                                        <td colSpan={9}>
+                                            <div className="space-y-3 py-4 px-6">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="flex items-center gap-4 animate-pulse">
+                                                        <Skeleton className="h-3 w-full max-w-[60px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[100px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[80px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[80px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[70px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[90px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[60px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[60px]" />
+                                                        <Skeleton className="h-3 w-full max-w-[50px]" />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : payments.length === 0 ? (

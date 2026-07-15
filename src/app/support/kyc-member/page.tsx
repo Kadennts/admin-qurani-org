@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     Search, Filter, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle2,
     XCircle, CreditCard, RefreshCw, Check, X, Phone, MapPin, User, Hash,
@@ -969,9 +970,17 @@ function KycMemberContent() {
                 {/* Table Card */}
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
                     {isLoading ? (
-                        <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
-                            <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                            <span className="text-sm">{t("kyc_member.loading")}</span>
+                        <div className="p-6 space-y-3">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="flex items-center gap-4 animate-pulse">
+                                    <Skeleton className="h-4 w-16" />
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-4 w-24" />
+                                    <Skeleton className="h-5 w-16 rounded-full" />
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-8 w-8 rounded-lg" />
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <>

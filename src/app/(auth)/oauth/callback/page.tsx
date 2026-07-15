@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { handleGoogleCallback } from "@/services/api/oauth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function OAuthCallbackContent() {
     const router = useRouter();
@@ -77,10 +78,10 @@ function OAuthCallbackContent() {
     if (processing) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-950">
-                <LoadingSpinner />
-                <p className="mt-4 text-gray-600 dark:text-gray-400">
-                    Completing sign in...
-                </p>
+                <div className="text-center space-y-4 animate-pulse">
+                    <Skeleton className="h-12 w-12 rounded-full mx-auto" />
+                    <Skeleton className="h-4 w-40 mx-auto" />
+                </div>
             </div>
         );
     }
@@ -112,10 +113,10 @@ export default function OAuthCallbackPage() {
     return (
         <Suspense fallback={
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-950">
-                <LoadingSpinner />
-                <p className="mt-4 text-gray-600 dark:text-gray-400">
-                    Loading...
-                </p>
+                <div className="text-center space-y-4 animate-pulse">
+                    <Skeleton className="h-12 w-12 rounded-full mx-auto" />
+                    <Skeleton className="h-4 w-40 mx-auto" />
+                </div>
             </div>
         }>
             <OAuthCallbackContent />

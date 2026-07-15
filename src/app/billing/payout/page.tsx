@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { useTranslation } from "@/hooks/use-translation"
 import {
@@ -325,8 +326,13 @@ function PayoutContent() {
                         {/* MOBILE CARD VIEW (<640px) */}
                         <div className="space-y-3 sm:hidden p-4">
                             {loading ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    Memuat data penarikan...
+                                <div className="space-y-3">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
+                                            <div className="flex justify-between items-start"><Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                                            <div className="grid grid-cols-2 gap-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /></div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : paged.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
@@ -424,8 +430,19 @@ function PayoutContent() {
                                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan={6} className="text-center py-12 text-gray-400">
-                                                Memuat data penarikan...
+                                            <td colSpan={6}>
+                                                <div className="space-y-3 py-4 px-6">
+                                                    {[...Array(4)].map((_, i) => (
+                                                        <div key={i} className="flex items-center gap-4 animate-pulse">
+                                                            <Skeleton className="h-3 w-full max-w-[120px]" />
+                                                            <Skeleton className="h-3 w-full max-w-[80px]" />
+                                                            <Skeleton className="h-3 w-full max-w-[100px]" />
+                                                            <Skeleton className="h-3 w-full max-w-[60px]" />
+                                                            <Skeleton className="h-3 w-full max-w-[90px]" />
+                                                            <Skeleton className="h-3 w-full max-w-[50px]" />
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </td>
                                         </tr>
                                     ) : paged.length === 0 ? (

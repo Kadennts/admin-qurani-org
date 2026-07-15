@@ -8,7 +8,7 @@ export default function DynamicTitle() {
 
   useEffect(() => {
     const p = pathname ?? "/"
-    const APP = "Qurani"
+    const APP = "Admin Qurani"
 
     const getTitle = () => {
       const exactMap: Record<string, string> = {
@@ -21,7 +21,7 @@ export default function DynamicTitle() {
         "/teman": `Teman | ${APP}`,
         "/tentang": `Tentang | ${APP}`,
         "/billing": `Billing | ${APP}`,
-        "/trainers": `Guru | ${APP}`,
+        "/teachers": `Guru | ${APP}`,
         "/billing/paket": `Paket | ${APP}`,
         "/billing/payout": `Payout | ${APP}`,
         "/groups/categories": `Group Categories | ${APP}`,
