@@ -750,7 +750,7 @@ function DiscountCodeDetailContent() {
                 {/* ── Tab Card ── */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     {/* Tab nav */}
-                    <div className="flex items-center border-b border-gray-100 dark:border-gray-800 px-2 overflow-x-auto">
+                    <div className="flex items-center border-b border-gray-100 dark:border-gray-800 px-2">
                         {([
                             { key: "detail" as TabKey, label: "Detail", icon: Info },
                             { key: "usage" as TabKey, label: "Riwayat Pemakaian", icon: History },
@@ -855,12 +855,7 @@ function DiscountCodeDetailContent() {
                     {/* ── Usage Tab ── */}
                     {activeTab === "usage" && (
                         <div>
-                            {!isRealUsage && !usageLoading && (
-                                <div className="mx-4 mt-4 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-                                    Menampilkan data contoh. API GET /api/v1/DiscountCodes/{id}/usages belum mengembalikan data.
-                                </div>
-                            )}
+
                             {usageLoading ? (
                                 <div className="space-y-3 py-4 px-4">
                                     {[...Array(4)].map((_, i) => (
@@ -922,12 +917,7 @@ function DiscountCodeDetailContent() {
                     {/* ── Analytics Tab ── */}
                     {activeTab === "analytics" && (
                         <div className="p-5">
-                            {!isRealAnalytics && !analyticsLoading && (
-                                <div className="mb-4 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-                                    Menampilkan data estimasi. API GET /api/v1/DiscountCodes/{id}/analytics belum mengembalikan data.
-                                </div>
-                            )}
+
                             {analyticsLoading ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4">
                                     {[...Array(8)].map((_, i) => (

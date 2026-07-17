@@ -5,7 +5,6 @@ import { useAuthContext } from "@/components/providers/auth-provider";
 // Re-export hook to maintain compatibility with existing components
 export function useAuth() {
   const {
-    user,
     profile,
     customUser,
     userId,
@@ -18,8 +17,8 @@ export function useAuth() {
   } = useAuthContext();
 
   return {
-    user,
     profile,
+    customUser,
     userId,
     authId,
     loading,

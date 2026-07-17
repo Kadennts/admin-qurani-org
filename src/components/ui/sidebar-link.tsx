@@ -1,7 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 import React from "react";
-import Link from "next/link";
+import { LocalizedLink as Link } from "@/components/ui/localized-link";
 // import { motion } from "motion/react";
 
 interface Links {

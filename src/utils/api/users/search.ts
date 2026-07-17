@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
+import { usersApi } from "@/lib/api";
 
 export interface SearchUser {
   id: string;
@@ -20,41 +21,34 @@ export async function searchUsers(
       return { users: [], total: 0 };
     }
 
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-    // Search users by full_name and username, exclude current user
-    // Use more efficient query without count for faster response
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select(
-        `
-        id,
-        name,
-        username,
-        avatar
-      `
-      )
-      .neq("id", currentUserId)
-      .or(`name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
-      .limit(limit)
-      .order("name");
+    const response = await usersApi.search(
+      { keyword: searchQuery, pageSize: limit },
+      token
+    );
 
-    if (error) {
-      console.error("Error searching users:", error);
-      throw error;
-    }
+    const items = response?.data?.items || response?.items || response?.data || [];
+    const rawUsers = Array.isArray(items) ? items : [];
+
+    // Filter out current user
+    const filteredUsers = rawUsers.filter(
+      (u: any) => u.id?.toString() !== currentUserId
+    );
 
     // Transform data to match SearchUser interface
-    const users: SearchUser[] = (data || []).map((user) => {
-      // Prioritas avatar: 1. profile_user (jika ada dan tidak kosong), 2. avatar (dari Google)
+    const users: SearchUser[] = filteredUsers.map((user: any) => {
       let avatarUrl = "";
       if (user.avatar && user.avatar.trim() !== "") {
         avatarUrl = user.avatar;
+      } else if (user.image && user.image.trim() !== "") {
+        avatarUrl = user.image;
       }
 
       return {
-        id: user.id,
-        name: user.name || "Unknown",
+        id: user.id?.toString() || "",
+        name: user.name || user.username || "Unknown",
         username: user.username || "",
         avatar: avatarUrl,
       };
@@ -62,7 +56,7 @@ export async function searchUsers(
 
     return {
       users,
-      total: users.length, // Use actual results length instead of expensive count query
+      total: users.length, 
     };
   } catch (error) {
     console.error("Error in searchUsers:", error);

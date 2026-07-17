@@ -26,7 +26,7 @@ function getPageNameFromPath(pathname: string): string | null {
 }
 
 export function RoleGuard({ pageName: explicitPageName, children }: RoleGuardProps) {
-    const { customUser, user, loading } = useAuthContext()
+    const { customUser, loading } = useAuthContext()
     const pathname = usePathname()
 
     if (loading) {
@@ -38,13 +38,6 @@ export function RoleGuard({ pageName: explicitPageName, children }: RoleGuardPro
     
     // If we can't determine the page, just let it pass (e.g. root route or unregulated route)
     if (!pageName) return <>{children}</>
-
-    // 1. Bypass if Supabase User is present (Temporary fallback as requested by user)
-    // When Supabase is removed, we will rely entirely on customUser.
-    if (user && !customUser) {
-        // If they are logged in via Supabase but haven't synced to API yet, allow access to prevent locking them out during transition.
-        return <>{children}</>
-    }
 
     // 2. Check API Qurani Roles (customUser)
     const userRoles = customUser?.roles || []

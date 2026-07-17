@@ -2,25 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./use-auth";
-import { useRealtime } from "./use-realtime";
-import { getNotifications } from "@/utils/api/notifikasi/fetch";
-
-interface MappedNotification {
-  id: string;
-  type: string;
-  is_read: boolean;
-  is_action_taken: boolean;
-  is_accept_friend: boolean | null;
-  created_at: string;
-  group_id: string | null;
-  groupName: string;
-  fromUserName: string;
-  fromUserUsername: string;
-  fromUserAvatar: string | null;
-  fromUserProfileUser: string | null;
-  fromUserId: string;
-  userId: string;
-}
+import { notificationsApi } from "@/lib/api";
 
 export function useNotificationCount() {
   const { userId } = useAuth();
@@ -35,16 +17,10 @@ export function useNotificationCount() {
 
     try {
       setIsLoading(true);
-      const result = await getNotifications(userId);
-
-      if (!result.error && result.data) {
-        const notifications = result.data as MappedNotification[];
-        const unread = notifications.filter((n) => !n.is_read).length;
-        console.log("Notification count updated:", unread); // Debug log
-        setUnreadCount(unread);
-      } else {
-        setUnreadCount(0);
-      }
+      const response = await notificationsApi.getUnreadCount();
+      const count = response?.data ?? response ?? 0;
+      const num = typeof count === 'number' ? count : (count?.data ?? 0);
+      setUnreadCount(num);
     } catch (error) {
       console.error("Error loading notification count:", error);
       setUnreadCount(0);
@@ -53,20 +29,21 @@ export function useNotificationCount() {
     }
   }, [userId]);
 
-  // Load notification count on mount and when user changes
+  // Load on mount + when user changes
   useEffect(() => {
     if (userId) {
       loadNotificationCount();
+    } else {
+      setUnreadCount(0);
     }
   }, [userId, loadNotificationCount]);
 
-  // Listen for realtime updates
-  useRealtime({
-    userId: userId,
-    onDataChange: loadNotificationCount,
-    enabled: !!userId,
-    tables: ["notifications", "friend_requests"],
-  });
+  // Poll every 60 seconds for fresh count
+  useEffect(() => {
+    if (!userId) return;
+    const interval = setInterval(loadNotificationCount, 60_000);
+    return () => clearInterval(interval);
+  }, [userId, loadNotificationCount]);
 
   return {
     unreadCount,

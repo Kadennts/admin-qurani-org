@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
-import { RealtimeChannel } from '@supabase/supabase-js'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { notificationsApi } from '@/lib/api'
 
 interface UseRealtimeProps {
   userId?: string
@@ -11,88 +10,64 @@ interface UseRealtimeProps {
   tables?: string[]
 }
 
-export function useRealtime({ userId, onDataChange, enabled = true, tables = ['friend_requests', 'notifications'] }: UseRealtimeProps) {
-  const channelRef = useRef<RealtimeChannel | null>(null)
+/**
+ * Polling-based replacement for Supabase Realtime.
+ * Supabase WebSocket telah dihapus - kini menggunakan interval polling
+ * ke endpoint API Qurani untuk mendeteksi perubahan data.
+ */
+export function useRealtime({ userId, onDataChange, enabled = true }: UseRealtimeProps) {
   const [isConnected, setIsConnected] = useState(false)
+  const lastCountRef = useRef<number | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const checkForUpdates = useCallback(async () => {
+    if (!userId || !enabled) return
+
+    try {
+      const response = await notificationsApi.getUnreadCount()
+      const count = response?.data ?? response ?? 0
+      const currentCount = typeof count === 'number' ? count : (count?.data ?? 0)
+
+      // Jika jumlah unread berubah → trigger onDataChange
+      if (lastCountRef.current !== null && lastCountRef.current !== currentCount) {
+        console.log('[useRealtime] Notification count changed, triggering refresh')
+        onDataChange()
+      }
+
+      lastCountRef.current = currentCount
+      setIsConnected(true)
+    } catch {
+      setIsConnected(false)
+    }
+  }, [userId, enabled, onDataChange])
 
   useEffect(() => {
     if (!userId || !enabled) {
       setIsConnected(false)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
       return
     }
 
-    const supabase = createClient()
+    // Run immediately on mount
+    checkForUpdates()
 
-    // Create unique channel name with timestamp
-    const channelName = `realtime_${userId}_${Date.now()}`
-    const channel = supabase.channel(channelName)
-
-    // Add listeners for each table
-    tables.forEach(table => {
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: table,
-        },
-        () => {
-          // Instant updates without loading states
-          const tableKey = `${table}_${userId}`
-
-          if (window.realtimeThrottle?.[tableKey]) {
-            clearTimeout(window.realtimeThrottle[tableKey])
-            return; // Skip if already throttled
-          }
-
-          if (!window.realtimeThrottle) {
-            window.realtimeThrottle = {}
-          }
-
-          // Immediate silent update for instant UX
-          onDataChange()
-
-          // Debounce additional calls to prevent spam
-          window.realtimeThrottle[tableKey] = setTimeout(() => {
-            if (window.realtimeThrottle) {
-              delete window.realtimeThrottle[tableKey]
-            }
-          }, 500) // Increased from 100ms to 500ms
-        }
-      )
-    })
-
-    // Subscribe with status handling
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    channel.subscribe((status, err) => {
-      switch (status) {
-        case 'SUBSCRIBED':
-          setIsConnected(true)
-          break
-        case 'CHANNEL_ERROR':
-        case 'TIMED_OUT':
-          setIsConnected(false)
-          break
-        case 'CLOSED':
-          setIsConnected(false)
-          break
-      }
-    })
-
-    channelRef.current = channel
+    // Poll every 30 seconds
+    intervalRef.current = setInterval(checkForUpdates, 30_000)
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-        setIsConnected(false)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
+      setIsConnected(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, enabled, tables.join(','), onDataChange])
+  }, [userId, enabled, checkForUpdates])
 
   return {
-    channel: channelRef.current,
-    isConnected
+    channel: null,
+    isConnected,
   }
 }

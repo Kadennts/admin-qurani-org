@@ -1,34 +1,39 @@
 "use client"
 
-import { createClient } from "../supabase/client";
+import { clearStoredAuth } from "@/lib/api";
+import { authApi } from "@/lib/api";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
 
 export default async function signOut(status: boolean, router?: AppRouterInstance) {
-  if (!status) return; // jika tidak melanjutkan, keluar dari fungsi
+  if (!status) return;
 
   try {
-    // Clear MyQurani API tokens from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('myqurani_auth');
-      localStorage.removeItem('myqurani_access_token');
-      localStorage.removeItem('myqurani_refresh_token');
-      localStorage.removeItem('myqurani_user');
+    // 1. Logout via API Qurani (revoke token server-side)
+    try {
+      await authApi.logout();
+    } catch {
+      // Silently ignore API errors - we still want to clear local data
+    }
 
-      // Clear all ticket cache
+    // 2. Clear all local auth data (localStorage + cookies)
+    if (typeof window !== 'undefined') {
+      clearStoredAuth();
+
+      // Clear profile cache
+      localStorage.removeItem('myqurani_user_profile_v2');
+      localStorage.removeItem('myqurani_user_profile');
+
+      // Clear all ticket/session cache
       Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('ticket_cache_') || key.startsWith('ticket_replies_')) {
+        if (
+          key.startsWith('ticket_cache_') ||
+          key.startsWith('ticket_replies_') ||
+          key.startsWith('myqurani_')
+        ) {
           localStorage.removeItem(key);
         }
       });
     }
-
-    // Clear cookies by setting them to expire
-    document.cookie = 'myqurani_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    document.cookie = 'myqurani_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-
-    // Try Supabase signout as well
-    const supabase = createClient();
-    await supabase.auth.signOut({ scope: "local" });
   } catch (error) {
     console.error('Error during signout:', error);
   }
@@ -38,7 +43,6 @@ export default async function signOut(status: boolean, router?: AppRouterInstanc
     router.push("/login");
     router.refresh();
   } else {
-    // Fallback - force full page redirect
     window.location.href = "/login";
   }
 }

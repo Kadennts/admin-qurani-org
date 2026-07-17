@@ -3,23 +3,13 @@
 import { useEffect, useCallback, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { MessageSquare, X, ExternalLink, Users, UserPlus, Bell } from "lucide-react"
-import { createClient } from "@/utils/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
-
-interface TicketInfo {
-    id: number
-    ticket_number: string
-    subject: string
-    contact: string
-    body?: string
-    department?: string
-}
+import { notificationsApi } from "@/lib/api"
 
 interface ToastNotification {
     id: string
     type: string
     ticketId?: number
-    ticket?: TicketInfo | null
     senderName: string
     message: string
     createdAt: string
@@ -32,6 +22,8 @@ export function UnifiedNotificationToast() {
     const [toast, setToast] = useState<ToastNotification | null>(null)
     const subscriptionSetupRef = useRef(false)
     const userIdRef = useRef<string | null>(null)
+    const lastCheckTimeRef = useRef<number>(Date.now())
+    
     // Deduplication: track recent toasts to prevent spam
     const recentToastsRef = useRef<Map<string, number>>(new Map())
 
@@ -49,24 +41,21 @@ export function UnifiedNotificationToast() {
         dismissToast()
     }, [router, dismissToast])
 
-    const showToast = useCallback(async (
-        notificationId: string,
-        type: string,
-        ticketId?: number | null,
-        fromUserId?: string | null
-    ) => {
+    const showToast = useCallback((notification: any) => {
         // Skip if this is admin's own action (admin should not see their own replies)
-        if (fromUserId && fromUserId === userIdRef.current) {
-            console.log(" Skipping notification from self:", notificationId)
+        if (notification.fromUserId && notification.fromUserId.toString() === userIdRef.current) {
             return
         }
 
-        // Deduplication key: type + ticketId (or notificationId if no ticketId)
+        const type = notification.type;
+        const ticketId = notification.ticketId || notification.ticket_id || notification.recapId || null;
+        const notificationId = notification.id.toString();
+
+        // Deduplication key
         const dedupKey = ticketId ? `${type}-${ticketId}` : notificationId
         const now = Date.now()
         const lastShown = recentToastsRef.current.get(dedupKey)
         if (lastShown && (now - lastShown) < 5000) {
-            console.log(` Toast ${dedupKey} already shown ${Math.round((now - lastShown) / 1000)}s ago, skipping`)
             return
         }
         recentToastsRef.current.set(dedupKey, now)
@@ -77,57 +66,19 @@ export function UnifiedNotificationToast() {
             if (timestamp < oneHourAgo) recentToastsRef.current.delete(key)
         }
 
-        let supabase: ReturnType<typeof createClient>
-        try {
-            supabase = createClient()
-        } catch {
-            return
-        }
-
-        let senderName = "User"
-        let ticketData: TicketInfo | null = null
+        let senderName = notification.fromUser?.name || notification.fromUser?.username || "User"
         let message = ""
         let actionUrl = "/notification"
 
-        // Fetch sender name
-        if (fromUserId) {
-            const { data } = await supabase
-                .from("user_profiles")
-                .select("name, username")
-                .eq("id", fromUserId)
-                .single()
-            senderName = data?.name || data?.username || "User"
-        }
-
         // Handle different notification types
         if (type === "ticket_new_message" || type === "ticket_replay") {
-            // For ticket notifications - SET actionUrl IMMEDIATELY if ticketId exists
             if (ticketId) {
                 actionUrl = `/support/tickets/${ticketId}`
             }
-
-            // Fetch ticket data if we have a ticket ID  
-            if (ticketId) {
-                const { data } = await supabase
-                    .from("tickets")
-                    .select("id, ticket_number, subject, contact, body, department")
-                    .eq("id", ticketId)
-                    .single()
-                ticketData = data as TicketInfo | null
-            }
-
             if (type === "ticket_new_message") {
-                message = ticketData?.contact
-                    ? `Tiket baru dari ${ticketData.contact}`
-                    : "Tiket support baru"
-                senderName = ticketData?.contact || "User"
+                message = "Tiket support baru"
             } else {
                 message = `Balasan baru dari ${senderName}`
-            }
-
-            // Final safety check - use ticketData.id as fallback
-            if (actionUrl === "/notification" && ticketData?.id) {
-                actionUrl = `/support/tickets/${ticketData.id}`
             }
         } else if (type === "friend_request") {
             message = `${senderName} mengirim permintaan pertemanan`
@@ -149,102 +100,53 @@ export function UnifiedNotificationToast() {
             id: notificationId,
             type,
             ticketId: ticketId ?? undefined,
-            ticket: ticketData,
             senderName,
             message,
             createdAt: new Date().toISOString(),
             actionUrl
         }
 
-        console.log(" Showing toast with actionUrl:", actionUrl, "ticketId:", ticketId, "ticketData:", ticketData)
         setToast(newToast)
     }, [])
 
     useEffect(() => {
-        if (loading) {
-            console.log(" UnifiedToast: Auth loading...")
-            return
-        }
-
-        if (!isAuthenticated || !userId) {
-            console.log("UnifiedToast: Not authenticated", { isAuthenticated, userId })
+        if (loading || !isAuthenticated || !userId) {
             return
         }
 
         if (subscriptionSetupRef.current) {
-            console.log("🔔 UnifiedToast: Subscription already setup")
             return
         }
-
-        let supabase: ReturnType<typeof createClient>
-        try {
-            supabase = createClient()
-        } catch (error) {
-            console.error("Failed to init realtime client:", error)
-            return
-        }
-
-        console.log("🔔 UnifiedToast: Setting up realtime subscription for user:", userId)
         subscriptionSetupRef.current = true
 
-        const channel = supabase
-            .channel(`unified-toast-${userId}-${Date.now()}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "INSERT",
-                    schema: "public",
-                    table: "notifications"
-                },
-                (payload) => {
-                    console.log("🔔 New notification received:", payload)
-                    const notification = payload.new as {
-                        id: string
-                        type: string
-                        ticket_id: number | null
-                        user_id: string | null
-                        from_user_id: string | null
+        // Use polling via API Qurani to get new notifications
+        const fetchLatestNotifications = async () => {
+            try {
+                // Fetch the latest 5 notifications
+                const response = await notificationsApi.getWithCursor({ pageSize: 5 })
+                const data = response?.data || response
+                const items = Array.isArray(data) ? data : (data?.data || [])
+
+                items.forEach((notif: any) => {
+                    const notifTime = new Date(notif.createdAt || notif.created_at).getTime()
+                    // If notification was created after our last check
+                    if (notifTime > lastCheckTimeRef.current) {
+                        showToast(notif)
                     }
+                })
 
-                    // Debug log
-                    console.log("🔔 Notification details:", {
-                        type: notification.type,
-                        ticketId: notification.ticket_id,
-                        userId: notification.user_id,
-                        fromUserId: notification.from_user_id,
-                        currentUserId: userId
-                    })
+                lastCheckTimeRef.current = Date.now()
+            } catch (error) {
+                console.error("Failed to poll notifications:", error)
+            }
+        }
 
-                    // Show toast for:
-                    // 1. Ticket notifications (any type) with ticket_id
-                    // 2. Notifications targeted to current user
-                    const isTicketNotification =
-                        (notification.type === "ticket_new_message" || notification.type === "ticket_replay")
-                        && notification.ticket_id
-
-                    const isTargetedToMe = notification.user_id === userId
-
-                    if (isTicketNotification || isTargetedToMe) {
-                        console.log("🔔 Processing notification:", notification.type)
-                        showToast(
-                            notification.id,
-                            notification.type,
-                            notification.ticket_id,
-                            notification.from_user_id
-                        )
-                    } else {
-                        console.log("🔔 Skipping notification (not relevant):", notification.type)
-                    }
-                }
-            )
-            .subscribe((status) => {
-                console.log("🔔 UnifiedToast subscription status:", status)
-            })
+        // Poll every 30 seconds
+        const intervalId = setInterval(fetchLatestNotifications, 30000)
 
         return () => {
-            console.log("🔔 Cleaning up subscription")
             subscriptionSetupRef.current = false
-            supabase?.removeChannel(channel)
+            clearInterval(intervalId)
         }
     }, [loading, isAuthenticated, userId, showToast])
 
@@ -299,9 +201,6 @@ export function UnifiedNotificationToast() {
                             </div>
                             <div>
                                 <p className="text-white font-semibold text-sm">{getTitle()}</p>
-                                {toast.ticket && (
-                                    <p className="text-white/80 text-xs">#{toast.ticket.ticket_number}</p>
-                                )}
                             </div>
                         </div>
                         <button
@@ -321,33 +220,13 @@ export function UnifiedNotificationToast() {
                         </div>
                         <p className="font-medium text-gray-900 dark:text-white text-sm">{toast.senderName}</p>
                     </div>
-
-                    {toast.ticket ? (
-                        <>
-                            <h3 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-1.5 line-clamp-2">
-                                {toast.ticket.subject}
-                            </h3>
-                            {toast.ticket.body && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                                    {toast.ticket.body}
-                                </p>
-                            )}
-                        </>
-                    ) : (
-                        <p className="text-sm text-gray-600 dark:text-gray-300">{toast.message}</p>
-                    )}
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{toast.message}</p>
                 </div>
 
                 <div className="px-4 pb-4 flex gap-2">
                     <button
                         onClick={() => {
-                            // Priority: use ticket.id, then ticketId, then actionUrl
-                            const url = toast.ticket?.id
-                                ? `/support/tickets/${toast.ticket.id}`
-                                : toast.ticketId
-                                    ? `/support/tickets/${toast.ticketId}`
-                                    : (toast.actionUrl || "/notification")
-                            console.log("🔔 Button clicked, navigating to:", url)
+                            const url = toast.actionUrl || "/notification"
                             handleAction(url)
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors flex items-center justify-center gap-1.5"

@@ -1,31 +1,49 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
+import { notificationsApi } from "@/lib/api";
 
 // Fungsi untuk meng-update status notifikasi
 export async function updateNotificationStatus(
   notificationId: string,
   updates: { is_read?: boolean; is_action_taken?: boolean }
 ) {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  const { error } = await supabase
-    .from("notifications")
-    .update(updates)
-    .eq("id", notificationId);
+    if (!token) {
+      return { error: "No authentication token found" };
+    }
 
-  return { error };
+    if (updates.is_read) {
+      await notificationsApi.markAsRead(notificationId, token);
+    }
+    
+    // If there is an action taken endpoint, call it here. For now, mark as read is the primary action.
+
+    return { error: null };
+  } catch (error) {
+    console.error("Error updating notification status:", error);
+    return { error: error instanceof Error ? error.message : "Failed to update notification" };
+  }
 }
 
 // Fungsi untuk mark all notifications sebagai read untuk user tertentu
 export async function markAllNotificationsAsRead(userId: string) {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  const { error } = await supabase
-    .from("notifications")
-    .update({ is_read: true })
-    .eq("user_id", userId)
-    .eq("is_read", false); // Only update unread notifications
+    if (!token) {
+      return { error: "No authentication token found" };
+    }
 
-  return { error };
+    await notificationsApi.markAllAsRead(token);
+    
+    return { error: null };
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error);
+    return { error: error instanceof Error ? error.message : "Failed to mark all as read" };
+  }
 }

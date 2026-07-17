@@ -1,6 +1,7 @@
 "use server"
 
-import { createAdminClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
+import { usersApi } from "@/lib/api"
 
 export interface AdminUser {
   id: string
@@ -11,24 +12,24 @@ export interface AdminUser {
 
 export async function fetchAdmins(): Promise<{ admins: AdminUser[]; error?: string }> {
   try {
-    const supabase = await createAdminClient()
+    const cookieStore = await cookies()
+    const token = cookieStore.get("myqurani_access_token")?.value
+    
+    const response = await usersApi.search({ pageSize: 100 }, token)
+    
+    const items = response?.data?.items || response?.items || response?.data || []
+    const usersArray = Array.isArray(items) ? items : []
 
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("id, name, email, avatar_url")
-      .eq("role", "admin")
-      .order("name")
+    const adminsList = usersArray.filter((user: any) => {
+        const role = user.role || (user.roles && user.roles[0]);
+        return role?.toLowerCase() === "admin"
+    })
 
-    if (error) {
-      console.error("Error fetching admins:", error)
-      return { admins: [], error: error.message }
-    }
-
-    const admins: AdminUser[] = (data || []).map((user) => ({
-      id: user.id,
-      name: user.name || "Unknown",
+    const admins: AdminUser[] = adminsList.map((user: any) => ({
+      id: user.id?.toString() || "",
+      name: user.name || user.username || "Unknown",
       email: user.email || "",
-      avatar_url: user.avatar_url
+      avatar_url: user.avatar || user.image
     }))
 
     return { admins }

@@ -1531,32 +1531,37 @@ export function Notifikasi({ userId }: NotifikasiProps) {
             </div>
             <div className="flex-1 md:flex-none w-full p-4 sm:p-4 md:p-6 bg-white dark:bg-gray-800 rounded-lg md:rounded-3xl border md:border border-gray-200 md:border-gray-300 dark:border-gray-700 shadow-none sm:shadow-sm md:shadow-xl dark:shadow-gray-800/25 space-y-3 sm:space-y-4 md:space-y-7 overflow-hidden md:overflow-visible">
 
-                <div className="relative flex items-center">
-                    <button
-                        className="absolute left-3 top-1/2 -translate-y-1/2 p-0 bg-transparent border-0"
-                        aria-label="Cari notifikasi"
-                        onClick={() => setSearchQuery(searchValue)}
-                    >
-                        <Search className="h-4 w-4 text-gray-400 hover:text-emerald-500 transition-colors duration-200 cursor-pointer" />
-                    </button>
-                    <Input
-                        value={searchValue}
-                        onChange={e => setSearchValue(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === "Enter") setSearchQuery(searchValue);
-                        }}
-                        placeholder={t('notifikasi.filter_placeholder', 'Cari notifikasi...')}
-                        className="pl-9 pr-8 h-9 text-sm rounded-lg border border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 bg-gray-50/80 dark:bg-gray-800/20 w-64 sm:w-80"
-                    />
-                    {searchValue && (
-                        <button
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-                            aria-label="Hapus pencarian"
-                            onClick={() => { setSearchValue(""); setSearchQuery(""); }}
+                <div className="flex justify-end w-full">
+                    <div className="flex items-center w-full sm:w-auto">
+                        <div className="relative flex items-center w-full sm:w-[320px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                            <Input
+                                value={searchValue}
+                                onChange={e => setSearchValue(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === "Enter") setSearchQuery(searchValue);
+                                }}
+                                placeholder={t('notifikasi.filter_placeholder', 'Cari notifikasi...')}
+                                className="pl-9 pr-9 h-10 text-sm rounded-l-lg rounded-r-none border border-r-0 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0 bg-white dark:bg-gray-800 w-full"
+                            />
+                            {searchValue && (
+                                <button
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                                    aria-label="Hapus pencarian"
+                                    onClick={() => { setSearchValue(""); setSearchQuery(""); }}
+                                >
+                                    <X className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                                </button>
+                            )}
+                        </div>
+                        <Button
+                            onClick={() => setSearchQuery(searchValue)}
+                            className="h-10 rounded-l-none rounded-r-lg bg-emerald-500 hover:bg-emerald-600 text-white px-4 md:px-5 shadow-none flex items-center gap-2 m-0 border border-emerald-500 hover:border-emerald-600"
                         >
-                            <X className="h-3 w-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
-                        </button>
-                    )}
+                            <Search className="h-4 w-4" />
+                            <span className="font-semibold">{t('notifikasi.cari', 'Cari')}</span>
+                        </Button>
+                    </div>
                 </div>
                 <div className="grid grid-cols-3 sm:flex gap-2 md:gap-3 lg:gap-3 xl:gap-3">
                     {/* All tab - reactivated */}

@@ -1,8 +1,6 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react"
-import { User } from "@supabase/supabase-js"
-import { createClient } from "@/utils/supabase/client"
 import useSWR from "swr"
 import { getStoredAuth, clearStoredAuth, authApi, API_BASE, type AuthData } from "@/lib/api"
 
@@ -13,11 +11,11 @@ interface UserProfile {
     email: string
     avatar: string
     role?: string
+    roles?: string[]
     timezone?: string
 }
 
 interface AuthContextType {
-    user: User | null
     profile: UserProfile | null
     customUser: AuthData | null
     userId: string | undefined
@@ -38,21 +36,21 @@ const normalizeAvatarUrl = (url: string | null | undefined): string => {
     // Already a full URL or data URI
     if (img.startsWith('http') || img.startsWith('data:')) return img;
     // Relative path - prepend API base URL
-    const normalizedPath = img.replace(/\\/g, '/'); // Fix Windows backslashes
+    const normalizedPath = img.replace(/\\/g, '/');
     return `${API_BASE}${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null)
     const [customUser, setCustomUser] = useState<AuthData | null>(null)
     const [authLoading, setAuthLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const initialized = useRef(false)
 
-    const supabase = useMemo(() => createClient(), [])
-
-    // Synchronize customUser from localStorage on mount (like My-Qurani example)
+    // Synchronize customUser from localStorage on mount
     useEffect(() => {
+        if (initialized.current) return;
+        initialized.current = true;
+
         const stored = getStoredAuth();
         if (stored) {
             console.log('[AuthProvider] Found stored auth in localStorage:', stored.username);
@@ -66,14 +64,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: stored.email,
                 username: stored.username,
                 name: stored.name,
-                role: 'member',
+                roles: stored.roles,
             }))}; expires=${expires}; path=/; SameSite=Lax`;
         }
+
+        setAuthLoading(false);
 
         // Listen for auth changes (from login/logout in other tabs)
         const handleAuthChange = () => {
             console.log('[AuthProvider] Auth change event received');
-            setCustomUser(getStoredAuth());
+            const updated = getStoredAuth();
+            setCustomUser(updated);
         };
 
         window.addEventListener('auth-change', handleAuthChange);
@@ -81,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // ── Proactive Token Auto-Refresh ──────────────────────────────────────────
-    // Cek setiap 1 menit, refresh token jika kurang dari 5 menit lagi expired
     useEffect(() => {
         const checkAndRefresh = async () => {
             const stored = getStoredAuth();
@@ -91,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const now = Date.now();
             const fiveMinutes = 5 * 60 * 1000;
 
-            // Refresh jika token akan expired dalam 5 menit
             if (expiresAt - now < fiveMinutes) {
                 console.log('[AuthProvider] Token expiring soon, auto-refreshing...');
                 try {
@@ -99,19 +98,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (res.ok) {
                         const data = await res.json();
                         if (data?.accessToken) {
-                            // Update localStorage
-                            const newAuth = { ...stored, accessToken: data.accessToken, expiresAt: data.expiresAt || stored.expiresAt };
+                            const newAuth = {
+                                ...stored,
+                                accessToken: data.accessToken,
+                                expiresAt: data.expiresAt || stored.expiresAt
+                            };
                             localStorage.setItem('myqurani_auth', JSON.stringify(newAuth));
 
-                            // Update cookie agar middleware tidak redirect
                             const expires = new Date(newAuth.expiresAt).toUTCString();
                             document.cookie = `myqurani_access_token=${data.accessToken}; expires=${expires}; path=/; SameSite=Lax`;
 
                             setCustomUser(newAuth);
                             console.log('[AuthProvider] Token refreshed successfully ✅');
                         }
-                    } else {
-                        console.warn('[AuthProvider] Token refresh failed, status:', res.status);
                     }
                 } catch (err) {
                     console.warn('[AuthProvider] Token refresh error:', err);
@@ -119,27 +118,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        // Jalankan langsung saat mount
         checkAndRefresh();
-
-        // Lalu cek setiap 60 detik
         const interval = setInterval(checkAndRefresh, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 
-
-    // Fetch user profile from API - only called if no cached profile
+    // Fetch user profile from API Qurani
     const fetchUserProfile = useCallback(
         async (authId: string): Promise<UserProfile | null> => {
-            // Priority 0: Check cached profile in localStorage (from previous login)
-            // This prevents 'me' request on every page load
+            // Priority 0: Check cached profile in localStorage
             try {
                 const cachedProfile = localStorage.getItem('myqurani_user_profile_v2');
                 if (cachedProfile) {
                     const parsed = JSON.parse(cachedProfile);
-                    // Verify cached profile matches current user AND timezone sudah ada
-                    if ((parsed.id?.toString() === authId || parsed.userId?.toString() === authId) && parsed.timezone) {
-                        console.log('[AuthProvider] Using cached user profile, timezone:', parsed.timezone);
+                    if (
+                        (parsed.id?.toString() === authId || parsed.userId?.toString() === authId) &&
+                        parsed.timezone
+                    ) {
+                        console.log('[AuthProvider] Using cached user profile');
                         return {
                             id: parsed.id?.toString() || authId,
                             name: parsed.name || parsed.username,
@@ -147,100 +143,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: parsed.email,
                             avatar: normalizeAvatarUrl(parsed.avatar || parsed.image),
                             role: parsed.role || "member",
+                            roles: parsed.roles || [],
                             timezone: parsed.timezone,
                         } as UserProfile;
-                    } else if (parsed.id?.toString() === authId || parsed.userId?.toString() === authId) {
-                        // Profile match tapi timezone kosong → hapus cache, fetch ulang dengan timezone
-                        console.log('[AuthProvider] Cached profile has no timezone, re-fetching...');
+                    } else if (
+                        parsed.id?.toString() === authId ||
+                        parsed.userId?.toString() === authId
+                    ) {
                         localStorage.removeItem('myqurani_user_profile_v2');
                     }
                 }
-            } catch (e) {
+            } catch {
                 console.log('[AuthProvider] No valid cached profile, will fetch from API');
             }
 
-            // Priority 1: Custom API if customUser exists (only on login or cache miss)
+            // Priority 1: Fetch from API Qurani
             const stored = getStoredAuth();
             if (stored?.accessToken) {
                 try {
-                    console.log('[AuthProvider] Fetching profile from API (first time or cache miss)');
+                    console.log('[AuthProvider] Fetching profile from API Qurani');
                     const { userApi } = await import('@/lib/api');
                     const result = await userApi.getMe(stored.accessToken);
                     const userData = result.data || result;
+
                     if (userData) {
-                        const profile = {
+                        const profile: UserProfile = {
                             id: userData.id?.toString() || authId,
                             name: userData.name || userData.username,
                             username: userData.username,
                             email: userData.email,
                             avatar: normalizeAvatarUrl(userData.avatar || userData.image),
                             role: userData.role || "member",
+                            roles: userData.roles || [],
                             timezone: userData.timezone || "",
-                        } as UserProfile;
+                        };
 
-                        // Selalu utamakan timezone dari Supabase user_profiles
-                        // karena ini source of truth saat user update profil location.
-                        if (userData.id || authId) {
-                            try {
-                                const { data: tzData } = await supabase
-                                    .from("user_profiles")
-                                    .select("timezone, cityId")
-                                    .eq("id", userData.id?.toString() || authId)
-                                    .maybeSingle();
-
-                                if (tzData?.timezone) {
-                                    profile.timezone = tzData.timezone;
-                                    console.log('[AuthProvider] Timezone from Supabase profile (preferred):', profile.timezone);
-                                } else if (!profile.timezone && tzData?.cityId) {
-                                    const { data: cityData } = await supabase
-                                        .from("cities")
-                                        .select("timezone")
-                                        .eq("id", tzData.cityId)
-                                        .maybeSingle();
-                                    if (cityData?.timezone) {
-                                        profile.timezone = cityData.timezone;
-                                        console.log('[AuthProvider] Timezone derived from city:', profile.timezone);
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('[AuthProvider] Failed to get timezone from Supabase:', e);
-                            }
-                        }
-
-                        // Cache the profile for future page loads (v2 key = busts old cache without timezone)
+                        // Cache the profile
                         localStorage.setItem('myqurani_user_profile_v2', JSON.stringify({
                             ...profile,
                             userId: authId,
                             cachedAt: new Date().toISOString(),
                         }));
-                        console.log('[AuthProvider] Profile cached for future use, timezone:', profile.timezone);
 
                         return profile;
                     }
                 } catch (e) {
-                    console.warn("[AuthProvider] Custom API getMe failed, falling back to Supabase:", e);
+                    console.warn("[AuthProvider] API getMe failed:", e);
                 }
             }
 
-            // Priority 2: Supabase direct query (fallback)
-            const { data, error } = await supabase
-                .from("user_profiles")
-                .select("*")
-                .eq("auth", authId)
-                .maybeSingle();
-
-            if (error) {
-                console.error("Error fetching profile:", error);
-                throw error;
-            }
-
-            return data;
+            return null;
         },
-        [supabase]
+        []
     );
 
-    const swrProfileKey = (user?.id || customUser?.userId) ? `user-profile-${user?.id || customUser?.userId}` : null;
-    const swrProfileId = user?.id?.toString() || customUser?.userId?.toString() || null;
+    const swrProfileKey = customUser?.userId
+        ? `user-profile-${customUser.userId}`
+        : null;
+    const swrProfileId = customUser?.userId?.toString() || null;
 
     const {
         data: profile,
@@ -250,126 +210,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         swrProfileKey,
         swrProfileId ? () => fetchUserProfile(swrProfileId) : null,
         {
-            // Disable automatic revalidation to prevent duplicate 'me' requests
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
-            dedupingInterval: 300000, // 5 minutes - prevent duplicate requests
+            dedupingInterval: 300000, // 5 minutes
             shouldRetryOnError: false,
             revalidateIfStale: false,
         }
     );
 
-    // Initial Supabase auth check
-    useEffect(() => {
-        if (initialized.current) return;
-        initialized.current = true;
-
-        const getInitialSession = async () => {
-            // Safety timeout: paksa berhenti loading setelah 6 detik
-            const timeoutId = setTimeout(() => {
-                console.warn('[AuthProvider] Auth timeout - forcing loading false');
-                setAuthLoading(false);
-            }, 6000);
-
-            try {
-                // Skip Supabase if we have custom auth
-                if (getStoredAuth()) {
-                    console.log('[AuthProvider] Custom auth found, skipping Supabase');
-                    clearTimeout(timeoutId);
-                    setAuthLoading(false);
-                    return;
-                }
-
-                // ─── STALE COOKIE DETECTION ───────────────────────────────────
-                // Jika cookie MyQurani ada tapi localStorage KOSONG → stale state.
-                // Redirect ke /api/auth/force-logout (exclude dari middleware)
-                // agar cookie dihapus server-side, lalu redirect bersih ke /login.
-                const hasMyQuraniCookie = document.cookie.includes('myqurani_access_token=');
-                if (hasMyQuraniCookie) {
-                    console.warn('[AuthProvider] Stale MyQurani cookie (no localStorage). Force logout...');
-                    clearTimeout(timeoutId);
-                    setAuthLoading(false);
-                    window.location.href = '/api/auth/force-logout';
-                    return;
-                }
-                // ─────────────────────────────────────────────────────────────
-
-                // Try to get Supabase user
-                const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-
-                if (userError) {
-                    if (userError.message?.includes('session missing') || userError.message?.includes('Auth session missing')) {
-                        console.log('[AuthProvider] No Supabase session, this is OK');
-                    } else {
-                        console.error("Error getting user:", userError);
-                    }
-                } else {
-                    setUser(currentUser || null);
-                }
-            } catch (err) {
-                console.error("Error in getInitialSession:", err);
-            } finally {
-                clearTimeout(timeoutId);
-                setAuthLoading(false);
-            }
-        };
-
-        getInitialSession();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-            try {
-                if (event === "SIGNED_IN") {
-                    setUser(session?.user ?? null);
-                    setError(null);
-                } else if (event === "SIGNED_OUT") {
-                    setUser(null);
-                    mutate(null, false);
-                    setError(null);
-                } else if (event === "TOKEN_REFRESHED") {
-                    setUser(session?.user ?? null);
-                }
-            } catch (err) {
-                console.error("Error in onAuthStateChange:", err);
-            } finally {
-                setAuthLoading(false);
-            }
-        });
-
-        return () => {
-            subscription?.unsubscribe();
-        };
-    }, [supabase, mutate]);
-
-    // Sign out function - clears everything and redirects to login
+    // Sign out function
     const signOut = useCallback(async () => {
         setAuthLoading(true);
         try {
-            // 1. Sign out from Custom API (calls API and clears localStorage + cookies)
+            // 1. Logout from API Qurani
             try {
                 await authApi.logout();
-                console.log('[AuthProvider] Custom API logout successful');
+                console.log('[AuthProvider] API logout successful');
             } catch (err) {
-                console.warn("Custom API logout failed", err);
-                // Still clear local data even if API fails
+                console.warn("API logout failed", err);
                 clearStoredAuth();
             }
 
-            // 2. Sign out from Supabase
-            await supabase.auth.signOut();
-
-            // 3. Clear state
-            setUser(null);
+            // 2. Clear state
             setCustomUser(null);
             mutate(null, false);
 
-            // 4. Additionally clear any httpOnly cookies via API
+            // 3. Clear profile cache
+            localStorage.removeItem('myqurani_user_profile_v2');
+            localStorage.removeItem('myqurani_user_profile');
+
+            // 4. Clear httpOnly cookies via API
             try {
                 await fetch('/api/auth/force-logout', { method: 'POST' });
             } catch {
                 // Ignore
             }
 
-            // 5. Redirect to login page
+            // 5. Redirect to login
             console.log('[AuthProvider] Redirecting to login...');
             window.location.href = '/login';
         } catch (err) {
@@ -378,14 +255,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setAuthLoading(false);
         }
-    }, [supabase, mutate]);
+    }, [mutate]);
 
-    const isAuthenticated = useMemo(() => !!user || !!customUser, [user, customUser]);
+    const isAuthenticated = useMemo(() => !!customUser, [customUser]);
 
-    // FIX: jika customUser (MyQurani) ada → effectiveProfile sudah tersedia → tidak perlu tunggu SWR
-    const loading = authLoading || (!customUser && !!user && !profile && !profileError);
+    const loading = authLoading || (!!customUser && !profile && !profileError);
 
-    // Build effective profile from custom user if available
+    // Build effective profile from customUser when SWR hasn't loaded yet
     const effectiveProfile = useMemo(() => {
         if (profile) return profile;
         if (customUser) {
@@ -395,7 +271,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 username: customUser.username,
                 email: customUser.email,
                 avatar: normalizeAvatarUrl(customUser.image),
-                role: "member",
+                role: customUser.roles?.[0] || "member",
+                roles: customUser.roles || [],
                 timezone: (customUser as any).timezone || "",
             } as UserProfile;
         }
@@ -404,11 +281,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const value = useMemo(
         () => ({
-            user,
             profile: effectiveProfile,
             customUser,
             userId: effectiveProfile?.id ?? undefined,
-            authId: user?.id ?? customUser?.userId?.toString() ?? null,
+            authId: customUser?.userId?.toString() ?? null,
             loading,
             error: error || (profileError ? "Failed to load profile" : null),
             signOut,
@@ -416,7 +292,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             refreshProfile: mutate,
         }),
         [
-            user,
             effectiveProfile,
             customUser,
             loading,

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useLocalizedRouter as useRouter } from "@/hooks/use-localized-router"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useUnreadCount } from "@/hooks/use-notifications"
@@ -10,7 +10,7 @@ import { SidebarProvider } from "@/components/ui/sidebar/custom-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar/custom-sidebar-inset"
 import { SidebarTrigger } from "@/components/ui/sidebar/custom-sidebar-trigger"
 import Image from "next/image"
-import Link from "next/link"
+import { LocalizedLink as Link } from "@/components/ui/localized-link"
 import { RoleGuard } from "@/components/auth/role-guard"
 
 interface DashboardLayoutProps {
@@ -24,8 +24,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { unreadCount } = useUnreadCount(isAuthenticated ? userId : undefined)
   const [hasVisitedNotifications, setHasVisitedNotifications] = useState(false)
 
+  // Strip locale prefix from pathname for comparisons
+  const strippedPathname = (() => {
+    const LOCALES = ["id", "en", "ar"]
+    const segments = (pathname ?? "/").split("/").filter(Boolean)
+    if (segments.length > 0 && LOCALES.includes(segments[0])) {
+      return "/" + segments.slice(1).join("/")
+    }
+    return pathname ?? "/"
+  })()
+
   // Cek apakah user sedang di halaman notifikasi
-  const isOnNotificationsPage = pathname === '/notification'
+  const isOnNotificationsPage = strippedPathname === '/notification'
 
   // Memoize keys untuk menghindari pembuatan string berulang
   const visitKey = useMemo(() => userId ? `notifications_visited_${userId}` : '', [userId])

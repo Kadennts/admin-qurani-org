@@ -55,24 +55,24 @@ export function useGlobalPresence() {
  * ```
  */
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth()
+  const { customUser, isAuthenticated } = useAuth()
 
   // Track presence globally - aktif di semua halaman
   const presenceState = usePresence({
     channelName: 'friends-presence',
-    currentUserId: user?.id || '',
-    username: user?.user_metadata?.full_name || user?.email || 'Anonymous',
-    enabled: isAuthenticated && !!user
+    currentUserId: customUser?.userId?.toString() || '',
+    username: customUser?.name || customUser?.email || 'Anonymous',
+    enabled: isAuthenticated && !!customUser
   })
 
   // Optional: Log connection status untuk debugging
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      if (presenceState.isConnected && user) {
-        console.log('✅ Presence connected globally for:', user.user_metadata?.full_name || user.email)
+      if (presenceState.isConnected && customUser) {
+        console.log('✅ Presence connected globally for:', customUser.name || customUser.email)
       }
     }
-  }, [presenceState.isConnected, user])
+  }, [presenceState.isConnected, customUser])
 
   // Share presence state via context
   return (

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { useI18n } from "@/components/providers/i18n-provider";
+import { usersApi, getStoredAuth } from "@/lib/api";
 
 export function useUsernameValidation(
   userId?: string,
@@ -69,27 +69,23 @@ export function useUsernameValidation(
 
       setIsCheckingUsername(true);
       try {
-        const supabase = createClient();
+        const stored = getStoredAuth();
+        const token = stored?.accessToken;
+        const normalizedUsername = username.startsWith("@") ? username : `@${username}`;
 
-        const { data, error } = await supabase
-          .from("user_profiles")
-          .select("username")
-          .eq("username", username)
-          .neq("id", userId || "")
-          .limit(1);
+        const result = await usersApi.search({ keyword: normalizedUsername }, token);
+        const items = result?.data?.items || result?.items || result?.data || [];
 
-        if (error) {
-          console.error("Error checking username:", error);
-          setUsernameError(
-            t(
-              "profile.messages.error.check_username",
-              "Error checking username availability"
+        // Check if there's any user with the same username (excluding the current user)
+        const existingUser = Array.isArray(items)
+          ? items.find((u: any) =>
+              (u.username?.toLowerCase() === normalizedUsername.toLowerCase() ||
+               u.username?.toLowerCase() === username.toLowerCase()) &&
+              u.id?.toString() !== userId
             )
-          );
-          return false;
-        }
+          : null;
 
-        if (data && data.length > 0) {
+        if (existingUser) {
           setUsernameError(
             t(
               "profile.messages.error.username_taken",

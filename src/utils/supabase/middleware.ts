@@ -1,4 +1,3 @@
-import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 /**
@@ -9,8 +8,8 @@ interface MyQuraniUser {
   email: string;
   name?: string;
   role?: string;
+  roles?: string[];
 }
-
 
 /**
  * Get user from MyQurani token cookie
@@ -23,7 +22,11 @@ function getMyQuraniUser(request: NextRequest): MyQuraniUser | null {
     if (!accessToken) return null;
 
     if (userCookie) {
-      return JSON.parse(userCookie) as MyQuraniUser;
+      try {
+        return JSON.parse(decodeURIComponent(userCookie)) as MyQuraniUser;
+      } catch {
+        return JSON.parse(userCookie) as MyQuraniUser;
+      }
     }
 
     // If we have token but no user cookie, still consider authenticated
@@ -40,8 +43,11 @@ function getMyQuraniUser(request: NextRequest): MyQuraniUser | null {
  * Kita gunakan NEXT_PUBLIC_BASE_URL sebagai base URL yang benar.
  */
 function buildRedirectUrl(request: NextRequest, pathname: string): URL {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.startsWith('192.168.');
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  const isLocal =
+    host.includes("localhost") ||
+    host.includes("127.0.0.1") ||
+    host.startsWith("192.168.");
 
   const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   if (publicBaseUrl && !isLocal) {
@@ -54,40 +60,56 @@ function buildRedirectUrl(request: NextRequest, pathname: string): URL {
 }
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
 
-  const pathname = request.nextUrl.pathname;
+  let pathname = request.nextUrl.pathname;
+  let possibleLocale = "";
+
+  // Extract and remove locale prefix if present
+  const segments = pathname.split('/');
+  if (segments.length > 1 && ["id", "en", "ar"].includes(segments[1])) {
+    possibleLocale = segments[1];
+    pathname = pathname.replace(`/${possibleLocale}`, '') || '/';
+  }
 
   // Define route types
-  const isAuthCallback = pathname.startsWith("/auth/callback") || pathname.startsWith("/oauth/callback");
+  const isAuthCallback =
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/oauth/callback");
   const isLoginPage = pathname.startsWith("/login");
   const isRegisterPage = pathname.startsWith("/register");
   const isHomePage = pathname === "/";
-  const isDashboard = pathname.startsWith("/dashboard");
   const isProtectedRoute =
-    isDashboard ||
+    pathname.startsWith("/dashboard") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/support") ||
     pathname.startsWith("/billing") ||
     pathname.startsWith("/administrator") ||
     pathname.startsWith("/master-data") ||
     pathname.startsWith("/notification") ||
-    pathname.startsWith("/settings");
-  const isBlockedPage = pathname.startsWith("/blocked");
-
-
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/users") ||
+    pathname.startsWith("/groups") ||
+    pathname.startsWith("/teachers") ||
+    pathname.startsWith("/myqurani") ||
+    pathname.startsWith("/setoran") ||
+    pathname.startsWith("/admin");
 
   // ============================================
-  // STEP 1: Check for MyQurani API token first
+  // Check for MyQurani API token (sole auth method)
   // ============================================
   const myquraniUser = getMyQuraniUser(request);
 
   if (myquraniUser) {
-    console.log("[Middleware] MyQurani user found:", myquraniUser?.email || "token-only");
+    console.log(
+      "[Middleware] MyQurani user found:",
+      myquraniUser?.email || "token-only"
+    );
 
     // Redirect authenticated user away from login/register pages
     if (isLoginPage || isRegisterPage || isHomePage) {
-      return NextResponse.redirect(buildRedirectUrl(request, "/dashboard"));
+      const redirectPath = possibleLocale ? `/${possibleLocale}/dashboard` : "/dashboard";
+      return NextResponse.redirect(buildRedirectUrl(request, redirectPath));
     }
 
     // Allow access to protected routes
@@ -95,68 +117,20 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ============================================
-  // STEP 2: Fallback to Supabase session check
+  // Handle unauthenticated users
   // ============================================
-  let supabaseUser = null;
 
-  try {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-            response = NextResponse.next({ request });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
-
-    const { data: { user } } = await supabase.auth.getUser();
-    supabaseUser = user;
-
-    if (supabaseUser && !isAuthCallback && !isLoginPage && !isRegisterPage) {
-      console.log("[Middleware] Supabase user found:", supabaseUser.email);
-
-      // Check user profile from Supabase
-      const { data: userProfile } = await supabase
-        .from("user_profiles")
-        .select("username, role, isBlocked")
-        .eq("auth", supabaseUser.id)
-        .single();
-
-      const isBlocked = userProfile?.isBlocked || false;
-
-      // Check if user is blocked
-      if (isBlocked && !isBlockedPage) {
-        return NextResponse.redirect(buildRedirectUrl(request, "/blocked"));
-      }
-    }
-  } catch (error) {
-    console.error("[Middleware] Supabase check error:", error);
-  }
-
-  // ============================================
-  // STEP 3: Handle unauthenticated users
-  // ============================================
-  const isAuthenticated = myquraniUser !== null || supabaseUser !== null;
-
-  // Redirect authenticated users away from auth pages
-  if (isAuthenticated && (isLoginPage || isRegisterPage || isHomePage)) {
-    return NextResponse.redirect(buildRedirectUrl(request, "/dashboard"));
-  }
-
-  // Redirect unauthenticated users to login
-  if (!isAuthenticated && !isAuthCallback && !isLoginPage && !isRegisterPage && !isHomePage && isProtectedRoute) {
+  // Redirect unauthenticated users to login for protected routes
+  if (
+    !isAuthCallback &&
+    !isLoginPage &&
+    !isRegisterPage &&
+    !isHomePage &&
+    isProtectedRoute
+  ) {
     console.log("[Middleware] No auth found, redirecting to login");
-    return NextResponse.redirect(buildRedirectUrl(request, "/login"));
+    const redirectPath = possibleLocale ? `/${possibleLocale}/login` : "/login";
+    return NextResponse.redirect(buildRedirectUrl(request, redirectPath));
   }
 
   return response;

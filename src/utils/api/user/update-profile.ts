@@ -1,62 +1,17 @@
 "use server";
 
-import { createClient, createAdminClient } from "@/utils/supabase/server";
-const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com";
-
-async function checkStateWithCountry(
-  stateId: number,
-  countryId: number
-): Promise<boolean> {
-  if (!stateId || !countryId) return true; // Skip if no location set
-  
-  try {
-    const supabase = await createAdminClient();
-    const { data, error } = await supabase
-      .from("states")
-      .select("country_id")
-      .eq("id", stateId)
-      .maybeSingle();
-      
-    if (error || !data) return true; 
-    return String(data.country_id) === String(countryId);
-  } catch (err) {
-    console.warn("[checkStateWithCountry] Validation error:", err);
-    return true; // Don't block on error
-  }
-}
-
-async function checkCityWithState(
-  cityId: number,
-  stateId: number
-): Promise<boolean> {
-  if (!cityId || !stateId) return true; // Skip if no location set
-  
-  try {
-    const supabase = await createAdminClient();
-    const { data, error } = await supabase
-      .from("cities")
-      .select("state_id")
-      .eq("id", cityId)
-      .maybeSingle();
-
-    if (error || !data) return true;
-    return String(data.state_id) === String(stateId);
-  } catch (err) {
-    console.warn("[checkCityWithState] Validation error:", err);
-    return true;
-  }
-}
+import { userApi } from "@/lib/api";
 
 export const updateUserProfile = async (
   userId: string,
-  countryId: number, // Pindah ke depan
-  stateId: number, // Pindah ke depan
-  cityId: number, // Pindah ke depan
-  countryName: string, // Pindah ke depan
-  statesName: string, // Pindah ke depan
-  cityName: string, // Pindah ke depan
+  countryId: number, 
+  stateId: number, 
+  cityId: number, 
+  countryName: string, 
+  statesName: string, 
+  cityName: string, 
   timezone: string,
-  fullName?: string, // Optional di belakang
+  fullName?: string, 
   nickname?: string,
   username?: string,
   gender?: number | null,
@@ -65,157 +20,51 @@ export const updateUserProfile = async (
   phoneNumber?: string,
   bio?: string,
   profilePhotoUrl?: string,
-  email?: string // Argument ke-18
+  email?: string 
 ) => {
-  // Prepare update data with all fields
-  // Helper: pastikan username selalu punya prefix '@' untuk konsistensi di Supabase
-  const formatUsername = (uname: string) => {
-    if (!uname) return uname;
-    return uname.startsWith('@') ? uname : `@${uname}`;
-  };
-
-  const updateData: any = {
-    countryId: countryId,
-    stateId: stateId,
-    cityId: cityId,
-    countryName: countryName,
-    stateName: statesName,
-    cityName: cityName,
-    timezone,
-  };
-
-  if (fullName !== undefined) updateData.name = fullName;
-  if (nickname !== undefined) updateData.nickname = nickname;
-  if (username !== undefined) updateData.username = formatUsername(username);
-  if (gender !== undefined) updateData.gender = gender;
-  if (date_of_birth !== undefined) updateData.dob = date_of_birth || null;
-  if (job !== undefined) updateData.job = job;
-  if (phoneNumber !== undefined) updateData.hp = phoneNumber;
-  if (bio !== undefined) updateData.bio = bio;
-  if (profilePhotoUrl !== undefined) updateData.avatar = profilePhotoUrl;
-  if (email !== undefined) updateData.email = email;
-
   try {
-    console.log("[updateUserProfile] Starting UPSERT for email:", email || userId);
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-    const isStateValid = await checkStateWithCountry(stateId, countryId);
-    const isCityValid = await checkCityWithState(cityId, stateId);
-
-    if (!isStateValid) {
-      return { type: "state", warning: true, success: false, message: "State does not belong to the specified country" };
-    }
-    if (!isCityValid) {
-      return { warning: true, success: false, message: "City does not belong to the specified state" };
+    if (!token) {
+      return { success: false, message: "No active session found. Please login again." };
     }
 
-    const adminSupabase = await createAdminClient();
+    const finalPayload: Record<string, any> = {
+      name: fullName || null, 
+      nickname: nickname || null, 
+      bio: bio || null, 
+      address: phoneNumber || null, 
+      cityId: cityId || null,
+      city: cityName || null,
+      stateId: stateId || null,
+      state: statesName || null,
+      countryId: countryId || null,
+      country: countryName || null,
+      sex: gender !== undefined ? gender : null,
+      job: job || null,
+      imageBase64: profilePhotoUrl || null,
+    };
 
-    // 1. Cek manual apakah profil sudah ada (berdasarkan id)
-    const { data: existing, error: findError } = await adminSupabase
-      .from("user_profiles")
-      .select("id, auth, email")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (findError) {
-      console.error("Find Profile Error:", findError);
-      return { success: false, message: `Database error: ${findError.message}` };
+    if (date_of_birth) {
+      finalPayload.dateOfBirth = date_of_birth;
     }
 
-    let result;
-    let error;
-
-    if (existing) {
-      // 2a. JIKA ADA: Gunakan UPDATE
-      console.log("[updateUserProfile] Found existing profile, performing UPDATE");
-      const { data, error: updateErr } = await adminSupabase
-        .from("user_profiles")
-        .update(updateData)
-        .eq("id", existing.id)
-        .select();
-      result = data;
-      error = updateErr;
-    } else {
-      // 2b. JIKA TIDAK ADA: Gunakan INSERT (Buat Baru)
-      console.log(`[updateUserProfile] Profile not found for ${userId}, performing INSERT`);
-
-      const newData: any = {
-        ...updateData,
-        id: userId,       // Primary key = userId dari MyQurani
-        role: "member",
-        created: new Date().toISOString(),
-        email: email
-        // NOTE: 'auth' field dihapus karena menyebabkan FK constraint error
-        // (auth merujuk ke Supabase auth.users, bukan MyQurani user)
-      };
-
-      console.log("[updateUserProfile] INSERT payload:", JSON.stringify(newData, null, 2));
-
-      const { data, error: insertErr } = await adminSupabase
-        .from("user_profiles")
-        .insert([newData])
-        .select();
-      result = data;
-      error = insertErr;
+    // API expects timezone as integer, so we only send it if it's a number
+    if (timezone && !isNaN(Number(timezone))) {
+      finalPayload.timezone = Number(timezone);
     }
 
-    if (error) {
-      console.error("Supabase Save Error - Full details:", {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      return { 
-        success: false, 
-        message: `Database Save Error: ${error.message} | Code: ${error.code} | Hint: ${error.hint || 'none'}`
-      };
-    }
+    const response = await userApi.updateMe(finalPayload, token);
 
-    // Optionally sync to external API (non-blocking)
-    try {
-      const { cookies } = await import("next/headers");
-      const cookieStore = await cookies();
-      const token = cookieStore.get("myqurani_access_token")?.value;
-
-      if (token) {
-        const finalPayload = {
-          name: fullName || "", 
-          nickname: nickname || "", 
-          username: username || "", 
-          sex: gender ?? 0, 
-          dateOfBirth: date_of_birth || "",
-          job: job || "", 
-          address: phoneNumber || "", // Map phoneNumber to address temporarily if API lacks phone
-          bio: bio || "", 
-          imageBase64: profilePhotoUrl || "", // Send URL if base64 isn't strictly required by API wrapper
-          countryId: countryId || 0, 
-          stateId: stateId || 0, 
-          cityId: cityId || 0, 
-          country: countryName || "", 
-          state: statesName || "", 
-          city: cityName || "", 
-          timezone: timezone || ""
-        };
-
-        fetch(`${API_BASE_URL}/api/v1/Users/me`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify(finalPayload)
-        }).catch((e) => console.warn("[updateUserProfile] API sync fail:", e));
-      }
-    } catch (syncErr) {
-      console.warn("[updateUserProfile] API sync error:", syncErr);
-    }
-
-    return { success: true, message: "Profile updated successfully" };
-
-  } catch (err) {
+    return { 
+      success: true, 
+      message: "Profile updated successfully",
+      data: response?.data || response
+    };
+  } catch (err: any) {
     console.error("Update Profile Error:", err);
-    return { success: false, message: "Failed to update profile" };
+    return { success: false, message: err.message || "Failed to update profile" };
   }
 };

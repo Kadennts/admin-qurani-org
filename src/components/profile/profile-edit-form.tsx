@@ -19,7 +19,7 @@ interface ProfileEditFormProps {
     gender: number | null
     date_of_birth: string
     job: string
-    phoneNumber: string
+    address: string
     timezone: string
     bio: string
   }
@@ -108,23 +108,11 @@ export function ProfileEditForm({
             <Input
               id="username"
               value={profileData.username}
-              onChange={(e) => handleInputChange("username", e.target.value)}
+              disabled
               placeholder="@username"
-              maxLength={15}
-              className={`${usernameError ? 'border-red-500 focus:border-red-500' : ''} ${isCheckingUsername ? 'pr-10' : ''}`}
+              className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500"
             />
-            {isCheckingUsername && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            )}
           </div>
-          {usernameError && (
-            <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
-              <span className="w-4 h-4 text-red-500">⚠</span>
-              {usernameError}
-            </p>
-          )}
         </div>
 
         {/* email */}
@@ -135,20 +123,20 @@ export function ProfileEditForm({
             type="email"
             value={profileData.email}
             disabled
+            className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500"
           />
         </div>
 
-        {/* phone number */}
+        {/* address */}
         <div className="space-y-2">
-          <Label htmlFor="phoneNumber">{t('profile.auth.phone_number')}</Label>
+          <Label htmlFor="address">{t('profile.auth.address', 'Alamat Lengkap')}</Label>
           <Input
-            id="phoneNumber"
-            type="tel"
-            value={profileData.phoneNumber}
-            onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
-            placeholder="+12 345 6789 1234"
-            minLength={10}
-            maxLength={15}
+            id="address"
+            type="text"
+            value={profileData.address}
+            onChange={(e) => handleInputChange("address", e.target.value)}
+            placeholder="Masukkan alamat..."
+            maxLength={100}
           />
         </div>
 
@@ -239,4 +227,3 @@ export function ProfileEditForm({
     </div>
   )
 }
-

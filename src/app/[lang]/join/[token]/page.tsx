@@ -32,7 +32,7 @@ interface PageProps {
 
 export default function JoinGroupPage({ params }: PageProps) {
   const router = useRouter();
-  const { user, userId, profile, loading: authLoading } = useAuth();
+  const { customUser, profile, loading: authLoading } = useAuth();
   const { t } = useI18n();
   const [invitation, setInvitation] = useState<InvitationLinkWithGroup | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +79,7 @@ export default function JoinGroupPage({ params }: PageProps) {
   }, [token, authLoading, loadInvitationData]);
 
   const handleJoinGroup = async () => {
-    if (!user) {
+    if (!customUser) {
       toast.error(t('join grup.toast.login_required', 'Anda harus login terlebih dahulu'));
       router.push(`/login?redirect=/join/${token}`);
       return;
@@ -98,8 +98,8 @@ export default function JoinGroupPage({ params }: PageProps) {
         toast.success(result.message || t('join grup.toast.join_success', 'Berhasil bergabung ke grup!'));
 
         // Invalidate groups cache to ensure fresh data is loaded
-        if (userId) {
-          ClientCache.invalidateUserGroupsCache(userId);
+        if (customUser?.userId) {
+          ClientCache.invalidateUserGroupsCache(customUser.userId.toString());
         }
 
         // Redirect to group page or groups list
@@ -245,7 +245,7 @@ export default function JoinGroupPage({ params }: PageProps) {
 
           {/* Action Buttons */}
           <div className="space-y-4">
-            {!user ? (
+            {!customUser ? (
               <>
                 <Alert>
                   <UserCheck className="h-4 w-4" />
@@ -305,7 +305,7 @@ export default function JoinGroupPage({ params }: PageProps) {
           {/* Footer */}
           <div className="text-center text-xs text-muted-foreground border-t dark:border-slate-700 pt-4 mt-6">
             <p>{t('join grup.footer.terms', 'Dengan bergabung, Anda menyetujui untuk mengikuti aturan grup')}</p>
-            {user && (
+            {customUser && (
               <p className="mt-1">
                 {t('join grup.footer.joining_as', 'Bergabung sebagai: {username}').replace('{username}', profile?.username || profile?.name || 'User')}
               </p>

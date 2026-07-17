@@ -12,7 +12,7 @@ interface UserLocation {
 }
 
 export function useUserLocation() {
-  const { user } = useAuth();
+  const { userId } = useAuth();
   const [userLocation, setUserLocation] = useState<UserLocation>({
     cityId: null,
     cityName: null,
@@ -23,7 +23,7 @@ export function useUserLocation() {
 
   useEffect(() => {
     const fetchUserLocation = async () => {
-      if (!user?.id) {
+      if (!userId) {
         setLoading(false);
         return;
       }
@@ -36,7 +36,7 @@ export function useUserLocation() {
         const { data: profile, error: profileError } = await supabase
           .from("user_profiles")
           .select("cityId")
-          .eq("id", user.id)
+          .eq("id", userId)
           .single();
 
         if (profileError || !profile?.cityId) {
@@ -72,7 +72,7 @@ export function useUserLocation() {
     };
 
     fetchUserLocation();
-  }, [user?.id]);
+  }, [userId]);
 
   return { userLocation, loading };
 }

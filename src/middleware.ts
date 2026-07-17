@@ -1,8 +1,27 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
+import { defaultLocale, locales } from "../i18n.config";
 
 export async function middleware(request: NextRequest) {
-  // Only handle auth, no i18n routing
+  const { pathname } = request.nextUrl;
+
+  // Check if there is any supported locale in the pathname
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  );
+
+  if (!pathnameHasLocale) {
+    const cookieLocale = request.cookies.get('preferred-locale')?.value;
+    const localeToUse = (cookieLocale && locales.includes(cookieLocale as any)) 
+      ? cookieLocale 
+      : defaultLocale;
+      
+    request.nextUrl.pathname = `/${localeToUse}${pathname}`;
+    // We redirect to the localized URL, the next request will go through auth check
+    return NextResponse.redirect(request.nextUrl);
+  }
+
+  // Handle auth, now the request URL already has the locale prefix
   return await updateSession(request);
 }
 
@@ -17,6 +36,6 @@ export const config = {
      * - api/auth/force-logout (force logout endpoint)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|clear-session|api/auth/force-logout|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|clear-session|api/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

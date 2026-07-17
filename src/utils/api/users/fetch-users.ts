@@ -1,6 +1,7 @@
 "use server"
 
-import { createAdminClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
+import { usersApi } from "@/lib/api"
 
 export interface RegularUser {
   id: string
@@ -11,24 +12,27 @@ export interface RegularUser {
 
 export async function fetchAdminUsers(): Promise<{ users: RegularUser[]; error?: string }> {
   try {
-    const supabase = await createAdminClient()
+    const cookieStore = await cookies()
+    const token = cookieStore.get("myqurani_access_token")?.value
+    
+    // Gunakan endpoint list user API Qurani dengan filter Role=Admin
+    const response = await usersApi.search({ pageSize: 100 }, token)
+    
+    const items = response?.data?.items || response?.items || response?.data || []
+    const usersArray = Array.isArray(items) ? items : []
 
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("id, name, email, avatar, role")
-      .or("role.eq.admin,role.eq.Admin")
-      .order("name")
+    // Filter secara manual jika API tidak mendukung filter by role di parameter
+    // atau jika role didapat dari item.role
+    const admins = usersArray.filter((user: any) => {
+        const role = user.role || (user.roles && user.roles[0]);
+        return role?.toLowerCase() === "admin"
+    })
 
-    if (error) {
-      console.error("Error fetching admin users:", error)
-      return { users: [], error: error.message }
-    }
-
-    const users: RegularUser[] = (data || []).map((user) => ({
-      id: user.id,
-      name: user.name || "Unknown",
+    const users: RegularUser[] = admins.map((user: any) => ({
+      id: user.id?.toString() || "",
+      name: user.name || user.username || "Unknown",
       email: user.email || "",
-      avatar_url: user.avatar
+      avatar_url: user.avatar || user.image
     }))
 
     return { users }
@@ -40,24 +44,24 @@ export async function fetchAdminUsers(): Promise<{ users: RegularUser[]; error?:
 
 export async function fetchRegularUsers(): Promise<{ users: RegularUser[]; error?: string }> {
   try {
-    const supabase = await createAdminClient()
+    const cookieStore = await cookies()
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("id, name, email, avatar")
-      .or("role.neq.admin,role.is.null")
-      .order("name")
+    const response = await usersApi.search({ pageSize: 100 }, token);
+    
+    const items = response?.data?.items || response?.items || response?.data || []
+    const usersArray = Array.isArray(items) ? items : []
 
-    if (error) {
-      console.error("Error fetching regular users:", error)
-      return { users: [], error: error.message }
-    }
+    const members = usersArray.filter((user: any) => {
+        const role = user.role || (user.roles && user.roles[0]);
+        return role?.toLowerCase() !== "admin"
+    })
 
-    const users: RegularUser[] = (data || []).map((user) => ({
-      id: user.id,
-      name: user.name || "Unknown",
+    const users: RegularUser[] = members.map((user: any) => ({
+      id: user.id?.toString() || "",
+      name: user.name || user.username || "Unknown",
       email: user.email || "",
-      avatar_url: user.avatar // Map 'avatar' column to 'avatar_url' prop
+      avatar_url: user.avatar || user.image
     }))
 
     return { users }

@@ -1,18 +1,12 @@
 "use server"
 
-import type { PostgrestError } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
-import { createClient } from "@/utils/supabase/server"
+import { usersApi } from "@/lib/api"
 import type { AdminDashboardSummary, DashboardCountItem } from "@/types/admin-dashboard"
 
-const PROFILE_TABLE = "user_profiles"
-const ROLE_COLUMN = "role"
-const BLOCKED_COLUMN = "isBlocked"
 const ROLE_ADMIN = "admin"
-const LOCATION_COLUMNS = "countryName, stateName, cityName, gender"
 const TOP_LIMIT = 58
 const CACHE_TTL_MS = 60 * 1000
-const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
 
 let cachedSummary:
   | {
@@ -33,11 +27,9 @@ const normalizeLabel = (value: unknown) => {
     const trimmed = value.trim()
     return trimmed.length ? trimmed : "Unknown"
   }
-
   if (value === null || value === undefined) {
     return "Unknown"
   }
-
   return String(value)
 }
 
@@ -52,140 +44,85 @@ const toTopList = (map: Map<string, number>, limit: number): DashboardCountItem[
     .slice(0, limit)
 }
 
-const parseCount = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) return value
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return null
-}
-
-const parseApiTotalCount = (payload: any): number | null => {
-  const candidates = [
-    payload?.data?.pagination?.totalCount,
-    payload?.data?.pagination?.total,
-    payload?.data?.totalCount,
-    payload?.data?.TotalCount,
-    payload?.pagination?.totalCount,
-    payload?.pagination?.total,
-    payload?.totalCount,
-    payload?.TotalCount,
-    payload?.total,
-    payload?.count,
-  ]
-
-  for (const candidate of candidates) {
-    const parsed = parseCount(candidate)
-    if (parsed !== null) return parsed
-  }
-
-  if (Array.isArray(payload?.data?.items)) return payload.data.items.length
-  if (Array.isArray(payload?.items)) return payload.items.length
-  if (Array.isArray(payload?.data)) return payload.data.length
-  if (Array.isArray(payload)) return payload.length
-
-  return null
-}
-
 const fetchUserCountFromApi = async (
   token: string | undefined,
   filters: Record<string, string | boolean> = {}
-): Promise<number | null> => {
-  if (!token) return null
+): Promise<number> => {
+  if (!token) return 0
 
-  const query = new URLSearchParams({
-    Page: "1",
-    PageSize: "1",
-  })
+  try {
+    const response = await usersApi.search({
+      ...filters,
+      pageSize: 1
+    }, token);
+    
+    // Attempt to find totalCount
+    const payload = response?.data || response;
+    const candidates = [
+      payload?.pagination?.totalCount,
+      payload?.pagination?.total,
+      payload?.totalCount,
+      payload?.TotalCount,
+      payload?.total,
+      payload?.count,
+    ]
 
-  for (const [key, value] of Object.entries(filters)) {
-    const stringValue = String(value)
-    query.set(key, stringValue)
-    query.set(key.toLowerCase(), stringValue)
+    for (const candidate of candidates) {
+      if (typeof candidate === "number" && Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+    
+    // Fallback length
+    return Array.isArray(payload?.items) ? payload.items.length : 0;
+  } catch (error) {
+    return 0;
   }
+}
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/Users/search?${query.toString()}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  })
-
-  if (!response.ok) {
-    return null
+const fetchAllUsersForLocations = async (token: string | undefined): Promise<ProfileLocationRow[]> => {
+  if (!token) return [];
+  try {
+    const response = await usersApi.search({ pageSize: 500 }, token); // Get a decent sample for dashboard
+    const payload = response?.data || response;
+    const items = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+    
+    return items.map((u: any) => ({
+      countryName: u.country || u.countryName || null,
+      stateName: u.state || u.stateName || null,
+      cityName: u.city || u.cityName || null,
+      gender: u.sex !== undefined ? u.sex : (u.gender !== undefined ? u.gender : null),
+    }));
+  } catch (error) {
+    return [];
   }
-
-  const raw = await response.json().catch(() => null)
-  return parseApiTotalCount(raw)
 }
 
 const buildSummary = async (): Promise<AdminDashboardSummary> => {
   const start = Date.now()
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const token = cookieStore.get("myqurani_access_token")?.value
 
   const [
-    totalUsersResult,
-    totalAdminsResult,
-    blockedResult,
-    profilesResult,
     apiTotalUsers,
     apiTotalAdmins,
     apiBlockedUsers,
     apiActiveUsers,
+    profiles
   ] = await Promise.all([
-    supabase.from(PROFILE_TABLE).select("id", { count: "exact", head: true }),
-    supabase
-      .from(PROFILE_TABLE)
-      .select("id", { count: "exact", head: true })
-      .eq(ROLE_COLUMN, ROLE_ADMIN),
-    supabase
-      .from(PROFILE_TABLE)
-      .select("id", { count: "exact", head: true })
-      .eq(BLOCKED_COLUMN, true),
-    supabase.from(PROFILE_TABLE).select(LOCATION_COLUMNS),
     fetchUserCountFromApi(token),
     fetchUserCountFromApi(token, { Role: ROLE_ADMIN }),
     fetchUserCountFromApi(token, { IsBlocked: true }),
     fetchUserCountFromApi(token, { IsBlocked: false }),
+    fetchAllUsersForLocations(token)
   ])
 
-  const errors = [
-    totalUsersResult.error,
-    totalAdminsResult.error,
-    blockedResult.error,
-    profilesResult.error,
-  ].filter(Boolean) as PostgrestError[]
+  const totalUsers = Math.max(apiTotalUsers, 0)
+  const totalAdmins = Math.max(apiTotalAdmins, 0)
+  const blockedUsers = Math.max(apiBlockedUsers, 0)
+  const activeUsers = Math.max(apiActiveUsers, 0)
+  const activeRule = "Active = API filter IsBlocked=false"
 
-  if (errors.length > 0) {
-    const message = errors.map((error) => error.message).join(" | ")
-    throw new Error(message)
-  }
-
-  const totalUsersFromDb = totalUsersResult.count ?? 0
-  const blockedUsersFromDb = blockedResult.count ?? 0
-  const adminsFromDb = totalAdminsResult.count ?? 0
-
-  const totalUsers = Math.max(apiTotalUsers ?? totalUsersFromDb, 0)
-  const totalAdmins = Math.max(apiTotalAdmins ?? adminsFromDb, 0)
-  const blockedUsers = Math.max(
-    0,
-    Math.min(apiBlockedUsers ?? blockedUsersFromDb, totalUsers || Number.MAX_SAFE_INTEGER)
-  )
-  const activeUsers = Math.max(
-    0,
-    Math.min(apiActiveUsers ?? Math.max(totalUsers - blockedUsers, 0), totalUsers || Number.MAX_SAFE_INTEGER)
-  )
-  const activeRule =
-    apiActiveUsers !== null
-      ? "Active = API filter IsBlocked=false"
-      : `Active = ${BLOCKED_COLUMN} is false or null`
-
-  const profiles = (profilesResult.data || []) as ProfileLocationRow[]
   const countryCounts = new Map<string, number>()
   const stateCounts = new Map<string, number>()
   const cityCounts = new Map<string, number>()
@@ -216,7 +153,7 @@ const buildSummary = async (): Promise<AdminDashboardSummary> => {
     },
     meta: {
       activeRule,
-      sourceTable: apiTotalUsers !== null ? "MyQurani Users API + Supabase locations" : PROFILE_TABLE,
+      sourceTable: "MyQurani Users API",
     },
   }
 

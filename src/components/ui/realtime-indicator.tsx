@@ -10,14 +10,14 @@ interface RealtimeIndicatorProps {
 }
 
 export function RealtimeIndicator({ enabled = true, tables = ['friend_requests', 'notifications'] }: RealtimeIndicatorProps) {
-  const { user } = useAuth()
+  const { customUser } = useAuth()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showPermanent, setShowPermanent] = useState(false)
   
   const realtime = useRealtime({
-    userId: user?.id,
+    userId: customUser?.userId?.toString(),
     onDataChange: () => {},
-    enabled: enabled && !!user?.id,
+    enabled: enabled && !!customUser?.userId,
     tables
   })
 
@@ -28,7 +28,7 @@ export function RealtimeIndicator({ enabled = true, tables = ['friend_requests',
     }
   }, [realtime.isConnected])
 
-  if (!enabled || !user?.id) return null
+  if (!enabled || !customUser?.userId) return null
 
   return (
     <div className="fixed bottom-4 left-4 z-50">

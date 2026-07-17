@@ -1,7 +1,7 @@
 "use client";
 
-import { createClient } from "@/utils/supabase/client";
 import useSWR from "swr";
+import { groupsApi } from "@/lib/api";
 
 // Type untuk join request dengan user data
 export interface RequestJoin {
@@ -35,75 +35,38 @@ const fetchRequestJoinGrup = async (
     };
   }
 
-  const supabase = createClient();
+  try {
+    const response = await groupsApi.getJoinRequests(groupId);
+    const data = response?.data || response || [];
 
-  const { data, error } = await supabase
-    .from("grup_join_req")
-    .select(
-      `
-      id,
-      grup_id,
-      user_id,
-      status,
-      created_at,
-      user:user_profiles (
-        id,
-        username,
-        name,
-        avatar
-      )
-    `
-    )
-    .eq("grup_id", groupId)
-    .eq("status", "request")
-    .order("created_at", { ascending: false });
+    // Ensure it's an array
+    const rawData = Array.isArray(data) ? data : (data?.data || data?.items || []);
 
-  if (error) {
+    const mappedData: RequestJoin[] = rawData.map((item: any) => ({
+      id: item.id?.toString() || "",
+      grup_id: item.groupId?.toString() || item.grup_id || groupId,
+      user_id: item.userId?.toString() || item.user_id || "",
+      status: item.status || "request",
+      created_at: item.createdAt || item.created_at || new Date().toISOString(),
+      user: {
+        id: item.user?.id?.toString() || item.userId?.toString() || "",
+        username: item.user?.username || null,
+        name: item.user?.name || null,
+        avatar: item.user?.avatar || null,
+      },
+    }));
+
+    return {
+      success: true,
+      data: mappedData,
+    };
+  } catch (error) {
     console.error("Error fetching join requests:", error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : "Failed to fetch join requests",
     };
   }
-
-  // Map data to ensure correct type structure
-  type RawRequestJoin = {
-    id: string;
-    grup_id: string;
-    user_id: string;
-    status: string;
-    created_at: string;
-    user:
-      | {
-          id: string;
-          username: string | null;
-          name: string | null;
-          avatar: string | null;
-        }
-      | {
-          id: string;
-          username: string | null;
-          name: string | null;
-          avatar: string | null;
-        }[]
-      | null;
-  };
-
-  const mappedData: RequestJoin[] = (data || []).map(
-    (item: RawRequestJoin) => ({
-      id: item.id,
-      grup_id: item.grup_id,
-      user_id: item.user_id,
-      status: item.status,
-      created_at: item.created_at,
-      user: Array.isArray(item.user) ? item.user[0] || null : item.user || null,
-    })
-  );
-
-  return {
-    success: true,
-    data: mappedData,
-  };
 };
 
 interface UseRequestJoinGrupParams {

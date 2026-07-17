@@ -210,11 +210,6 @@ const getSidebarData = (
           icon: Globe,
         },
         {
-          title: t("navigation.manage_categories", "Group Categories"),
-          url: "/groups/categories",
-          icon: Tags,
-        },
-        {
           title: t("navigation.categories", "Categories"),
           url: "/master/categories",
           icon: Tag,

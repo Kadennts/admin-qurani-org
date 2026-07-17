@@ -29,7 +29,7 @@ import * as React from "react"
 import { useState } from "react"
 import { getInitials } from "@/utils/helpers/get-initials"
 import signOut from "@/utils/Auth/logout"
-import { useRouter } from "next/navigation"
+import { useLocalizedRouter as useRouter } from "@/hooks/use-localized-router"
 export const NavUser = React.memo(function NavUser() {
   const { profile } = useAuth()
   const router = useRouter()

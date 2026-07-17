@@ -1,159 +1,151 @@
 "use server";
 
 import { UserProfile, UserProfileWithGmailAvatar } from "@/types/database.types";
-import { createClient } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
+import { usersApi } from "@/lib/api";
 
 export const getUsers = async () => {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  // Get user profiles first
-  const { data: userProfiles, error: userError } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .order("role", { ascending: true })
-    .order("name", { ascending: true });
+    const response = await usersApi.search({ pageSize: 100 }, token);
+    const items = response?.data?.items || response?.items || response?.data || [];
+    const usersArray = Array.isArray(items) ? items : [];
 
-  if (userError) {
+    const usersWithGmailAvatar = usersArray.map((user: any) => ({
+      ...user,
+      id: user.id?.toString() || "",
+      gmail_avatar: null as string | null
+    }));
+
+    return {
+      success: true,
+      message: "users fetched successfully",
+      data: usersWithGmailAvatar as UserProfileWithGmailAvatar[],
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: userError.message,
+      message: error.message || "Failed to fetch users",
     };
   }
-
-  // Convert to UserProfileWithGmailAvatar format
-  // gmail_avatar is a virtual field for Gmail photo fallback, not stored in DB
-  const usersWithGmailAvatar = userProfiles?.map(user => ({
-    ...user,
-    gmail_avatar: null as string | null // Virtual field for Gmail photo fallback
-  }));
-
-  return {
-    success: true,
-    message: "users fetched successfully",
-    data: usersWithGmailAvatar as UserProfileWithGmailAvatar[],
-  };
 };
 
 export const getUserBySearch = async (search: string) => {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  // First get user profiles that match search criteria
-  const { data: userProfiles, error: userError } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .like("username", `%${search}%`)
-    .or(`name.ilike.%${search}%,email.ilike.%${search}%`)
-    .order("name", { ascending: true })
-    .order("role", { ascending: true });
+    const response = await usersApi.search({ keyword: search, pageSize: 50 }, token);
+    const items = response?.data?.items || response?.items || response?.data || [];
+    const usersArray = Array.isArray(items) ? items : [];
 
-  if (userError) {
+    const usersWithGmailAvatar = usersArray.map((user: any) => ({
+      ...user,
+      id: user.id?.toString() || "",
+      gmail_avatar: null as string | null
+    }));
+
+    return {
+      success: true,
+      message: "users fetched successfully",
+      data: usersWithGmailAvatar as UserProfileWithGmailAvatar[],
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: userError.message,
+      message: error.message || "Failed to search users",
     };
   }
-
-  // Convert to UserProfileWithGmailAvatar format
-  // gmail_avatar is a virtual field for Gmail photo fallback, not stored in DB
-  const usersWithGmailAvatar = userProfiles?.map(user => ({
-    ...user,
-    gmail_avatar: null as string | null // Virtual field for Gmail photo fallback
-  }));
-
-  return {
-    success: true,
-    message: "users fetched successfully",
-    data: usersWithGmailAvatar as UserProfileWithGmailAvatar[],
-  };
 };
 
 export const getUserById = async (id: string) => {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("id", id)
-    .single();
+    const response = await usersApi.getById(id, token);
+    const user = response?.data || response;
 
-  if (error) {
+    if (!user) {
+      return {
+        success: false,
+        message: "user not found",
+      };
+    }
+
+    return {
+      success: true,
+      message: "user get by id successfully",
+      data: {
+        ...user,
+        id: user.id?.toString() || id,
+      } as UserProfile,
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: error.message,
+      message: error.message || "Failed to get user by ID",
     };
   }
-
-  if (data.length === 0) {
-    return {
-      success: false,
-      message: "user not found",
-    };
-  }
-
-  return {
-    success: true,
-    message: "user get by id successfully",
-    data: data as UserProfile,
-  };
 };
 
 export const getUserByUsername = async (username: string) => {
-  const supabase = await createClient();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("myqurani_access_token")?.value;
 
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("username", `@${username}`)
-    .single();
+    const searchKeyword = username.startsWith("@") ? username : `@${username}`;
+    const response = await usersApi.search({ keyword: searchKeyword, pageSize: 1 }, token);
+    const items = response?.data?.items || response?.items || response?.data || [];
+    
+    const user = Array.isArray(items) && items.length > 0 ? items[0] : null;
 
-  if (error) {
+    if (!user) {
+      return {
+        success: false,
+        message: "user not found",
+      };
+    }
+
+    return {
+      success: true,
+      message: "user get by username successfully",
+      data: {
+        ...user,
+        id: user.id?.toString() || "",
+      } as UserProfile,
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: error.message,
+      message: error.message || "Failed to get user by username",
     };
   }
-
-  if (!data) {
-    return {
-      success: false,
-      message: "user not found",
-    };
-  }
-
-  return {
-    success: true,
-    message: "user get by username successfully",
-    data: data as UserProfile,
-  };
 };
 
 export const checkUserHasUsername = async (userId: string) => {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("username")
-    .eq("id", userId)
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      // User profile doesn't exist
+  try {
+    const response = await getUserById(userId);
+    
+    if (!response.success || !response.data) {
       return {
         success: true,
         hasUsername: false,
         profileExists: false,
       };
     }
+
+    return {
+      success: true,
+      hasUsername: !!response.data.username,
+      profileExists: true,
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: error.message,
+      message: error.message || "Error checking username",
     };
   }
-
-  return {
-    success: true,
-    hasUsername: !!data?.username,
-    profileExists: true,
-  };
 };

@@ -3,7 +3,7 @@
 import { loginMyQurani } from "./login";
 import signup from "./register";
 import { toast } from "sonner";
-import { createClient } from "@/utils/supabase/client";
+import { usersApi, getStoredAuth } from "@/lib/api";
 import { getDictionaries, getStoredLocale } from "@/lib/i18n";
 
 /**
@@ -54,7 +54,6 @@ export async function loginWithToast(formData: FormData) {
 
 export async function registerWithToast(formData: FormData) {
   const res = await signup(formData);
-  // If we reach here, redirect was successful or no error occurredd
   if (res?.success) {
     toast.success("Registration successful!");
     toast.info("Please check your email to verify your account.");
@@ -106,23 +105,18 @@ export function validateUsername(username: string): {
       message: "Username must be at least 3 characters",
     };
   }
-  // Check for spaces
   if (username.includes(" ")) {
     return {
       isValid: false,
       message: "Username cannot contain spaces. Use underscore (_) instead",
     };
   }
-
-  // Check for hyphens
   if (username.includes("-")) {
     return {
       isValid: false,
-      message:
-        "Username cannot contain hyphens (-). Use underscore (_) instead",
+      message: "Username cannot contain hyphens (-). Use underscore (_) instead",
     };
   }
-
   if (!/^[a-zA-Z0-9_]+$/.test(username)) {
     return {
       isValid: false,
@@ -132,7 +126,10 @@ export function validateUsername(username: string): {
   return { isValid: true };
 }
 
-// Fungsi untuk mengecek ketersediaan username
+/**
+ * Cek ketersediaan username via API Qurani
+ * Menggunakan endpoint /api/v1/Users/search
+ */
 export async function checkUsernameAvailability(username: string): Promise<{
   isAvailable: boolean;
   message?: string;
@@ -147,31 +144,30 @@ export async function checkUsernameAvailability(username: string): Promise<{
       };
     }
 
-    const supabase = createClient();
+    const stored = getStoredAuth();
+    const token = stored?.accessToken;
 
-    // Cek di tabel user_profiles untuk username yang sudah ada
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("username")
-      .ilike("username", `@${username.toLowerCase()}`)
-      .limit(1);
+    // Cari username via API Qurani
+    const normalizedUsername = username.startsWith("@") ? username : `@${username}`;
 
-    if (error) {
-      return {
-        isAvailable: false,
-        message: "Error checking username availability",
-      };
-    }
+    const result = await usersApi.search({ keyword: normalizedUsername }, token);
+    const items = result?.data?.items || result?.items || result?.data || [];
 
-    // Jika ada data berarti username sudah digunakan
-    if (data && data.length > 0) {
+    // Jika ada user dengan username yang sama, berarti tidak tersedia
+    const existingUser = Array.isArray(items)
+      ? items.find((u: any) =>
+          u.username?.toLowerCase() === normalizedUsername.toLowerCase() ||
+          u.username?.toLowerCase() === username.toLowerCase()
+        )
+      : null;
+
+    if (existingUser) {
       return {
         isAvailable: false,
         message: "Username is already taken",
       };
     }
 
-    // Username tersedia
     return {
       isAvailable: true,
       message: "Username is available",

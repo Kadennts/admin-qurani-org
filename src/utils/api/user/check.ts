@@ -1,33 +1,27 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { normalizeUsername } from "@/utils/validation/username";
+import { getUserByUsername } from "./fetch";
 
 export const checkUsernameAvailability = async (username: string) => {
-  const supabase = await createClient();
+  try {
+    const normalizedUsername = normalizeUsername(username);
 
-  const normalizedUsername = normalizeUsername(username);
+    // Cek apakah username sudah digunakan
+    const response = await getUserByUsername(normalizedUsername);
 
-  // Cek apakah username sudah digunakan
-  const { data: existingUser, error } = await supabase
-    .from("user_profiles")
-    .select("id")
-    .eq("username", `${normalizedUsername}`)
-    .single();
+    // Jika response sukses dan ada data, berarti username tidak tersedia
+    const isAvailable = !response.success || !response.data;
 
-  if (error && error.code !== "PGRST116") {
+    return {
+      success: true,
+      available: isAvailable,
+      username: normalizedUsername,
+    };
+  } catch (error: any) {
     return {
       success: false,
-      message: error.message,
+      message: error.message || "Failed to check username availability",
     };
   }
-
-  // Username tersedia jika tidak ada user yang menggunakan atau user yang menggunakan adalah user saat ini
-  const isAvailable = !existingUser;
-
-  return {
-    success: true,
-    available: isAvailable,
-    username: normalizedUsername,
-  };
 };

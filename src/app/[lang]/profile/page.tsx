@@ -55,7 +55,7 @@ function ProfilePageContent() {
     gender: 0 as number | null,
     date_of_birth: "",
     job: "",
-    phoneNumber: "",
+    address: "",
     timezone: "",
     bio: "",
   })
@@ -205,10 +205,10 @@ function ProfilePageContent() {
         nickname: profile.nickname || "",
         username: profile.username || "",
         email: profile.email || "",
-        gender: profile.gender ?? null,
-        date_of_birth: profile.dob || "",
+        gender: profile.gender ?? (profile as any).sex ?? null,
+        date_of_birth: profile.dob || (profile as any).dateOfBirth || "",
         job: profile.job || "",
-        phoneNumber: profile.hp || "",
+        address: (profile as any).address || profile.hp || "",
         timezone: correctedTimezone,
         bio: profile.bio || "",
       })
@@ -417,15 +417,15 @@ function ProfilePageContent() {
         profileData.gender,
         profileData.date_of_birth,
         profileData.job,
-        profileData.phoneNumber,
+        profileData.address,
         profileData.bio,
         profilePhotoUrl || undefined,
         profileData.email, // Tambahkan email di sini
       )
 
       if (!result.success) {
-        if (result.warning) {
-          toast.warning(result.type == "state" ? t("profile.messages.warning.state_not_valid") : t("profile.messages.warning.city_not_valid"))
+        if ((result as any).warning) {
+          toast.warning((result as any).type == "state" ? t("profile.messages.warning.state_not_valid") : t("profile.messages.warning.city_not_valid"))
           return
         }
         console.error('Error updating profile:', result.message)

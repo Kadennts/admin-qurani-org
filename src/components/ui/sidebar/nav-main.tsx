@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
+import { useLocalizedRouter as useRouter } from "@/hooks/use-localized-router"
 import { ChevronRight, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { markSidebarNavigation } from "@/utils/navigation-cache"
@@ -38,15 +39,26 @@ export const NavMain = React.memo(function NavMain({
 }: {
   items: NavItem[]
 }) {
-  const pathname = usePathname()
+  const rawPathname = usePathname()
   const router = useRouter()
+
+  // Strip locale prefix so comparisons work regardless of active language
+  const LOCALES = ["id", "en", "ar"]
+  const pathname = (() => {
+    const segments = (rawPathname ?? "/").split("/").filter(Boolean)
+    if (segments.length > 0 && LOCALES.includes(segments[0])) {
+      return "/" + segments.slice(1).join("/")
+    }
+    return rawPathname ?? "/"
+  })()
+
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({})
   // const { t } = useI18n()
   const { state, isMobile, setOpenMobile } = useSidebar()
   const [mounted, setMounted] = useState(false)
   const isCollapsed = mounted ? (state === "collapsed" && !isMobile) : false // Di mobile, tidak pernah collapsed
-  const { user, userId } = useAuth()
+  const { userId } = useAuth()
   const { unreadCount } = useUnreadCount(userId)
   const [hasVisitedNotifications, setHasVisitedNotifications] = useState(false)
 
@@ -63,32 +75,32 @@ export const NavMain = React.memo(function NavMain({
 
   // Load status kunjungan dari localStorage saat component mount
   useEffect(() => {
-    if (user?.id) {
-      const visitKey = `notifications_visited_${user.id}`
+    if (userId) {
+      const visitKey = `notifications_visited_${userId}`
       const hasVisited = localStorage.getItem(visitKey) === 'true'
       setHasVisitedNotifications(hasVisited)
     }
-  }, [user?.id])
+  }, [userId])
 
   // Simpan status kunjungan ketika user masuk ke halaman notifikasi
   useEffect(() => {
-    if (isOnNotificationsPage && user?.id) {
-      const visitKey = `notifications_visited_${user.id}`
+    if (isOnNotificationsPage && userId) {
+      const visitKey = `notifications_visited_${userId}`
       console.log('NavMain: User is on notifications page, saving visit status:', visitKey)
       localStorage.setItem(visitKey, 'true')
       setHasVisitedNotifications(true)
     }
-  }, [isOnNotificationsPage, user?.id])
+  }, [isOnNotificationsPage, userId])
 
   // Reset status kunjungan jika ada notifikasi baru masuk
   useEffect(() => {
-    if (user?.id && unreadCount > 0 && hasVisitedNotifications) {
-      const lastCountKey = `last_notification_count_${user.id}`
+    if (userId && unreadCount > 0 && hasVisitedNotifications) {
+      const lastCountKey = `last_notification_count_${userId}`
       const lastCount = parseInt(localStorage.getItem(lastCountKey) || '0')
 
       // Jika ada notifikasi baru (count bertambah), reset status kunjungan
       if (unreadCount > lastCount) {
-        const visitKey = `notifications_visited_${user.id}`
+        const visitKey = `notifications_visited_${userId}`
         localStorage.removeItem(visitKey)
         setHasVisitedNotifications(false)
       }
@@ -96,7 +108,7 @@ export const NavMain = React.memo(function NavMain({
       // Simpan count terbaru
       localStorage.setItem(lastCountKey, unreadCount.toString())
     }
-  }, [unreadCount, user?.id, hasVisitedNotifications])
+  }, [unreadCount, userId, hasVisitedNotifications])
 
   // Badge count untuk sidebar: hilang jika sedang di halaman notifikasi ATAU sudah pernah mengunjungi
   const sidebarBadgeCount = (isOnNotificationsPage || hasVisitedNotifications) ? 0 : unreadCount
@@ -125,22 +137,52 @@ export const NavMain = React.memo(function NavMain({
     router.push(url);
   }, [isMobile, setOpenMobile, router, handlePWAInstall]);
 
-  // Initialize open state based on current pathname and default isActive
+  // Auto-open the group that contains the current page.
+  const initializedRef = React.useRef(false)
+
+  // Helper: check if current pathname is active for a given sub-item url
+  const isSubItemActive = React.useCallback((subUrl: string): boolean => {
+    if (pathname === subUrl) return true
+    // Match sub-pages, but avoid matching /groups when on /groups/categories etc.
+    // Use startsWith only for paths that have dynamic children (not exact data pages)
+    if (subUrl !== '/' && pathname.startsWith(subUrl + '/')) return true
+    return false
+  }, [pathname])
+
   useEffect(() => {
-    const initialState: Record<string, boolean> = {}
-
-    items.forEach((item) => {
-      if (item.items && item.items.length > 0) {
-        // Check if current pathname matches any submenu item
-        const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
-          ((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false
-        // Open only if has active sub item
-        initialState[item.title] = hasActiveSubItem
+    const groupToOpen: string | null = (() => {
+      for (const item of items) {
+        if (item.items && item.items.length > 0) {
+          const hasActive = item.items.some(sub =>
+            isSubItemActive(sub.url) ||
+            (sub.items && sub.items.some(nested => isSubItemActive(nested.url)))
+          )
+          if (hasActive) return item.title
+        }
       }
-    })
+      return null
+    })()
 
-    setOpenMenus(initialState)
-  }, [pathname, items])
+    if (!initializedRef.current) {
+      const initialState: Record<string, boolean> = {}
+      items.forEach((item) => {
+        if (item.items && item.items.length > 0) {
+          const hasActive = item.items.some(sub =>
+            isSubItemActive(sub.url) ||
+            (sub.items && sub.items.some(nested => isSubItemActive(nested.url)))
+          )
+          initialState[item.title] = hasActive
+        }
+      })
+      setOpenMenus(initialState)
+      initializedRef.current = true
+    } else if (groupToOpen) {
+      setOpenMenus(prev => {
+        if (prev[groupToOpen]) return prev
+        return { ...prev, [groupToOpen]: true }
+      })
+    }
+  }, [pathname, items, isSubItemActive])
 
   // Close mobile sidebar when pathname changes (navigation)
   useEffect(() => {
@@ -177,9 +219,10 @@ export const NavMain = React.memo(function NavMain({
           if (item.items && item.items.length > 0) {
             if (isCollapsed) {
               // Check if this menu is active in collapsed state
-              const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
-
-                (((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
+              const hasActiveSubItem = item.items.some(subItem =>
+                pathname === subItem.url ||
+                (subItem.url !== '/' && pathname.startsWith(subItem.url + '/'))
+              )
 
               // Collapsed state: render as dropdown with tooltip
               return (
@@ -257,9 +300,10 @@ export const NavMain = React.memo(function NavMain({
               )
             } else {
               // Check if this menu is active (user is on one of its sub-pages)
-              const hasActiveSubItem = item.items.some(subItem => pathname === subItem.url) ||
-
-                (((item.url.startsWith("/grup") || item.url.startsWith("/groups")) && (pathname?.startsWith("/groups/detail/") || pathname?.startsWith("/grup/detail/") || pathname?.startsWith("/grup/kelola/"))) || false)
+              const hasActiveSubItem = item.items.some(subItem =>
+                pathname === subItem.url ||
+                (subItem.url !== '/' && pathname.startsWith(subItem.url + '/'))
+              )
 
               // Menu tidak aktif atau aktif: selalu render sebagai collapsible biasa agar bisa ditutup
               return (

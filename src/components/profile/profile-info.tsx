@@ -1,6 +1,6 @@
 "use client"
 
-import { Mail, Phone, BriefcaseBusiness, Calendar, MapPin, VenusAndMars } from "lucide-react"
+import { Mail, Home, BriefcaseBusiness, Calendar, MapPin, VenusAndMars } from "lucide-react"
 import { useI18n } from "@/components/providers/i18n-provider"
 
 interface ProfileInfoProps {
@@ -10,7 +10,7 @@ interface ProfileInfoProps {
     username: string
     email: string
     gender: number | null
-    phoneNumber: string
+    address: string
     job: string
     date_of_birth: string
     timezone: string
@@ -44,11 +44,11 @@ export function ProfileInfo({
               </span>
             </div>
           )}
-          {profileData.phoneNumber && (
+          {profileData.address && (
             <div className="flex items-center gap-2">
-              <Phone className="text-gray-700 dark:text-gray-300 w-4" />
+              <Home className="text-gray-700 dark:text-gray-300 w-4" />
               <span className="text-sm text-gray-700 dark:text-gray-300 font-thin">
-                {profileData.phoneNumber}
+                {profileData.address}
               </span>
             </div>
           )}
@@ -98,14 +98,14 @@ export function ProfileInfo({
               </span>
             </div>
           )}
-          {(profileData.email && profileData.phoneNumber) && (
+          {(profileData.email && profileData.address) && (
             <span className="text-gray-700 dark:text-gray-300 block">|</span>
           )}
-          {profileData.phoneNumber && (
+          {profileData.address && (
             <div className="flex items-center gap-2">
-              <Phone className="text-gray-700 dark:text-gray-300 w-4" />
+              <Home className="text-gray-700 dark:text-gray-300 w-4" />
               <span className="text-sm text-gray-700 dark:text-gray-300 font-thin">
-                {profileData.phoneNumber}
+                {profileData.address}
               </span>
             </div>
           )}

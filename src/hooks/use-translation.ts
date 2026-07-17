@@ -1,33 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getDictionaries, getStoredLocale, setStoredLocale } from '@/lib/i18n';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { getDictionaries, setStoredLocale } from '@/lib/i18n';
 import { LOCALE_CHANGE_EVENT } from '@/lib/i18n';
-import { defaultLocale, type Locale } from '../../i18n.config';
+import { defaultLocale, locales, type Locale } from '../../i18n.config';
 
 type Dictionary = Record<string, unknown>;
 
 export function useTranslation(namespaces: string[] = ['common']) {
-  const [locale, setLocale] = useState<Locale>(defaultLocale);
+  const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const localeFromUrl = (params?.lang as Locale) || defaultLocale;
+  const [locale, setLocale] = useState<Locale>(localeFromUrl);
   const [dictionary, setDictionary] = useState<Dictionary>({});
   const [isLoading, setIsLoading] = useState(true);
 
   const namespacesKey = useMemo(() => namespaces.slice().sort().join('|'), [namespaces]);
 
-  // Initialize locale from storage
+  // Initialize locale from URL instead of storage
   useEffect(() => {
-    const storedLocale = getStoredLocale();
-    setLocale(storedLocale);
-    // Listen for locale change events from other parts of the app
-    const handleLocaleChange = (event: Event) => {
-      const custom = event as CustomEvent<{ locale: Locale }>;
-      if (custom.detail?.locale) {
-        setLocale(custom.detail.locale);
-      }
-    };
-    window.addEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange as EventListener);
-    return () => {
-      window.removeEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange as EventListener);
-    };
-  }, []);
+    if (locales.includes(localeFromUrl)) {
+      setLocale(localeFromUrl);
+      setStoredLocale(localeFromUrl);
+    }
+  }, [localeFromUrl]);
 
   // Load dictionary when locale or namespaces change
   useEffect(() => {
@@ -50,11 +47,19 @@ export function useTranslation(namespaces: string[] = ['common']) {
   }, [locale, namespacesKey]);
 
   const changeLocale = (newLocale: Locale) => {
+    if (newLocale === locale) return;
+    
     setLocale(newLocale);
     setStoredLocale(newLocale);
-    // Broadcast change to all subscribers in the same tab
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale: newLocale } }));
+    
+    if (pathname) {
+      const segments = pathname.split('/');
+      if (segments.length > 1 && locales.includes(segments[1] as any)) {
+        segments[1] = newLocale;
+        router.push(segments.join('/'));
+      } else {
+        router.push(`/${newLocale}${pathname === '/' ? '' : pathname}`);
+      }
     }
   };
 
