@@ -77,8 +77,10 @@ async function compressImage(file: File): Promise<File> {
     })
 }
 
+import { ticketsApi } from "@/lib/api"
+
 /**
- * Upload a single image to ticket-attachments bucket
+ * Upload a single image to ticket-attachments bucket via Qurani API
  */
 export async function uploadTicketAttachment(
     file: File,
@@ -104,34 +106,20 @@ export async function uploadTicketAttachment(
         // Compress if needed
         const processedFile = await compressImage(file)
 
-        const supabase = createClient()
-
-        // Generate unique filename
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(2, 8)
-        const extension = processedFile.name.split(".").pop() || "webp"
-        const filename = `${ticketId}/${timestamp}_${randomStr}.${extension}`
-
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage
-            .from(BUCKET_NAME)
-            .upload(filename, processedFile, {
-                cacheControl: "3600",
-                upsert: false,
-            })
-
-        if (error) {
-            console.error("Upload error:", error)
-            return { success: false, error: error.message }
+        // Upload using MyQurani API
+        const response = await ticketsApi.uploadAttachment(ticketId, processedFile)
+        
+        // Asumsi API Qurani mengembalikan { success: true, data: { url: "..." } } atau similar
+        // Jika response-nya berupa string url saja atau JSON yang berbeda, sesuaikan.
+        // Disini kita asumsi response.data.url atau response.url
+        const uploadedUrl = response.data?.url || response.url || response.data?.path || response.path
+        
+        if (response.success === false) {
+             return { success: false, error: response.message || response.error || "Upload failed" }
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from(BUCKET_NAME)
-            .getPublicUrl(data.path)
-
-        return { success: true, url: urlData.publicUrl }
-    } catch (error) {
+        return { success: true, url: uploadedUrl }
+    } catch (error: any) {
         console.error("Upload error:", error)
         return {
             success: false,

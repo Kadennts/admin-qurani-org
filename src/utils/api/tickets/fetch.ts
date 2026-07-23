@@ -2,9 +2,9 @@
 
 /**
  * Tickets Fetch API
- * 
+ *
  * This module provides ticket fetching functions using the MyQurani API.
- * Interface remains the same as before for backward compatibility.
+ * Supabase has been fully removed — all data comes from API Qurani.
  */
 
 import { cookies } from 'next/headers';
@@ -109,14 +109,6 @@ interface ApiTicketAttachmentDto {
   url: string;
 }
 
-interface PagedResponse<T> {
-  data: T[];
-  offset: number;
-  limit: number;
-  totalCount: number;
-  hasMore: boolean;
-}
-
 // ============================================
 // Helper Functions
 // ============================================
@@ -154,24 +146,6 @@ function getPriorityNumber(priority?: string): number | undefined {
   return priorityMap[priority];
 }
 
-// Convert API ticket to local format
-function convertTicketListItem(apiTicket: ApiTicketListDto): TicketListItem {
-  return {
-    id: apiTicket.id,
-    ticket_number: apiTicket.ticketKey,
-    subject: apiTicket.subject,
-    contact: apiTicket.name || apiTicket.email || 'Unknown',
-    department: String(apiTicket.department), // TODO: Map to department name
-    project: null,
-    service: null,
-    priority: apiTicket.priorityName || getPriorityName(apiTicket.priority),
-    status: apiTicket.statusName || getStatusName(apiTicket.status),
-    last_reply: apiTicket.lastReply,
-    submitted_date: apiTicket.date,
-    body: null,
-  };
-}
-
 function getStatusName(status: number): string {
   const names: Record<number, string> = {
     1: 'Open',
@@ -190,6 +164,24 @@ function getPriorityName(priority: number): string {
     3: 'High',
   };
   return names[priority] || 'Medium';
+}
+
+// Convert API ticket to local format
+function convertTicketListItem(apiTicket: ApiTicketListDto): TicketListItem {
+  return {
+    id: apiTicket.id,
+    ticket_number: apiTicket.ticketKey,
+    subject: apiTicket.subject,
+    contact: apiTicket.name || apiTicket.email || 'Unknown',
+    department: String(apiTicket.department), // Will be resolved via GET /api/v1/tickets/config/categories
+    project: null,
+    service: null,
+    priority: apiTicket.priorityName || getPriorityName(apiTicket.priority),
+    status: apiTicket.statusName || getStatusName(apiTicket.status),
+    last_reply: apiTicket.lastReply,
+    submitted_date: apiTicket.date,
+    body: null,
+  };
 }
 
 // Convert API ticket detail to local format
@@ -221,71 +213,7 @@ function convertTicketWithReplies(apiTicket: ApiTicketDetailDto): TicketWithRepl
 }
 
 // ============================================
-// API Functions
-// ============================================
-// Helper: Ambil tiket dari Supabase (selalu dijalankan, tidak tergantung API)
-// ============================================
-async function fetchSupabaseTicketList(filters?: {
-  status?: string
-  priority?: string
-  search?: string
-  limit?: number
-}): Promise<TicketListItem[]> {
-  try {
-    const { createAdminClient } = await import('@/utils/supabase/server');
-    const supabase = await createAdminClient();
-
-    let query = supabase
-      .from('tickets')
-      .select('id, ticket_number, subject, contact, department, project, service, priority, status, last_reply, submitted_date, body')
-      .order('submitted_date', { ascending: false })
-      .limit(filters?.limit || 100);
-
-    if (filters?.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status);
-    }
-    if (filters?.priority && filters.priority !== 'all') {
-      query = query.eq('priority', filters.priority);
-    }
-    if (filters?.search) {
-      query = query.ilike('subject', `%${filters.search}%`);
-    }
-
-    const { data: sbData, error: sbError } = await query;
-
-    if (sbError || !sbData || sbData.length === 0) {
-      if (sbError) console.warn('[fetchSupabaseTicketList] Error:', sbError.message);
-      return [];
-    }
-
-    console.log('[fetchSupabaseTicketList] Found', sbData.length, 'tickets from Supabase');
-    return sbData.map(t => ({
-      id: t.id,
-      ticket_number: t.ticket_number || `#${t.id}`,
-      subject: t.subject,
-      contact: t.contact,
-      department: t.department || 'Support',
-      project: t.project || null,
-      service: t.service || null,
-      priority: t.priority || 'Medium',
-      status: t.status || 'Open',
-      last_reply: t.last_reply || null,
-      submitted_date: t.submitted_date || new Date().toISOString(),
-      body: t.body || null,
-    }));
-  } catch (err) {
-    console.warn('[fetchSupabaseTicketList] Skipped:', err);
-    return [];
-  }
-}
-
-// Helper: merge API + Supabase, hilangkan duplikat berdasarkan ID
-function mergeTickets(apiTickets: TicketListItem[], sbTickets: TicketListItem[]): TicketListItem[] {
-  const apiIds = new Set(apiTickets.map(t => String(t.id)));
-  const uniqueSb = sbTickets.filter(t => !apiIds.has(String(t.id)));
-  return [...apiTickets, ...uniqueSb];
-}
-
+// API Functions — Full API Qurani, no Supabase
 // ============================================
 
 export async function fetchTickets(filters?: {
@@ -300,13 +228,9 @@ export async function fetchTickets(filters?: {
 }): Promise<{ success: boolean; data?: TicketListItem[]; totalCount?: number; error?: string }> {
   const token = await getAuthToken();
 
-  // Mulai fetch Supabase DI AWAL secara paralel — tidak menunggu API
-  const supabasePromise = fetchSupabaseTicketList(filters);
-
   if (!token) {
     console.error('[fetchTickets] No auth token found');
-    const sbTickets = await supabasePromise;
-    return { success: true, data: sbTickets, totalCount: sbTickets.length };
+    return { success: false, error: 'Not authenticated', data: [], totalCount: 0 };
   }
 
   try {
@@ -331,7 +255,6 @@ export async function fetchTickets(filters?: {
     const url = `${API_BASE_URL}/api/v1/tickets${params.toString() ? `?${params.toString()}` : ''}`;
     console.log('[fetchTickets] Calling API:', url);
 
-    // Import fetchWithAutoRefresh for auto token refresh
     const { fetchWithAutoRefresh } = await import('@/utils/api/token-refresh');
 
     let response: Response;
@@ -339,19 +262,16 @@ export async function fetchTickets(filters?: {
       response = await fetchWithAutoRefresh(url, { method: 'GET' });
     } catch (authError) {
       console.error('[fetchTickets] Auth error:', authError);
-      const sbTickets = await supabasePromise;
-      return { success: true, data: sbTickets, totalCount: sbTickets.length, error: 'Authentication required' };
+      return { success: false, error: 'Authentication required', data: [], totalCount: 0 };
     }
 
-    // Handle empty response
     const responseText = await response.text();
     console.log('[fetchTickets] Response status:', response.status);
     console.log('[fetchTickets] Response text:', responseText.substring(0, 300));
 
     if (!responseText || responseText.trim() === '') {
-      console.log('[fetchTickets] Empty response, using Supabase only');
-      const sbTickets = await supabasePromise;
-      return { success: true, data: sbTickets, totalCount: sbTickets.length };
+      console.log('[fetchTickets] Empty response from API');
+      return { success: true, data: [], totalCount: 0 };
     }
 
     let rawResult: any;
@@ -359,59 +279,45 @@ export async function fetchTickets(filters?: {
       rawResult = JSON.parse(responseText);
     } catch (parseError) {
       console.error('[fetchTickets] JSON parse error:', parseError);
-      const sbTickets = await supabasePromise;
-      return { success: true, data: sbTickets, totalCount: sbTickets.length };
+      return { success: false, error: 'Invalid response format', data: [], totalCount: 0 };
     }
 
     if (!response.ok) {
       console.error('[fetchTickets] API error:', rawResult);
-      const sbTickets = await supabasePromise;
-      return { success: true, data: sbTickets, totalCount: sbTickets.length, error: rawResult.message || 'Failed to fetch tickets' };
+      return { success: false, error: rawResult.message || 'Failed to fetch tickets', data: [], totalCount: 0 };
     }
 
-    // Handle different response structures
-    // API might return: { success, data: { data: [...], totalCount } } or { data: [...], totalCount }
     // Handle different response structures (MyQurani API patterns)
     let ticketData: ApiTicketListDto[] = [];
     let totalCount = 0;
 
     const rData = rawResult.data || rawResult;
-    
+
     if (Array.isArray(rData)) {
       ticketData = rData;
       totalCount = rawResult.totalCount || rData.length;
     } else if (rData && typeof rData === 'object') {
       ticketData = rData.items || rData.data || (Array.isArray(rData) ? rData : []);
-      // Search for total count in all common property names
-      totalCount = 
-        rData.totalCount || rData.TotalCount || 
-        rData.total || rData.Total || 
-        rData.count || 
-        rawResult.totalCount || rawResult.TotalCount || 
+      totalCount =
+        rData.totalCount || rData.TotalCount ||
+        rData.total || rData.Total ||
+        rData.count ||
+        rawResult.totalCount || rawResult.TotalCount ||
         (Array.isArray(ticketData) ? ticketData.length : 0);
     }
 
     console.log('[fetchTickets] Parsed:', ticketData.length, 'tickets, total:', totalCount);
 
-    // Convert API tickets to local format
     const apiTickets = ticketData.map(convertTicketListItem);
-
-    // Await Supabase (sudah berjalan paralel sejak awal)
-    const sbTickets = await supabasePromise;
-    const allTickets = mergeTickets(apiTickets, sbTickets);
-
-    console.log('[fetchTickets] Final:', apiTickets.length, 'API +', (allTickets.length - apiTickets.length), 'Supabase =', allTickets.length, 'total');
 
     return {
       success: true,
-      data: allTickets,
-      totalCount: totalCount + (allTickets.length - apiTickets.length),
+      data: apiTickets,
+      totalCount,
     };
   } catch (error) {
     console.error('[fetchTickets] Error:', error);
-    // Fallback ke Supabase saja jika terjadi error
-    const sbTickets = await supabasePromise.catch(() => [] as TicketListItem[]);
-    return { success: true, data: sbTickets, totalCount: sbTickets.length, error: error instanceof Error ? error.message : 'Unknown error' };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error', data: [], totalCount: 0 };
   }
 }
 
@@ -442,7 +348,7 @@ export async function fetchTicketById(ticketId: number): Promise<{ success: bool
     // 1. { success: true, data: {...} }
     // 2. { data: {...} }
     // 3. Direct object: {...}
-    let ticketData = result.data || result;
+    const ticketData = result.data || result;
 
     if (!ticketData || typeof ticketData !== 'object') {
       console.error('[fetchTicketById] Invalid data format:', result);
@@ -478,7 +384,6 @@ export async function fetchRelatedTickets(excludeId: number): Promise<{ success:
     let score = 0;
     if (normalize(t.department) && normalize(t.department) === normalize(current.department)) score += 5;
     if (normalize(t.contact) && normalize(t.contact) === normalize(current.contact)) score += 3;
-    if (normalize(t.service) && normalize(t.service) === normalize(current.service)) score += 3;
     if (normalize(t.priority) && normalize(t.priority) === normalize(current.priority)) score += 1;
 
     const subject = normalize(t.subject);

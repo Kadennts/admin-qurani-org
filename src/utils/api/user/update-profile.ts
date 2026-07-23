@@ -20,7 +20,12 @@ export const updateUserProfile = async (
   phoneNumber?: string,
   bio?: string,
   profilePhotoUrl?: string,
-  email?: string 
+  email?: string,
+  language?: string | number,
+  dateFormat?: string,
+  timeFormat?: string,
+  numberFormat?: string,
+  currencyFormat?: string
 ) => {
   try {
     const { cookies } = await import("next/headers");
@@ -29,6 +34,14 @@ export const updateUserProfile = async (
 
     if (!token) {
       return { success: false, message: "No active session found. Please login again." };
+    }
+
+    // Strip data URL prefix if present (API expects raw base64 only, not "data:image/...;base64,...")
+    // If it's a normal URL (not starting with data:), we don't send it as imageBase64
+    let imageBase64Value: string | null = null;
+    if (profilePhotoUrl && profilePhotoUrl.startsWith('data:')) {
+      const parts = profilePhotoUrl.split(',');
+      imageBase64Value = parts.length > 1 ? parts[1] : null;
     }
 
     const finalPayload: Record<string, any> = {
@@ -44,7 +57,12 @@ export const updateUserProfile = async (
       country: countryName || null,
       sex: gender !== undefined ? gender : null,
       job: job || null,
-      imageBase64: profilePhotoUrl || null,
+      imageBase64: imageBase64Value,
+      language: language !== undefined ? Number(language) : null,
+      dateFormat: dateFormat || null,
+      timeFormat: timeFormat || null,
+      numberFormat: numberFormat || null,
+      currencyFormat: currencyFormat || null,
     };
 
     if (date_of_birth) {

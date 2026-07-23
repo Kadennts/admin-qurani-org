@@ -45,6 +45,7 @@ function ProfilePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const { masterdataApi } = require("@/lib/api")
 
   // Profile state
   const [profileData, setProfileData] = useState({
@@ -58,6 +59,11 @@ function ProfilePageContent() {
     address: "",
     timezone: "",
     bio: "",
+    language: 1,
+    dateFormat: "",
+    timeFormat: "",
+    numberFormat: "",
+    currencyFormat: "",
   })
   const [imageLoadError, setImageLoadError] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -211,6 +217,11 @@ function ProfilePageContent() {
         address: (profile as any).address || profile.hp || "",
         timezone: correctedTimezone,
         bio: profile.bio || "",
+        language: (profile as any).language ?? 1,
+        dateFormat: (profile as any).dateFormat || "",
+        timeFormat: (profile as any).timeFormat || "",
+        numberFormat: (profile as any).numberFormat || "",
+        currencyFormat: (profile as any).currencyFormat || "",
       })
 
       if (profile.stateId) {
@@ -238,6 +249,49 @@ function ProfilePageContent() {
     }
   }, [cleanupUsernameValidation])
 
+  const isCountryTouched = selectedCountry.id !== 0
+  const isStateTouched = selectedState.id !== 0
+  const effectiveCountry = selectedCountry.id !== 0 ? selectedCountry : currentCountry
+  const effectiveState = selectedState.id !== 0 ? selectedState : (isCountryTouched ? { id: 0, name: "" } : currentState)
+  const effectiveCity = selectedCity.id !== 0 ? selectedCity : ((isCountryTouched || isStateTouched) ? { id: 0, name: "", timezone: "" } : currentCity)
+  const displayTimezone = resolvedTimezone
+    || effectiveCity.timezone
+    || ((isCountryTouched || isStateTouched) ? "" : (currentCity.timezone || profileData.timezone || ""))
+
+  // Auto-fill locale formats when country changes
+  useEffect(() => {
+    const fetchAndApplyLocale = async () => {
+      const countryCode = effectiveCountry.iso2
+      if (!countryCode) return
+
+      try {
+        const res = await masterdataApi.locales.getAll()
+        if (res.success && res.data) {
+          const localesList = res.data
+          const matchingLocale = localesList.find((l: any) => {
+            const locCountry = l.countryCode || (l.id && l.id.includes('_') ? l.id.split('_')[1] : null)
+            return locCountry && locCountry.toUpperCase() === countryCode.toUpperCase()
+          })
+          if (matchingLocale) {
+            setProfileData(prev => ({
+              ...prev,
+              language: matchingLocale.languageCode === 'id' ? 1 : matchingLocale.languageCode === 'ar' ? 2 : 1, // mapping logic if needed, fallback to 1
+              dateFormat: matchingLocale.dateFormatShort || prev.dateFormat,
+              timeFormat: matchingLocale.uses12HourClock === 1 ? "hh:mm A" : "HH:mm:ss",
+              currencyFormat: matchingLocale.currencyCode || prev.currencyFormat,
+            }))
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch locales:", err)
+      }
+    }
+
+    if (isEditing && isCountryTouched) {
+      fetchAndApplyLocale()
+    }
+  }, [effectiveCountry.iso2, isEditing, isCountryTouched])
+
   // Apply crop when shouldApplyCrop changes
   useEffect(() => {
     if (shouldApplyCrop && cropApplyRef.current) {
@@ -260,17 +314,8 @@ function ProfilePageContent() {
     return user.avatar || undefined
   }
 
-  const isCountryTouched = selectedCountry.id !== 0
-  const isStateTouched = selectedState.id !== 0
-  const effectiveCountry = selectedCountry.id !== 0 ? selectedCountry : currentCountry
-  const effectiveState = selectedState.id !== 0 ? selectedState : (isCountryTouched ? { id: 0, name: "" } : currentState)
-  const effectiveCity = selectedCity.id !== 0 ? selectedCity : ((isCountryTouched || isStateTouched) ? { id: 0, name: "", timezone: "" } : currentCity)
-  const displayTimezone = resolvedTimezone
-    || effectiveCity.timezone
-    || ((isCountryTouched || isStateTouched) ? "" : (currentCity.timezone || profileData.timezone || ""))
-
-  const handleInputChange = (field: string, value: string) => {
-    if (field === 'username') {
+  const handleInputChange = (field: string, value: string | number) => {
+    if (field === 'username' && typeof value === 'string') {
       let formattedValue = value
       if (!formattedValue.startsWith('@') && formattedValue.length > 0) {
         formattedValue = '@' + formattedValue
@@ -365,29 +410,24 @@ function ProfilePageContent() {
 
     setIsSaving(true)
     try {
-      const supabase = createClient()
       let profilePhotoUrl = profile?.avatar
 
-      // Upload avatar if selected
+      // Upload avatar if selected (convert to base64 for Qurani API)
       if (selectedAvatar) {
-        const fileExt = selectedAvatar.name.split('.').pop()
-        const fileName = `${userId}-${Date.now()}.${fileExt}`
+        try {
+          const base64Str = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(selectedAvatar)
+          })
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('profile_user')
-          .upload(fileName, selectedAvatar)
-
-        if (uploadError) {
-          console.error('Error uploading avatar:', uploadError)
-          toast.error(t('profile.messages.error.upload_avatar_failed', 'Failed to upload avatar'))
+          profilePhotoUrl = base64Str
+        } catch (error) {
+          console.error('Error reading avatar file:', error)
+          toast.error(t('profile.messages.error.upload_avatar_failed', 'Failed to process avatar image'))
           return
         }
-
-        const { data: urlData } = supabase.storage
-          .from('profile_user')
-          .getPublicUrl(uploadData.path)
-
-        profilePhotoUrl = urlData.publicUrl
       }
 
       if (isCountryTouched && effectiveState.id === 0) {
@@ -421,6 +461,11 @@ function ProfilePageContent() {
         profileData.bio,
         profilePhotoUrl || undefined,
         profileData.email, // Tambahkan email di sini
+        profileData.language,
+        profileData.dateFormat,
+        profileData.timeFormat,
+        profileData.numberFormat,
+        profileData.currencyFormat
       )
 
       if (!result.success) {
@@ -466,19 +511,8 @@ function ProfilePageContent() {
       setSelectedCountry({ id: 0, name: "" })
       setProfileData(prev => ({ ...prev, timezone: timezoneToSave }))
 
-      try {
-        const cached = localStorage.getItem('myqurani_user_profile_v2')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          localStorage.setItem('myqurani_user_profile_v2', JSON.stringify({
-            ...parsed,
-            timezone: timezoneToSave,
-            cachedAt: new Date().toISOString(),
-          }))
-        }
-      } catch {
-        // no-op
-      }
+      // We no longer manually cache myqurani_user_profile_v2. 
+      // The auth provider will fetch the latest via refreshProfile().
 
       try {
         await refreshProfile()

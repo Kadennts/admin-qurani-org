@@ -39,6 +39,26 @@ export interface AuthData {
     refreshToken: string;
     expiresAt: string;
     roles: string[];
+    bio?: string;
+    address?: string;
+    cityId?: number | string;
+    cityName?: string;
+    city?: string;
+    stateId?: number | string;
+    state?: string;
+    countryId?: number | string;
+    country?: string;
+    countryName?: string;
+    gender?: number | string;
+    sex?: number | string;
+    dob?: string;
+    dateOfBirth?: string;
+    job?: string;
+    language?: string;
+    timezone?: string | number;
+    dateFormat?: string;
+    timeFormat?: string;
+    visibility?: number | string;
 }
 
 interface ApiOptions {
@@ -81,6 +101,19 @@ export function setStoredAuth(auth: AuthData): void {
         name: auth.name,
         image: auth.image,
         roles: auth.roles,
+        bio: auth.bio,
+        address: auth.address,
+        cityId: auth.cityId,
+        cityName: auth.cityName || auth.city,
+        stateId: auth.stateId,
+        countryId: auth.countryId,
+        countryName: auth.countryName || auth.country,
+        gender: auth.gender || auth.sex,
+        dob: auth.dob || auth.dateOfBirth,
+        job: auth.job,
+        language: auth.language,
+        timezone: auth.timezone,
+        dateFormat: auth.dateFormat,
     }))}; expires=${expires}; path=/; SameSite=Lax`;
 
     // Dispatch auth change event
@@ -601,6 +634,31 @@ export const ticketsApi = {
 
     closeTicket: (id: number | string, token?: string) =>
         apiRequest<any>(`/api/v1/tickets/${id}/close`, { method: 'PUT', token }),
+
+    assignTicket: (id: number | string, userId: string | number, token?: string) =>
+        apiRequest<any>(`/api/v1/tickets/${id}/assign`, {
+            method: 'PUT',
+            body: { assigneeId: userId },
+            token
+        }),
+
+    uploadAttachment: async (id: number | string, file: File, token?: string) => {
+        const authToken = token || getStoredAuth()?.accessToken;
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`${API_BASE}/api/v1/tickets/${id}/attachments`, {
+            method: 'POST',
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+            body: formData,
+        });
+        
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(err || 'Upload failed');
+        }
+        return response.json();
+    },
 };
 
 // ============================================
@@ -1113,7 +1171,7 @@ export const permissionsApi = {
 
 export const notificationsApi = {
     // GET /api/v1/Notifications/searchCursor
-    getWithCursor: (params: { cursor?: string, pageSize?: number, type?: string, category?: string, isRead?: boolean } = {}, token?: string) => {
+    getWithCursor: async (params: { cursor?: string, pageSize?: number, type?: string, category?: string, isRead?: boolean } = {}, token?: string) => {
         const queryParams = new URLSearchParams();
         if (params.cursor) queryParams.append('Cursor', params.cursor);
         if (params.pageSize) queryParams.append('PageSize', params.pageSize.toString());
@@ -1121,12 +1179,25 @@ export const notificationsApi = {
         if (params.category) queryParams.append('Category', params.category);
         if (params.isRead !== undefined) queryParams.append('IsRead', String(params.isRead));
         const qs = queryParams.toString();
-        return apiRequest<any>(`/api/v1/Notifications/searchCursor${qs ? `?${qs}` : ''}`, { token });
+        try {
+            return await apiRequest<any>(`/api/v1/Notifications/searchCursor${qs ? `?${qs}` : ''}`, { token });
+        } catch (error) {
+            return { data: [] }; // Silent fallback to avoid breaking UI/console
+        }
     },
 
+    // GET /api/v1/Notifications/{id}
+    getById: (id: string | number, token?: string) =>
+        apiRequest<any>(`/api/v1/Notifications/${id}`, { token }),
+
     // GET /api/v1/Notifications/unread-count
-    getUnreadCount: (token?: string) =>
-        apiRequest<any>('/api/v1/Notifications/unread-count', { token }),
+    getUnreadCount: async (token?: string) => {
+        try {
+            return await apiRequest<any>('/api/v1/Notifications/unread-count', { token });
+        } catch {
+            return { data: 0 };
+        }
+    },
 
     // POST /api/v1/Notifications/{id}/read
     markAsRead: (id: string | number, token?: string) =>
@@ -2334,6 +2405,43 @@ export const walletApi = {
     updateWalletLimits: (walletId: number | string, data: any, token?: string) =>
         apiRequest<any>(`/api/v1/Wallet/admin/${walletId}/limits`, { method: 'PUT', body: data, token }),
 
+    // ── User-level / General Wallet Endpoints ─────────────────────────────────
+    // NOTE: These endpoints (/api/v1/Wallet/transactions, /topups, /withdraws)
+    // are user-level endpoints. When called with an admin token, they may return
+    // data specific to the admin's own wallet. Admin-specific versions with full
+    // user data access have been requested from the API team.
+
+    // Get transaction history (user-scoped, will return transactions for token owner)
+    getTransactions: (params: { type?: number; page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.type !== undefined) searchParams.append('type', params.type.toString());
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Wallet/transactions${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get transaction by ID (user-scoped)
+    getTransactionById: (id: number | string, token?: string, signal?: AbortSignal) =>
+        apiRequest<any>(`/api/v1/Wallet/transactions/${id}`, { token, signal }),
+
+    // Get topup history (user-scoped, will return topups for token owner only)
+    getTopupHistory: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Wallet/topups${query ? `?${query}` : ''}`, { token, signal });
+    },
+
+    // Get withdraw history (user-scoped, will return withdrawals for token owner only)
+    getWithdrawHistory: (params: { page?: number; pageSize?: number } = {}, token?: string, signal?: AbortSignal) => {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+        const query = searchParams.toString();
+        return apiRequest<any>(`/api/v1/Wallet/withdraws${query ? `?${query}` : ''}`, { token, signal });
+    },
 
 };
 

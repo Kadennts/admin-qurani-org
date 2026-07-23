@@ -97,10 +97,10 @@ function GuruContent() {
                 // Inject dummy accepted gurus
                 try {
                     const pengajuanStatuses = JSON.parse(sessionStorage.getItem("pengajuanGuruStatuses") || "{}")
-                    const acceptedIds = Object.keys(pengajuanStatuses).filter(id => pengajuanStatuses[id] === "diterima").map(Number)
+                    const acceptedIds = Object.keys(pengajuanStatuses).filter(id => pengajuanStatuses[id] === "diterima").map(String)
                     if (acceptedIds.length > 0) {
                         import("@/data/pending-trainers-list.json").then(dummies => {
-                            const newGurus = dummies.default.filter(d => acceptedIds.includes(d.id)).map((d: any) => ({
+                            const newGurus = dummies.default.filter(d => acceptedIds.includes(String(d.id))).map((d: any) => ({
                                 id: d.id,
                                 name: d.userName || d.name || `Guru #${d.id}`,
                                 email: d.email || "",

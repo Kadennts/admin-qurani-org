@@ -350,7 +350,7 @@ function GuruDetailContent() {
             })
             .catch(() => {
                 // Fallback to dummy data
-                const dummy = pendingDummies.find(d => d.id === id)
+                const dummy = pendingDummies.find(d => String(d.id) === String(id))
                 if (dummy) {
                     let ds = "pending"
                     try {
@@ -376,8 +376,8 @@ function GuruDetailContent() {
                     } catch { }
 
                     setDetail({
-                        id: dummy.id,
-                        userId: dummy.userId,
+                        id: Number(dummy.id),
+                        userId: Number(dummy.userId),
                         userName: dummy.userName,
                         username: dummy.username,
                         email: dummy.email,

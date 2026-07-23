@@ -42,7 +42,7 @@ import {
     fetchTicketRepliesPage
 } from "@/utils/api/tickets/fetch"
 import { createTicketReply } from "@/utils/api/tickets/insert"
-import { updateTicketStatus, updateTicketPriority, updateTicketDetails } from "@/utils/api/tickets/update"
+import { updateTicketStatus, updateTicketPriority } from "@/utils/api/tickets/update"
 import { uploadMultipleAttachments } from "@/utils/api/tickets/upload"
 import { useAuth } from "@/hooks/use-auth"
 // import { createClient } from "@/utils/supabase/client"
@@ -206,17 +206,7 @@ export default function TicketDetailClient({
     const [isSavingAssignee, setIsSavingAssignee] = useState(false)
     const assigneeDropdownRef = useRef<HTMLDivElement>(null)
 
-    // Project / Service editing
-    const [editingProject, setEditingProject] = useState(false)
-    const [projectValue, setProjectValue] = useState(initialTicket?.project || "")
-    const [isSavingProject, setIsSavingProject] = useState(false)
 
-    const [editingService, setEditingService] = useState(false)
-    const [serviceValue, setServiceValue] = useState(initialTicket?.service || "")
-    const [isSavingService, setIsSavingService] = useState(false)
-    const [savedServices, setSavedServices] = useState<string[]>([])
-    const [showServiceDropdown, setShowServiceDropdown] = useState(false)
-    const serviceDropdownRef = useRef<HTMLDivElement>(null)
 
     // Tags
     const [tags, setTags] = useState<string[]>([])
@@ -225,28 +215,12 @@ export default function TicketDetailClient({
     // Hydrate local storage fields
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            try { 
+            try {
                 const savedTags = JSON.parse(localStorage.getItem(`ticket_${ticketId}_tags`) || '[]')
                 if (Array.isArray(savedTags) && savedTags.length > 0) setTags(savedTags)
-                
-                const savedServices = JSON.parse(localStorage.getItem('ticket_saved_services') || '[]')
-                if (Array.isArray(savedServices)) setSavedServices(savedServices)
 
                 const savedAssignee = JSON.parse(localStorage.getItem(`ticket_${ticketId}_assignee`) || 'null')
                 if (savedAssignee) setSelectedAssignee(savedAssignee)
-                
-                // If project/service were updated locally but API doesn't have them, load them from cache
-                const ticketCache = JSON.parse(localStorage.getItem(`ticket_cache_${ticketId}`) || 'null')
-                if (ticketCache) {
-                    if (ticketCache.project && !initialTicket?.project) {
-                        setProjectValue(ticketCache.project)
-                        setTicket(prev => prev ? { ...prev, project: ticketCache.project } : prev)
-                    }
-                    if (ticketCache.service && !initialTicket?.service) {
-                        setServiceValue(ticketCache.service)
-                        setTicket(prev => prev ? { ...prev, service: ticketCache.service } : prev)
-                    }
-                }
             } catch (e) {
                 console.warn('Hydration error:', e)
             }
@@ -389,26 +363,14 @@ export default function TicketDetailClient({
         user.email.toLowerCase().includes(assigneeSearch.toLowerCase())
     )
 
-    const handleSelectAssignee = async (user: any) => {
-        setSelectedAssignee(user)
-        setAssigneeSearch("")
-        setShowAssigneeDropdown(false)
-        setIsSavingAssignee(true)
-        try {
-            // Save locally since API doesn't have assignee endpoint yet
-            localStorage.setItem(`ticket_${ticketId}_assignee`, JSON.stringify(user))
-            showSuccessToast()
-        } finally {
-            setIsSavingAssignee(false)
-        }
-    }
+
 
     // Load saved assignee
     useEffect(() => {
         try {
             const saved = localStorage.getItem(`ticket_${ticketId}_assignee`)
             if (saved) setSelectedAssignee(JSON.parse(saved))
-        } catch {}
+        } catch { }
     }, [ticketId])
 
     const getStatusConfig = (status: string) => {
@@ -465,13 +427,13 @@ export default function TicketDetailClient({
             const raw = localStorage.getItem('myqurani_user_profile_v2')
             if (raw) {
                 const parsed = JSON.parse(raw)
-                cachedTimezone = (parsed?.timezone || "").trim()
+                cachedTimezone = String(parsed?.timezone || "").trim()
             }
         } catch {
             // no-op
         }
 
-        const fromProfile = (profile?.timezone || "").trim()
+        const fromProfile = String(profile?.timezone || "").trim()
         const preferred = cachedTimezone || fromProfile
         if (preferred && isValidTimezone(preferred)) return preferred
         if (fromProfile && isValidTimezone(fromProfile)) return fromProfile
@@ -834,50 +796,7 @@ export default function TicketDetailClient({
         }
     };
 
-    // ---- Project save ----
-    const handleSaveProject = async () => {
-        if (!ticket) return
-        setIsSavingProject(true)
-        try {
-            const res = await updateTicketDetails(ticket.id, { project: projectValue || null })
-            if (res.success) {
-                setTicket(prev => prev ? { ...prev, project: projectValue || null } : prev)
-                updateTicketCache({ project: projectValue || null })
-                setEditingProject(false)
-                showSuccessToast()
-            }
-        } finally {
-            setIsSavingProject(false)
-        }
-    }
 
-    // ---- Service save + add to global list ----
-    const handleSaveService = async (val?: string) => {
-        if (!ticket) return
-        const finalVal = val !== undefined ? val : serviceValue
-        setIsSavingService(true)
-        try {
-            const res = await updateTicketDetails(ticket.id, { service: finalVal || null })
-            if (res.success) {
-                setTicket(prev => prev ? { ...prev, service: finalVal || null } : prev)
-                updateTicketCache({ service: finalVal || null })
-                setServiceValue(finalVal)
-                setEditingService(false)
-                showSuccessToast()
-            }
-        } finally {
-            setIsSavingService(false)
-        }
-    }
-
-    const handleAddServiceToList = () => {
-        const val = serviceValue.trim()
-        if (!val || savedServices.includes(val)) return
-        const next = [...savedServices, val]
-        setSavedServices(next)
-        localStorage.setItem('ticket_saved_services', JSON.stringify(next))
-        showSuccessToast()
-    }
 
     // ---- Tags ----
     const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -903,6 +822,29 @@ export default function TicketDetailClient({
         const next = tags.filter(t => t !== tag)
         setTags(next)
         localStorage.setItem(`ticket_${ticketId}_tags`, JSON.stringify(next))
+    }
+
+    const handleSelectAssignee = async (user: { id: string; name: string; email: string }) => {
+        if (!ticket) return;
+        setIsSavingAssignee(true);
+        try {
+            const { ticketsApi } = await import('@/lib/api');
+            const result = await ticketsApi.assignTicket(ticket.id, user.id);
+            if (result.success !== false) {
+                setSelectedAssignee(user);
+                localStorage.setItem(`ticket_${ticketId}_assignee`, JSON.stringify(user));
+                updateTicketCache({ assignee: user.name } as any);
+                setShowAssigneeDropdown(false);
+                showSuccessToast();
+            } else {
+                alert(result.message || 'Failed to assign ticket');
+            }
+        } catch (e: any) {
+            console.error('[Assignee] Failed to assign:', e);
+            alert(e.message || 'Failed to assign ticket');
+        } finally {
+            setIsSavingAssignee(false);
+        }
     }
 
     // ---- Assignee: load admin users from API ----
@@ -945,16 +887,7 @@ export default function TicketDetailClient({
         return () => document.removeEventListener('mousedown', handler)
     }, [])
 
-    // Close service dropdown on outside click
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
-                setShowServiceDropdown(false)
-            }
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [])
+
 
     // ---- Load Related Tickets via Qurani API ----
     const loadRelatedTickets = async () => {
@@ -1453,52 +1386,52 @@ export default function TicketDetailClient({
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {isLoadingRelated ? (
-                                            <div className="col-span-2 space-y-3 py-4">
-                                                {[...Array(2)].map((_, i) => (
-                                                    <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 animate-pulse">
-                                                        <Skeleton className="h-3 w-24" />
-                                                        <Skeleton className="h-4 w-full" />
-                                                        <Skeleton className="h-3 w-3/4" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : relatedTickets.length > 0 ? (
-                                            relatedTickets.map(t => (
-                                                <div key={t.id} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg cursor-default">
-                                                    <div className="flex justify-between text-xs mb-2">
-                                                        <span className="font-mono text-gray-500">{t.ticket_number || `#${t.id}`}</span>
-                                                        <span className={cn("px-2 py-0.5 rounded-full", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700")}>{t.status}</span>
-                                                    </div>
-                                                    <h4 className="font-semibold text-sm mb-1 line-clamp-1">{t.subject}</h4>
-                                                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                                                        <span className="text-[11px] text-gray-500">Related via:</span>
-                                                        {t.relatedBy.length > 0 ? (
-                                                            t.relatedBy.map((source) => (
-                                                                <span
-                                                                    key={source}
-                                                                    className={cn(
-                                                                        "px-2 py-0.5 rounded-full text-[10px] font-medium",
-                                                                        source === "Department" && "bg-blue-50 text-blue-700 border border-blue-200",
-                                                                        source === "Contact" && "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                                                    )}
-                                                                >
-                                                                    {source}
-                                                                </span>
-                                                            ))
-                                                        ) : (
-                                                            <span className="text-[11px] text-gray-400">-</span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-[11px] text-gray-500 mb-1">
-                                                        {t.contact || "Unknown"} · {t.department || "-"}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">{formatDateTime(t.submitted_date)}</p>
+                                            {isLoadingRelated ? (
+                                                <div className="col-span-2 space-y-3 py-4">
+                                                    {[...Array(2)].map((_, i) => (
+                                                        <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 animate-pulse">
+                                                            <Skeleton className="h-3 w-24" />
+                                                            <Skeleton className="h-4 w-full" />
+                                                            <Skeleton className="h-3 w-3/4" />
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <p className="col-span-2 text-center text-gray-500 text-sm py-8">No related tickets found.</p>
-                                        )}
+                                            ) : relatedTickets.length > 0 ? (
+                                                relatedTickets.map(t => (
+                                                    <div key={t.id} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg cursor-default">
+                                                        <div className="flex justify-between text-xs mb-2">
+                                                            <span className="font-mono text-gray-500">{t.ticket_number || `#${t.id}`}</span>
+                                                            <span className={cn("px-2 py-0.5 rounded-full", getStatusConfig(t.status).bgClass, "bg-opacity-20 text-gray-700")}>{t.status}</span>
+                                                        </div>
+                                                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">{t.subject}</h4>
+                                                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                                            <span className="text-[11px] text-gray-500">Related via:</span>
+                                                            {t.relatedBy.length > 0 ? (
+                                                                t.relatedBy.map((source) => (
+                                                                    <span
+                                                                        key={source}
+                                                                        className={cn(
+                                                                            "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                                                            source === "Department" && "bg-blue-50 text-blue-700 border border-blue-200",
+                                                                            source === "Contact" && "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                                        )}
+                                                                    >
+                                                                        {source}
+                                                                    </span>
+                                                                ))
+                                                            ) : (
+                                                                <span className="text-[11px] text-gray-400">-</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-500 mb-1">
+                                                            {t.contact || "Unknown"} · {t.department || "-"}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500">{formatDateTime(t.submitted_date)}</p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="col-span-2 text-center text-gray-500 text-sm py-8">No related tickets found.</p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1562,58 +1495,7 @@ export default function TicketDetailClient({
                                         <dt className="text-gray-500">Department</dt>
                                         <dd className="font-medium text-gray-900 dark:text-gray-100 text-right justify-self-end min-w-0 truncate">{ticket.department || "-"}</dd>
                                     </div>
-                                    <div className="grid grid-cols-[74px_minmax(0,1fr)] items-center gap-x-3 py-1.5 group min-h-[1.5rem]">
-                                        <dt className="text-gray-500">Project</dt>
-                                        <dd className="font-medium text-gray-900 dark:text-gray-100 flex items-center justify-end min-w-0">
-                                            {editingProject ? (
-                                                <div className="flex gap-1 items-center justify-end w-full">
-                                                    <Input value={projectValue} onChange={e => setProjectValue(e.target.value)} className="h-7 text-xs w-28" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()} />
-                                                    <button onClick={handleSaveProject} disabled={isSavingProject} className="p-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200">{isSavingProject ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}</button>
-                                                    <button onClick={() => {setEditingProject(false); setProjectValue(ticket.project || '')}} className="p-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"><X className="w-3 h-3"/></button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditingProject(true)}
-                                                    className="w-full text-right hover:text-emerald-700 hover:underline underline-offset-2 transition-colors truncate"
-                                                    title="Click to edit project"
-                                                >
-                                                    {ticket.project || "-"}
-                                                </button>
-                                            )}
-                                        </dd>
-                                    </div>
-                                    <div className="grid grid-cols-[74px_minmax(0,1fr)] items-center gap-x-3 py-1.5 group min-h-[1.5rem] relative" ref={serviceDropdownRef}>
-                                        <dt className="text-gray-500">Service</dt>
-                                        <dd className="font-medium text-gray-900 dark:text-gray-100 flex items-center justify-end min-w-0">
-                                            {editingService ? (
-                                                <div className="flex flex-col items-end">
-                                                    <div className="flex gap-1 items-center justify-end w-full">
-                                                        <Input value={serviceValue} onChange={e => {setServiceValue(e.target.value); setShowServiceDropdown(true)}} onFocus={() => setShowServiceDropdown(true)} className="h-7 text-xs w-28" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveService()} />
-                                                        <button onClick={handleAddServiceToList} title="Add to global list" className="p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"><Plus className="w-3 h-3"/></button>
-                                                        <button onClick={() => handleSaveService()} disabled={isSavingService} title="Save to ticket" className="p-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200">{isSavingService ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}</button>
-                                                        <button onClick={() => {setEditingService(false); setServiceValue(ticket.service || '')}} className="p-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"><X className="w-3 h-3"/></button>
-                                                    </div>
-                                                    {showServiceDropdown && savedServices.length > 0 && (
-                                                        <div className="absolute top-full right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 max-h-32 overflow-y-auto w-40 text-left">
-                                                            {savedServices.filter(s => s.toLowerCase().includes(serviceValue.toLowerCase())).map(s => (
-                                                                <div key={s} onClick={() => {setServiceValue(s); setShowServiceDropdown(false)}} className="px-2 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">{s}</div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {setEditingService(true); setShowServiceDropdown(true)}}
-                                                    className="w-full text-right hover:text-emerald-700 hover:underline underline-offset-2 transition-colors truncate"
-                                                    title="Click to edit service"
-                                                >
-                                                    {ticket.service || "-"}
-                                                </button>
-                                            )}
-                                        </dd>
-                                    </div>
+
                                 </dl>
                             </div>
 

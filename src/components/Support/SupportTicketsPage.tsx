@@ -40,10 +40,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { fetchTickets, fetchTicketStats, type TicketListItem } from "@/utils/api/tickets/fetch"
 import { bulkUpdateTickets } from "@/utils/api/tickets/update"
-import { bulkDeleteTickets } from "@/utils/api/tickets/delete"
 import { useAuth } from "@/hooks/use-auth"
-// DISABLED: Supabase realtime subscriptions
-// import { createClient } from "@/utils/supabase/client"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/hooks/use-translation"
 import { formatDistanceToNowStrict } from "date-fns"
@@ -75,13 +72,13 @@ export default function SupportTicketsPage() {
       const raw = localStorage.getItem('myqurani_user_profile_v2')
       if (raw) {
         const parsed = JSON.parse(raw)
-        cachedTimezone = (parsed?.timezone || "").trim()
+        cachedTimezone = String(parsed?.timezone || "").trim()
       }
     } catch {
       // no-op
     }
 
-    const fromProfile = (profile?.timezone || "").trim()
+    const fromProfile = String(profile?.timezone || "").trim()
     const preferred = cachedTimezone || fromProfile
     if (preferred && isValidTimezone(preferred)) return preferred
     if (fromProfile && isValidTimezone(fromProfile)) return fromProfile
@@ -126,9 +123,7 @@ export default function SupportTicketsPage() {
   const [showBulkSuccess, setShowBulkSuccess] = useState(false)
 
   // Bulk Action State
-  const [bulkDelete, setBulkDelete] = useState(false)
   const [bulkStatus, setBulkStatus] = useState("")
-  const [bulkDepartment, setBulkDepartment] = useState("")
   const [bulkPriority, setBulkPriority] = useState("")
 
   const [statusCounts, setStatusCounts] = useState({
@@ -345,7 +340,7 @@ export default function SupportTicketsPage() {
       };
 
       const stats = { all: 0, open: 0, in_progress: 0, answered: 0, on_hold: 0, closed: 0 };
-      
+
       // Fetch all status counts concurrently
       const promises = Object.entries(statusMap).map(async ([key, statusId]) => {
         try {
@@ -400,71 +395,7 @@ export default function SupportTicketsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // NOTE: Supabase realtime subscriptions DISABLED to eliminate Supabase requests
-  // TODO: Replace with MyQurani API websocket/polling when available
-  /*
-  // Realtime subscription for ticket replies - run only once on mount
-  useEffect(() => {
-    let supabase: ReturnType<typeof createClient> | null = null;
-    let channel: any = null;
-
-    try {
-      supabase = createClient();
-      channel = supabase
-        .channel("realtime-support-ticket-replies")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "ticket_replies" },
-          (payload) => {
-            console.log(" New ticket reply received:", payload);
-            loadTicketsSilently();
-          }
-        )
-        .subscribe((status) => {
-          console.log("Realtime subscription (replies) status:", status);
-        });
-    } catch (error) {
-      console.error("Failed to init realtime client:", error);
-    }
-
-    return () => {
-      if (supabase && channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
-
-  // Realtime subscription for new tickets - run only once on mount
-  useEffect(() => {
-    let supabase: ReturnType<typeof createClient> | null = null;
-    let channel: any = null;
-
-    try {
-      supabase = createClient();
-      channel = supabase
-        .channel("realtime-support-tickets")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "tickets" },
-          (payload) => {
-            console.log(" New ticket received:", payload);
-            loadTickets();
-          }
-        )
-        .subscribe((status) => {
-          console.log(" Realtime subscription (tickets) status:", status);
-        });
-    } catch (error) {
-      console.error("Failed to init realtime client:", error);
-    }
-
-    return () => {
-      if (supabase && channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
-  */
+  // Realtime: not yet available in API Qurani (removed Supabase realtime)
 
   // --- Handlers ---
 
@@ -571,20 +502,15 @@ export default function SupportTicketsPage() {
 
   const handleBulkConfirm = async () => {
     try {
-      if (bulkDelete) {
-        await bulkDeleteTickets(selectedTickets)
-      } else {
-        const updates: Record<string, string> = {}
-        if (bulkStatus) updates.status = bulkStatus
-        if (bulkDepartment) updates.department = bulkDepartment
-        if (bulkPriority) updates.priority = bulkPriority
-        if (Object.keys(updates).length > 0) {
-          await bulkUpdateTickets(selectedTickets, updates)
-        }
+      const updates: Record<string, string> = {}
+      if (bulkStatus) updates.status = bulkStatus
+      if (bulkPriority) updates.priority = bulkPriority
+      if (Object.keys(updates).length > 0) {
+        await bulkUpdateTickets(selectedTickets, updates)
       }
       setSelectedTickets([])
       setShowBulkModal(false)
-      setBulkDelete(false); setBulkStatus(""); setBulkDepartment(""); setBulkPriority("");
+      setBulkStatus(""); setBulkPriority("");
       setShowBulkSuccess(true)
       setTimeout(() => setShowBulkSuccess(false), 2000)
       loadTickets()
@@ -1318,84 +1244,46 @@ export default function SupportTicketsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl p-6 space-y-4">
             <h2 className="text-lg font-bold">{t('bulk_actions')}</h2>
 
-            <div className="flex p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-              <button
-                className={cn("flex-1 py-1.5 text-sm font-medium rounded-md transition-all", !bulkDelete ? "bg-white dark:bg-gray-600 shadow-sm" : "text-gray-500 dark:text-gray-400")}
-                onClick={() => setBulkDelete(false)}
-              >
-                {t('update')}
-              </button>
-              <button
-                className={cn("flex-1 py-1.5 text-sm font-medium rounded-md transition-all", bulkDelete ? "bg-red-50 text-red-600 dark:bg-red-900/30" : "text-gray-500 dark:text-gray-400")}
-                onClick={() => setBulkDelete(true)}
-              >
-                {t('delete')}
-              </button>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500">{t('status')}</label>
+                <select
+                  className="w-full h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
+                  value={bulkStatus}
+                  onChange={(e) => setBulkStatus(e.target.value)}
+                >
+                  <option value="">{t('no_change', 'No Change')}</option>
+                  <option value="Open">{getStatusConfig("Open").label}</option>
+                  <option value="In Progress">{getStatusConfig("In Progress").label}</option>
+                  <option value="Answered">{getStatusConfig("Answered").label}</option>
+                  <option value="On Hold">{getStatusConfig("On Hold").label}</option>
+                  <option value="Closed">{getStatusConfig("Closed").label}</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500">{t('priority')}</label>
+                <select
+                  className="w-full h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
+                  value={bulkPriority}
+                  onChange={(e) => setBulkPriority(e.target.value)}
+                >
+                  <option value="">{t('no_change', 'No Change')}</option>
+                  <option value="Low">{getPriorityConfig("Low").label}</option>
+                  <option value="Medium">{getPriorityConfig("Medium").label}</option>
+                  <option value="High">{getPriorityConfig("High").label}</option>
+                </select>
+              </div>
             </div>
 
-            {bulkDelete ? (
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/30 text-center space-y-2">
-                <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
-                <p className="text-sm text-red-800 dark:text-red-200 font-medium">
-                  {t('bulk_delete_warning', `Warning: You are about to delete ${selectedTickets.length} tickets!`, { count: selectedTickets.length })}
-                </p>
-                <p className="text-xs text-red-600 dark:text-red-300">
-                  {t("bulk_delete_irreversible", "This action cannot be undone.")}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">{t('status')}</label>
-                  <select
-                    className="w-full h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
-                    value={bulkStatus}
-                    onChange={(e) => setBulkStatus(e.target.value)}
-                  >
-                    <option value="">{t('no_change', 'No Change')}</option>
-                    <option value="Open">{getStatusConfig("Open").label}</option>
-                    <option value="In Progress">{getStatusConfig("In Progress").label}</option>
-                    <option value="Answered">{getStatusConfig("Answered").label}</option>
-                    <option value="On Hold">{getStatusConfig("On Hold").label}</option>
-                    <option value="Closed">{getStatusConfig("Closed").label}</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">{t('department')}</label>
-                  <select
-                    className="w-full h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
-                    value={bulkDepartment}
-                    onChange={(e) => setBulkDepartment(e.target.value)}
-                  >
-                    <option value="">{t('no_change', 'No Change')}</option>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">{t('priority')}</label>
-                  <select
-                    className="w-full h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
-                    value={bulkPriority}
-                    onChange={(e) => setBulkPriority(e.target.value)}
-                  >
-                    <option value="">{t('no_change', 'No Change')}</option>
-                    <option value="Low">{getPriorityConfig("Low").label}</option>
-                    <option value="Medium">{getPriorityConfig("Medium").label}</option>
-                    <option value="High">{getPriorityConfig("High").label}</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowBulkModal(false); setBulkDelete(false); }}>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowBulkModal(false); setBulkStatus(""); setBulkPriority(""); }}>
                 {t('cancel')}
               </Button>
               <Button
-                className={cn("flex-1 text-white", bulkDelete ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700")}
+                className="flex-1 text-white bg-emerald-600 hover:bg-emerald-700"
                 onClick={handleBulkConfirm}
               >
-                {bulkDelete ? t('delete') : t('update')}
+                {t('update')}
               </Button>
             </div>
           </div>

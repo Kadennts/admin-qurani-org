@@ -6,10 +6,10 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
     Search, ShoppingBag, Zap, CheckCircle2, X,
-    TrendingUp, MoreHorizontal, ChevronLeft,
+    MoreHorizontal, ChevronLeft,
     ChevronRight, Trash2,
     ChevronDown, Check, Timer, BarChart2, History, Calendar,
-    Loader2, AlertCircle,
+    Loader2, AlertCircle, Wifi, MapPin, CreditCard,
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import {
@@ -144,11 +144,14 @@ function FilterDropdown({ value, onChange }: { value: FilterKey; onChange: (k: F
 
 type PipelineOrder = {
     id: string | number
+    bookingCode: string
     member: string
     username: string
     memberAvatar: string
+    memberImage?: string
     guru: string
     guruUsername: string
+    guruImage?: string
     paket: string
     sesi: number
     sesiSelesai: number
@@ -156,6 +159,7 @@ type PipelineOrder = {
     tglPesan: string
     rawDate: Date
     payment: string
+    mode: "online" | "offline"
     status: PipelineStatus
     isPendingPayment?: boolean
     isSim?: boolean
@@ -194,11 +198,12 @@ function bookingToPipeline(b: typeof dummyData.bookings[0]): PipelineOrder {
     const isPendingPayment = detail ? detail.payment.status === "pending" : false
     return {
         id: b.id,
+        bookingCode: `#${b.id}`,
         member: b.userName,
         username: toUsername(b.userEmail, b.userName),
         memberAvatar: initials(b.userName),
         guru: b.trainerName,
-        guruUsername: `@${toUsername("", b.trainerName)}`, // Dummy username for static data
+        guruUsername: `@${toUsername("", b.trainerName)}`,
         paket: b.packageName,
         sesi: b.totalSessions,
         sesiSelesai: b.completedSessions,
@@ -208,6 +213,7 @@ function bookingToPipeline(b: typeof dummyData.bookings[0]): PipelineOrder {
         rawDate: new Date(b.bookingDate),
         status: getStage(b),
         isPendingPayment,
+        mode: "online",
     }
 }
 
@@ -218,6 +224,7 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
     else if (o.paymentStatus === "paid") status = "lunas"
     return {
         id: o.id,
+        bookingCode: `#${o.id}`,
         member: o.member.name,
         username: toUsername(o.member.email, o.member.name),
         memberAvatar: initials(o.member.name),
@@ -226,13 +233,14 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
         paket: o.pkg.name,
         sesi: o.totalSessions,
         sesiSelesai: o.completedSessions,
-        harga: o.pkg.price, // Service fee is free in Qurani
+        harga: o.pkg.price,
         tglPesan: new Date(o.bookingDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
         payment: o.paymentGateway || "—",
         rawDate: new Date(o.bookingDate),
         status,
         isPendingPayment: o.paymentStatus === "pending",
         isSim: true,
+        mode: "online",
     }
 }
 
@@ -488,6 +496,7 @@ function SimModal({ onClose, onOrderCreated }: { onClose: () => void; onOrderCre
 // ─── Static dummy: Pesanan Selesai — Zulfa Hanum (#3010) ──────────────────────
 const ZULFA_COMPLETED_ORDER: PipelineOrder = {
     id: 3010,
+    bookingCode: "#3010",
     member: "Zulfa Hanum",
     username: "zulfahanum",
     memberAvatar: "ZH",
@@ -502,11 +511,13 @@ const ZULFA_COMPLETED_ORDER: PipelineOrder = {
     rawDate: new Date("2026-01-10"),
     status: "selesai",
     isSim: true,
+    mode: "online",
 }
 
 // ─── Static dummy: Pesanan Menunggu Guru — Fauzia Nurrohma (#3098) ─────────────────
 const FAUZIA_WAITING_GURU_ORDER: PipelineOrder = {
     id: 3098,
+    bookingCode: "#3098",
     member: "Fauzia Nurrohma",
     username: "fauzianurrohma",
     memberAvatar: "FN",
@@ -522,11 +533,13 @@ const FAUZIA_WAITING_GURU_ORDER: PipelineOrder = {
     status: "menunggu_guru",
     isPendingPayment: false,
     isSim: true,
+    mode: "online",
 }
 
 // ─── Static dummy: Pesanan Pending — Rahma Aulia (#3099) ──────────────────────
 const RAHMA_PENDING_ORDER: PipelineOrder = {
     id: 3099,
+    bookingCode: "#3099",
     member: "Rahma Aulia",
     username: "rahmaaulia",
     memberAvatar: "RA",
@@ -542,24 +555,18 @@ const RAHMA_PENDING_ORDER: PipelineOrder = {
     status: "baru",
     isPendingPayment: true,
     isSim: true,
+    mode: "online",
 }
 
 // ─── Main Content ──────────────────────────────────────────────────────────────
 function PesananContent() {
     const router = useRouter()
+
+    // ── Search state — server-side via API Keyword param
     const [searchInput, setSearchInput] = useState("")
     const [search, setSearch] = useState("")
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    const handleSearch = () => {
-        setSearch(searchInput)
-        setPage(1)
-    }
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleSearch()
-        }
-    }
     const [dateFilter, setDateFilter] = useState<FilterKey>("this_year")
     const [statusTab, setStatusTab] = useState<"all" | PipelineStatus>("all")
     const [simOrders, setSimOrders] = useState<SimOrder[]>([])
@@ -576,28 +583,55 @@ function PesananContent() {
 
     const refreshSim = useCallback(() => setSimOrders(getSimOrders()), [])
 
-    const refreshApi = useCallback(() => {
+    // ── Server-side search + date filter
+    const refreshApi = useCallback((keyword?: string) => {
         setApiLoading(true)
         setApiError(null)
-        fetchAdminBookings({ page: 1, pageSize: 100 })
-            .then(rows => setApiOrders(rows))
+        const range = getDateRange(dateFilter)
+        fetchAdminBookings({
+            page: 1,
+            pageSize: 100,
+            ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
+            ...(keyword ? { keyword } : {}),
+        })
+            .then(rows => setApiOrders(rows as PipelineOrder[]))
             .catch(err => {
                 console.error("Failed to fetch bookings:", err)
                 setApiOrders([])
                 setApiError("API booking belum bisa dimuat, menampilkan data dummy untuk testing.")
             })
             .finally(() => setApiLoading(false))
-    }, [])
+    }, [dateFilter])
 
     useEffect(() => {
-        refreshApi()
-    }, [refreshApi])
+        refreshApi(search || undefined)
+    }, [refreshApi, search])
 
     useEffect(() => {
         refreshSim()
         window.addEventListener("sim-notif-update", refreshSim)
         return () => window.removeEventListener("sim-notif-update", refreshSim)
     }, [refreshSim])
+
+    // ── Debounced search handler
+    function handleSearchChange(val: string) {
+        setSearchInput(val)
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+        searchDebounceRef.current = setTimeout(() => {
+            setSearch(val)
+            setPage(1)
+        }, 600)
+    }
+
+    function handleSearchSubmit() {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+        setSearch(searchInput)
+        setPage(1)
+    }
+
+    function handleKeyPress(e: React.KeyboardEvent) {
+        if (e.key === "Enter") handleSearchSubmit()
+    }
 
     async function handleAdvance(id: string | number, next: PipelineStatus) {
         const allOrders = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simOrders.map(simOrderToPipeline), ...dummyData.bookings.map(bookingToPipeline)]
@@ -610,7 +644,7 @@ function PesananContent() {
         try {
             if (order.isApi) {
                 await bulkUpdateBookingStatus([id], next)
-                refreshApi()
+                refreshApi(search || undefined)
             }
             setStatusOverrides(prev2 => ({ ...prev2, [id]: next }))
         } catch (err) {
@@ -624,22 +658,9 @@ function PesananContent() {
 
         const numId = typeof id === "number" ? id : parseInt(String(id)) || 0
 
-        // Jika dari "baru" langsung ke "lunas", kirim dua notifikasi sekaligus
         if (prev === "baru" && next === "lunas") {
-            addSimNotif({
-                type: "new_order",
-                message: `Pesanan #${id} diproses — Sesi dimulai`,
-                subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`,
-                isRead: false,
-                orderId: numId,
-            })
-            addSimNotif({
-                type: "payment_success",
-                message: `Pembayaran Lunas — ${order.member}`,
-                subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`,
-                isRead: false,
-                orderId: numId,
-            })
+            addSimNotif({ type: "new_order", message: `Pesanan #${id} diproses — Sesi dimulai`, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
+            addSimNotif({ type: "payment_success", message: `Pembayaran Lunas — ${order.member}`, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
             return
         }
 
@@ -652,15 +673,7 @@ function PesananContent() {
             baru:          { msg: "", type: "new_order" },
         }
         const { msg, type } = msgs[next]
-        if (msg) {
-            addSimNotif({
-                type,
-                message: msg,
-                subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`,
-                isRead: false,
-                orderId: numId,
-            })
-        }
+        if (msg) addSimNotif({ type, message: msg, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
     }
 
     async function handleBulkStatus(next: PipelineStatus) {
@@ -673,7 +686,7 @@ function PesananContent() {
         try {
             if (apiIds.length > 0) {
                 await bulkUpdateBookingStatus(apiIds, next)
-                refreshApi()
+                refreshApi(search || undefined)
             }
             setStatusOverrides(prev => {
                 const updated = { ...prev }
@@ -695,7 +708,6 @@ function PesananContent() {
         const staticRows = dummyData.bookings.map(bookingToPipeline)
         const combined = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simRows, ...staticRows]
         const seen = new Set<string>()
-        // Apply local overrides
         return combined
             .filter(o => {
                 const key = String(o.id)
@@ -707,16 +719,15 @@ function PesananContent() {
             .filter(o => o.member !== "Ahmad Fauzi")
     }, [apiOrders, simOrders, statusOverrides])
 
+    // ── Client-side filtering: date range + status tab (search already applied server-side)
     const filtered = useMemo(() => {
         const range = getDateRange(dateFilter)
-        const q = search.toLowerCase()
         return allOrders.filter(o => {
-            // If filter is "all", skip date check
-            if (range !== null) {
+            // For API orders, date filtering already done server-side; apply locally for dummy data only
+            if (!o.isApi && range !== null) {
                 const inRange = o.rawDate >= range.from && o.rawDate <= range.to
                 if (!inRange) return false
             }
-            // Tab "Pending" (baru) mencakup juga menunggu_guru
             if (statusTab !== "all") {
                 if (statusTab === "baru") {
                     if (o.status !== "baru" && o.status !== "menunggu_guru") return false
@@ -724,36 +735,31 @@ function PesananContent() {
                     if (o.status !== statusTab) return false
                 }
             }
-            if (!q) return true
-            return (
-                o.member.toLowerCase().includes(q) ||
-                o.guru.toLowerCase().includes(q) ||
-                String(o.id).includes(q) ||
-                o.paket.toLowerCase().includes(q) ||
-                o.username.includes(q)
-            )
+            // For non-API orders, also apply client-side keyword search
+            if (!o.isApi && search) {
+                const q = search.toLowerCase()
+                return (
+                    o.member.toLowerCase().includes(q) ||
+                    o.guru.toLowerCase().includes(q) ||
+                    String(o.id).includes(q) ||
+                    o.paket.toLowerCase().includes(q) ||
+                    o.username.includes(q)
+                )
+            }
+            return true
         })
-    }, [search, allOrders, dateFilter, statusTab])
+    }, [allOrders, dateFilter, statusTab, search])
 
-    // Date-filtered only (no statusTab) — used for tab counts so they match the list
     const dateFiltered = useMemo(() => {
         const range = getDateRange(dateFilter)
-        const q = search.toLowerCase()
         return allOrders.filter(o => {
-            if (range !== null) {
+            if (!o.isApi && range !== null) {
                 const inRange = o.rawDate >= range.from && o.rawDate <= range.to
                 if (!inRange) return false
             }
-            if (!q) return true
-            return (
-                o.member.toLowerCase().includes(q) ||
-                o.guru.toLowerCase().includes(q) ||
-                String(o.id).includes(q) ||
-                o.paket.toLowerCase().includes(q) ||
-                o.username.includes(q)
-            )
+            return true
         })
-    }, [allOrders, dateFilter, search])
+    }, [allOrders, dateFilter])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
     const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -781,13 +787,6 @@ function PesananContent() {
         })
     }
 
-    const stats = useMemo(() => ({
-        total: allOrders.length,
-        baru: allOrders.filter(o => o.status === "baru").length,
-        gagal: allOrders.filter(o => o.status === "gagal").length,
-        revenue: allOrders.filter(o => o.status === "lunas").reduce((s, o) => s + o.harga, 0),
-    }), [allOrders])
-
     function handleResetSim() {
         import("@/lib/sim-store").then(m => { m.clearSimOrders(); setSimOrders([]) })
         setStatusOverrides({})
@@ -799,24 +798,25 @@ function PesananContent() {
 
             <div className="max-w-[1600px] mx-auto">
 
-
-
                 {/* ── Action Toolbar ── */}
                 <div className="flex items-center gap-4 mb-6">
                     {/* Search & Filter Container */}
                     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 shadow-sm flex items-center gap-3 flex-1 max-w-[calc(100%-180px)]">
                         <div className="relative group flex-1 max-w-2xl">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                            {apiLoading && search && (
+                                <Loader2 className="absolute right-16 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                            )}
                             <input
                                 type="text"
-                                placeholder="Cari member, guru, paket..."
+                                placeholder="Cari member, guru, paket, kode pesanan..."
                                 value={searchInput}
-                                onChange={e => setSearchInput(e.target.value)}
+                                onChange={e => handleSearchChange(e.target.value)}
                                 onKeyDown={handleKeyPress}
                                 className="w-full pl-11 pr-24 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all"
                             />
                             <button
-                                onClick={handleSearch}
+                                onClick={handleSearchSubmit}
                                 className="absolute right-1.5 top-1.5 bottom-1.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-2 text-xs font-bold transition-all cursor-pointer border border-gray-200 dark:border-gray-600 shadow-sm"
                             >
                                 <Search className="w-3.5 h-3.5" />
@@ -860,7 +860,7 @@ function PesananContent() {
                     </div>
                 </div>
 
-                {/* ── API Loading / Error Toast (pojok kanan bawah) ── */}
+                {/* ── API Loading / Error Toast ── */}
                 {(apiLoading || apiError) && (
                     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
                         {apiLoading && (
@@ -870,7 +870,9 @@ function PesananContent() {
                                 </div>
                                 <div>
                                     <p className="text-xs font-bold text-gray-800 dark:text-white">Memuat pesanan...</p>
-                                    <p className="text-[10px] text-gray-400 font-medium">Mengambil data dari API Qurani</p>
+                                    <p className="text-[10px] text-gray-400 font-medium">
+                                        {search ? `Mencari "${search}" via API Qurani` : "Mengambil data dari API Qurani"}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -894,15 +896,15 @@ function PesananContent() {
                     </div>
                 )}
 
-
+                {/* ── Status Tabs ── */}
                 <div className="flex items-center gap-6 border-b border-gray-100 dark:border-gray-800 mb-0">
                     {([
-                        { key: "all",     label: "Semua",   count: dateFiltered.length,                                                                                          activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
-                        { key: "lunas",   label: "Lunas",   count: dateFiltered.filter(o => o.status === "lunas").length,                                                         activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
-                        { key: "aktif",   label: "Aktif",   count: dateFiltered.filter(o => o.status === "aktif").length,                                                         activeText: "text-sky-600 dark:text-sky-400",         activeBorder: "border-sky-500",     activeCount: "text-sky-500"     },
-                        { key: "baru",    label: "Pending", count: dateFiltered.filter(o => o.status === "baru" || o.status === "menunggu_guru").length,                           activeText: "text-amber-600 dark:text-amber-400",     activeBorder: "border-amber-500",   activeCount: "text-amber-500"   },
-                        { key: "gagal",   label: "Batal",   count: dateFiltered.filter(o => o.status === "gagal").length,                                                         activeText: "text-rose-600 dark:text-rose-400",       activeBorder: "border-rose-500",    activeCount: "text-rose-500"    },
-                        { key: "selesai", label: "Selesai", count: dateFiltered.filter(o => o.status === "selesai").length,                                                        activeText: "text-blue-600 dark:text-blue-400",       activeBorder: "border-blue-500",    activeCount: "text-blue-500"    },
+                        { key: "all",     label: "Semua",   count: dateFiltered.length,                                                                              activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
+                        { key: "lunas",   label: "Lunas",   count: dateFiltered.filter(o => o.status === "lunas").length,                                             activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
+                        { key: "aktif",   label: "Aktif",   count: dateFiltered.filter(o => o.status === "aktif").length,                                             activeText: "text-sky-600 dark:text-sky-400",         activeBorder: "border-sky-500",     activeCount: "text-sky-500"     },
+                        { key: "baru",    label: "Pending", count: dateFiltered.filter(o => o.status === "baru" || o.status === "menunggu_guru").length,               activeText: "text-amber-600 dark:text-amber-400",     activeBorder: "border-amber-500",   activeCount: "text-amber-500"   },
+                        { key: "gagal",   label: "Batal",   count: dateFiltered.filter(o => o.status === "gagal").length,                                             activeText: "text-rose-600 dark:text-rose-400",       activeBorder: "border-rose-500",    activeCount: "text-rose-500"    },
+                        { key: "selesai", label: "Selesai", count: dateFiltered.filter(o => o.status === "selesai").length,                                           activeText: "text-blue-600 dark:text-blue-400",       activeBorder: "border-blue-500",    activeCount: "text-blue-500"    },
                     ] as { key: "all" | PipelineStatus; label: string; count: number; activeText: string; activeBorder: string; activeCount: string }[]).map(tab => (
                         <button key={tab.key} onClick={() => { setStatusTab(tab.key); setPage(1) }}
                             className={`cursor-pointer flex items-center gap-1.5 pb-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${statusTab === tab.key
@@ -930,9 +932,10 @@ function PesananContent() {
                                         />
                                     </th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Kode Pesanan</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Member</th>
+                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Murid</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Guru</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Paket</th>
+                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Metode</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Tanggal</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Harga</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Status</th>
@@ -942,9 +945,9 @@ function PesananContent() {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {paged.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                        <td colSpan={10} className="text-center py-16 text-gray-400 dark:text-gray-500">
                                             <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                            <p>Tidak ada pesanan ditemukan</p>
+                                            <p>{search ? `Tidak ada pesanan untuk "${search}"` : "Tidak ada pesanan ditemukan"}</p>
                                         </td>
                                     </tr>
                                 ) : paged.map(order => {
@@ -967,16 +970,28 @@ function PesananContent() {
                                             </td>
                                             {/* Kode Pesanan */}
                                             <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                                                <span className="inline-flex items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap">
-                                                    #{order.id}
-                                                </span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span
+                                                        onClick={() => router.push(`/billing/orders/${order.id}`)}
+                                                        className="inline-flex items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap cursor-pointer hover:bg-emerald-100 transition-colors"
+                                                    >
+                                                        {order.bookingCode}
+                                                    </span>
+                                                    {order.isApi && (
+                                                        <span className="text-[9px] font-medium text-emerald-500 dark:text-emerald-400 pl-1">API</span>
+                                                    )}
+                                                </div>
                                             </td>
                                             {/* Member */}
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[colorIdx]}`}>
-                                                        {order.memberAvatar || order.member.substring(0, 2).toUpperCase()}
-                                                    </div>
+                                                    {order.memberImage ? (
+                                                        <img src={order.memberImage} alt={order.member} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100" />
+                                                    ) : (
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[colorIdx]}`}>
+                                                            {order.memberAvatar || order.member.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.member}</p>
                                                         <p className="text-[11px] text-gray-500">{order.username}</p>
@@ -985,13 +1000,38 @@ function PesananContent() {
                                             </td>
                                             {/* Guru */}
                                             <td className="px-4 py-3">
-                                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
-                                                <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
+                                                <div className="flex items-center gap-2">
+                                                    {order.guruImage ? (
+                                                        <img src={order.guruImage} alt={order.guru} className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-gray-100" />
+                                                    ) : null}
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
+                                                        <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
+                                                    </div>
+                                                </div>
                                             </td>
                                             {/* Paket */}
                                             <td className="px-4 py-3">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{order.paket}</p>
                                                 <p className="text-[11px] text-gray-500">{order.sesiSelesai}/{order.sesi} Sesi</p>
+                                            </td>
+                                            {/* Metode (mode + payment) */}
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 w-fit ${order.mode === "online"
+                                                        ? "bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400"
+                                                        : "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400"
+                                                    }`}>
+                                                        {order.mode === "online" ? <Wifi className="w-2.5 h-2.5" /> : <MapPin className="w-2.5 h-2.5" />}
+                                                        {order.mode === "online" ? "Online" : "Offline"}
+                                                    </span>
+                                                    {order.payment && order.payment !== "-" && order.payment !== "—" && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                                                            <CreditCard className="w-2.5 h-2.5" />
+                                                            {order.payment}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             {/* Tanggal */}
                                             <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
@@ -1005,7 +1045,6 @@ function PesananContent() {
                                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dotCls} inline-block`} />
                                                     {st.label}
                                                 </span>
-
                                             </td>
                                             {/* Aksi */}
                                             <td className="px-4 py-3 relative">
@@ -1090,7 +1129,6 @@ function PesananContent() {
                         className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
-                        {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
                             <div>
                                 <p className="font-bold text-gray-900 dark:text-white text-sm">Ubah Status Massal</p>
@@ -1100,7 +1138,6 @@ function PesananContent() {
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        {/* Status Options */}
                         <div className="p-4 grid grid-cols-2 gap-2">
                             {STATUS_ACTIONS.map(action => (
                                 <button
@@ -1114,7 +1151,6 @@ function PesananContent() {
                                 </button>
                             ))}
                         </div>
-                        {/* Footer */}
                         <div className="px-4 pb-4">
                             <button
                                 onClick={() => { setSelectedIds([]); setBulkOpen(false) }}

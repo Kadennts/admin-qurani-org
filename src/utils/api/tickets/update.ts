@@ -2,9 +2,10 @@
 
 /**
  * Tickets Update API
- * 
+ *
  * This module provides ticket update functions using the MyQurani API.
- * Interface remains the same as before for backward compatibility.
+ * Supabase has been fully removed.
+ * Note: project/service fields are not supported by API Qurani and have been removed.
  */
 
 import { cookies } from 'next/headers';
@@ -128,50 +129,11 @@ export async function updateTicketPriority(
   }
 }
 
-export async function updateTicketDetails(
-  ticketId: number,
-  updates: {
-    project?: string | null
-    service?: string | null
-  }
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { createAdminClient } = await import('@/utils/supabase/server')
-    const supabase = await createAdminClient()
-
-    const payload: Record<string, string | null> = {}
-    if (updates.project !== undefined) payload.project = updates.project
-    if (updates.service !== undefined) payload.service = updates.service
-
-    if (Object.keys(payload).length === 0) {
-      return { success: true }
-    }
-
-    const { error } = await supabase
-      .from('tickets')
-      .update(payload)
-      .eq('id', ticketId)
-
-    if (error) {
-      console.error('[updateTicketDetails] Supabase error:', error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error('[updateTicketDetails] Error:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-  }
-}
-
 export async function updateTicket(
   ticketId: number,
   updates: {
     status?: string
     priority?: string
-    department?: string
-    service?: string
-    project?: string
   }
 ): Promise<{ success: boolean; error?: string }> {
   // Handle each update type separately since API has separate endpoints
@@ -194,12 +156,6 @@ export async function updateTicket(
     }
   }
 
-  // Note: department, service, project updates might need different endpoints
-  // For now, log a warning if these are passed
-  if (updates.department || updates.service || updates.project) {
-    console.warn('[updateTicket] Department/service/project updates not yet implemented');
-  }
-
   return hasError ? { success: false, error: errorMessage } : { success: true };
 }
 
@@ -208,8 +164,6 @@ export async function bulkUpdateTickets(
   updates: {
     status?: string
     priority?: string
-    department?: string
-    service?: string
   }
 ): Promise<{ success: boolean; error?: string }> {
   // Process updates for each ticket

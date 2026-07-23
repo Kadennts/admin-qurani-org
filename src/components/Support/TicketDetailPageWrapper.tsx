@@ -38,10 +38,8 @@ import {
   type TicketListItem,
 } from "@/utils/api/tickets/fetch"
 import { createTicketReply } from "@/utils/api/tickets/insert"
-import { updateTicketStatus, updateTicketPriority, updateTicketDetails } from "@/utils/api/tickets/update"
+import { updateTicketStatus, updateTicketPriority } from "@/utils/api/tickets/update"
 import { useAuth } from "@/hooks/use-auth"
-// DISABLED: Supabase realtime subscription
-// import { createClient } from "@/utils/supabase/client"
 import { fetchAdminUsers, type RegularUser } from "@/utils/api/users/fetch-users"
 import { cn } from "@/lib/utils"
 
@@ -76,8 +74,6 @@ interface TicketDetailPageWrapperProps {
 }
 
 interface TicketLocalMeta {
-  project?: string
-  service?: string
   tags?: string[]
   assignee?: {
     id: string
@@ -103,11 +99,6 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
   const [ticketTags, setTicketTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
-  const [isEditingProject, setIsEditingProject] = useState(false)
-  const [projectDraft, setProjectDraft] = useState("")
-  const [serviceOptions, setServiceOptions] = useState<string[]>(["technical"])
-  const [showAddService, setShowAddService] = useState(false)
-  const [newServiceInput, setNewServiceInput] = useState("")
 
   const [notes, setNotes] = useState<Note[]>([])
   const [newNote, setNewNote] = useState("")
@@ -176,32 +167,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     }
   }, [])
 
-  const loadServiceOptions = useCallback(() => {
-    try {
-      const raw = localStorage.getItem(SERVICE_OPTIONS_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as string[]
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = Array.from(new Set(parsed.map(s => s.trim()).filter(Boolean)))
-        if (cleaned.length > 0) setServiceOptions(cleaned)
-      }
-    } catch (error) {
-      console.warn("[TicketDetail] Failed to load service options:", error)
-    }
-  }, [])
 
-  const persistServiceOptions = useCallback((services: string[]) => {
-    try {
-      const cleaned = Array.from(new Set(services.map(s => s.trim()).filter(Boolean)))
-      localStorage.setItem(SERVICE_OPTIONS_KEY, JSON.stringify(cleaned))
-    } catch (error) {
-      console.warn("[TicketDetail] Failed to save service options:", error)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadServiceOptions()
-  }, [loadServiceOptions])
 
   const [activeTab, setActiveTab] = useState<DetailTab>("reply")
   const [replyContent, setReplyContent] = useState("")
@@ -229,13 +195,10 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
         const localMeta = readTicketMeta(ticketId)
         const mergedTicket: TicketWithReplies = {
           ...ticketResult.data,
-          project: localMeta.project ?? ticketResult.data.project,
-          service: localMeta.service ?? ticketResult.data.service,
         }
         setTicket(mergedTicket)
         setTicketStatus(mergedTicket.status)
         setTicketPriority(mergedTicket.priority)
-        setProjectDraft(mergedTicket.project || "")
         setTicketTags(localMeta.tags || [])
         if (localMeta.assignee) {
           setSelectedAssignee({
@@ -246,14 +209,6 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
           })
         } else {
           setSelectedAssignee(null)
-        }
-
-        if (mergedTicket.service) {
-          setServiceOptions(prev => {
-            const merged = Array.from(new Set([...prev, mergedTicket.service!]))
-            persistServiceOptions(merged)
-            return merged
-          })
         }
       }
     } catch (error) {
@@ -283,7 +238,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     } finally {
       setIsSecondaryLoading(false)
     }
-  }, [ticketId, persistServiceOptions, readTicketMeta])
+  }, [ticketId, readTicketMeta])
 
   useEffect(() => {
     loadTicket()
@@ -317,40 +272,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     showSuccessToast()
   }
 
-  // NOTE: Supabase realtime subscription DISABLED to eliminate Supabase requests
-  // TODO: Replace with MyQurani API websocket/polling when available
-  /*
-  useEffect(() => {
-    let supabase
-    try {
-      supabase = createClient()
-    } catch (error) {
-      console.error("Failed to init realtime client:", error)
-      return
-    }
-    const channel = supabase
-      .channel(`ticket-${ticketId}-replies`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "ticket_replies",
-          filter: `ticket_id=eq.${ticketId}`,
-        },
-        (payload) => {
-          console.log("🔔 New reply for ticket:", ticketId, payload)
-          loadTicket()
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase?.removeChannel(channel)
-    }
-  }, [ticketId, loadTicket])
-  */
+  // Realtime: not yet available in API Qurani (removed Supabase realtime)
 
   // Scroll to bottom on load/update
   useEffect(() => {
@@ -518,55 +440,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
     }
   }
 
-  const handleProjectSave = async () => {
-    if (!ticket) return
-    const value = projectDraft.trim()
 
-    setTicket(prev => prev ? { ...prev, project: value || null } : prev)
-    writeTicketMeta(ticketId, { project: value || "" })
-    setIsEditingProject(false)
-
-    const result = await updateTicketDetails(ticket.id, { project: value || null })
-    if (!result.success) {
-      console.warn("[TicketDetail] Project sync failed, kept local cache:", result.error)
-    }
-    showSuccessToast()
-  }
-
-  const handleServiceChange = async (service: string) => {
-    if (!ticket) return
-    const value = service.trim()
-    if (!value) return
-
-    setTicket(prev => prev ? { ...prev, service: value } : prev)
-    writeTicketMeta(ticketId, { service: value })
-
-    setServiceOptions(prev => {
-      const next = Array.from(new Set([...prev, value]))
-      persistServiceOptions(next)
-      return next
-    })
-
-    const result = await updateTicketDetails(ticket.id, { service: value })
-    if (!result.success) {
-      console.warn("[TicketDetail] Service sync failed, kept local cache:", result.error)
-    }
-    showSuccessToast()
-  }
-
-  const handleAddServiceOption = () => {
-    const value = newServiceInput.trim()
-    if (!value) return
-
-    setServiceOptions(prev => {
-      const next = Array.from(new Set([...prev, value]))
-      persistServiceOptions(next)
-      return next
-    })
-    setNewServiceInput("")
-    setShowAddService(false)
-    handleServiceChange(value)
-  }
 
   const handleAddTag = () => {
     const raw = tagInput.trim()
@@ -1115,10 +989,6 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
                   <span className="text-gray-400 block mb-0.5">Tickets</span>
                   <span className="font-semibold">{relatedTickets.length + 1}</span>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800/50 rounded border border-gray-100 dark:border-gray-800">
-                  <span className="text-gray-400 block mb-0.5">Projects</span>
-                  <span className="font-semibold">{ticket.project ? 1 : 0}</span>
-                </div>
               </div>
             </div>
 
@@ -1130,83 +1000,7 @@ export default function TicketDetailPageWrapper({ ticketId, backUrl = "/support/
                   <dd className="font-medium">{ticket.department}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-500 pt-2">Project</dt>
-                  <dd className="font-medium w-[180px]">
-                    {isEditingProject ? (
-                      <input
-                        value={projectDraft}
-                        onChange={(e) => setProjectDraft(e.target.value)}
-                        onBlur={handleProjectSave}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleProjectSave()
-                          if (e.key === "Escape") {
-                            setProjectDraft(ticket.project || "")
-                            setIsEditingProject(false)
-                          }
-                        }}
-                        autoFocus
-                        className="w-full text-right border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900"
-                        placeholder="Klik isi project"
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingProject(true)}
-                        className="w-full text-right text-emerald-600 hover:text-emerald-700"
-                        title="Klik untuk edit project"
-                      >
-                        {ticket.project || "-"}
-                      </button>
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between items-start gap-2">
-                  <dt className="text-gray-500 pt-2">Service</dt>
-                  <dd className="w-[180px] space-y-2">
-                    <div className="flex items-center gap-1">
-                      <select
-                        value={ticket.service || ""}
-                        onChange={(e) => handleServiceChange(e.target.value)}
-                        className="w-full border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900 text-right"
-                      >
-                        <option value="">-</option>
-                        {serviceOptions.map((service) => (
-                          <option key={service} value={service}>{service}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddService((prev) => !prev)}
-                        className="w-6 h-6 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center"
-                        title="Tambah service baru"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {showAddService && (
-                      <div className="flex items-center gap-1">
-                        <input
-                          value={newServiceInput}
-                          onChange={(e) => setNewServiceInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleAddServiceOption()
-                          }}
-                          className="w-full border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900 text-xs"
-                          placeholder="Service baru..."
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddServiceOption}
-                          className="px-2 py-1 rounded bg-emerald-600 text-white text-xs"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Submitted</dt>
+                  <dt className="text-gray-500 pt-2">Submitted</dt>
                   <dd className="font-medium text-right">{formatDateTime(ticket.submitted_date)}</dd>
                 </div>
                 <div className="flex justify-between">

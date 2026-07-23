@@ -4,18 +4,22 @@ export type BillingPipelineStatus = "baru" | "lunas" | "aktif" | "gagal" | "sele
 
 export type BillingPipelineOrder = {
     id: string | number
+    bookingCode: string          // Human-readable code e.g. "BK-3098" or raw bookingCode from API
     member: string
     username: string
     memberAvatar: string
+    memberImage?: string
     guru: string
     guruUsername: string
+    guruImage?: string
     paket: string
     sesi: number
     sesiSelesai: number
     harga: number
     tglPesan: string
     rawDate: Date
-    payment: string
+    payment: string              // Gateway: GoPay, QRIS, OVO, etc.
+    mode: "online" | "offline"   // Learning mode
     status: BillingPipelineStatus
     isPendingPayment?: boolean
     isSim?: boolean
@@ -154,11 +158,19 @@ export function apiStatusValue(status: BillingPipelineStatus): number {
 }
 
 export function apiBookingToPipeline(raw: any): BillingPipelineOrder {
-    const id = pick(raw, ["id", "bookingId", "bookingID", "bookingCode"], "-")
+    const id = pick(raw, ["id", "bookingId", "bookingID"], "-")
+    // bookingCode: prefer dedicated bookingCode field, else derive from id
+    const rawBookingCode = pick<string>(raw, ["bookingCode", "code", "orderCode"], "")
+    const bookingCode = rawBookingCode || `#${id}`
+
     const userName = pick<string>(raw, ["userName", "studentName", "memberName", "user.name", "student.name", "member.name"], `Member #${pick(raw, ["userId", "studentId"], "")}`)
     const userEmail = pick<string>(raw, ["userEmail", "studentEmail", "memberEmail", "user.email", "student.email", "member.email"], "")
+    const memberImage = pick<string>(raw, ["userImage", "memberImage", "studentImage", "user.image", "member.image"], "")
+
     const trainerName = pick<string>(raw, ["trainerName", "teacherName", "guruName", "trainer.name", "trainer.userName", "course.trainerName"], "Guru Qurani")
     const trainerEmail = pick<string>(raw, ["trainerEmail", "trainer.email", "teacherEmail"], "")
+    const guruImage = pick<string>(raw, ["trainerImage", "trainerAvatar", "trainer.image", "trainer.avatar", "trainer.userImage"], "")
+
     const packageName = pick<string>(raw, ["packageName", "courseName", "courseTitle", "course.title", "course.name", "package.name"], "Paket Qurani")
     const totalSessions = toNumber(pick(raw, ["totalSessions", "sessions", "course.totalSessions", "package.sessions"], 1), 1)
     const completedSessions = toNumber(pick(raw, ["completedSessions", "completedSessionCount", "sessionsCompleted"], 0), 0)
@@ -167,20 +179,30 @@ export function apiBookingToPipeline(raw: any): BillingPipelineOrder {
     const paymentStatus = pick(raw, ["paymentStatus", "payment.status"], null)
     const status = normalizeApiStatus(pick(raw, ["status"], null), pick(raw, ["statusText", "statusName"], null), paymentStatus)
 
+    // Mode: 1 = online, 2 = offline (or string "online"/"offline")
+    const modeRaw = pick(raw, ["mode", "course.mode", "learningMode"], 1)
+    const mode: "online" | "offline" = (String(modeRaw) === "2" || String(modeRaw).toLowerCase() === "offline") ? "offline" : "online"
+
+    const paymentGateway = pick<string>(raw, ["paymentGateway", "paymentMethod", "payment.method", "payment.gateway", "gateway"], paymentStatus === "paid" ? "Paid" : "-")
+
     return {
         id,
+        bookingCode,
         member: userName,
         username: toUsername(userEmail, userName),
         memberAvatar: initials(userName),
+        memberImage,
         guru: trainerName,
         guruUsername: `@${toUsername(trainerEmail, trainerName)}`,
+        guruImage,
         paket: packageName,
         sesi: totalSessions,
         sesiSelesai: completedSessions,
         harga: totalPayment,
         tglPesan: bookingDate.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
         rawDate: bookingDate,
-        payment: pick<string>(raw, ["paymentGateway", "paymentMethod", "payment.method", "gateway"], paymentStatus === "paid" ? "Paid" : "-"),
+        payment: paymentGateway,
+        mode,
         status,
         isPendingPayment: status === "baru",
         isApi: true,
@@ -199,7 +221,7 @@ export function apiBookingToDetail(rawPayload: any) {
     const raw = unwrapOne(rawPayload)
     const row = apiBookingToPipeline(raw)
     const scheduled = toDate(pick(raw, ["scheduledDate", "bookingDate", "startDate", "createdAt"], null))
-    const mode = toNumber(pick(raw, ["mode", "course.mode"], 1), 1) === 2 ? "offline" : "online"
+    const mode = row.mode
     const statusKey =
         row.status === "gagal" ? "cancelled" :
         row.status === "selesai" ? "completed" :
@@ -231,9 +253,13 @@ export function apiBookingToDetail(rawPayload: any) {
     return {
         booking: {
             id: row.id,
+            bookingCode: row.bookingCode,
             userName: row.member,
             userEmail: pick<string>(raw, ["userEmail", "studentEmail", "memberEmail", "user.email", "student.email"], ""),
+            userPhone: pick<string>(raw, ["userPhone", "studentPhone", "member.phone", "user.phone"], ""),
+            userLocation: pick<string>(raw, ["userLocation", "studentLocation", "city", "member.location", "user.city"], ""),
             trainerName: row.guru,
+            trainerUsername: pick<string>(raw, ["trainerUsername", "trainer.username", "trainer.userName"], row.guruUsername),
             packageName: row.paket,
             totalSessions,
             completedSessions: row.sesiSelesai,
@@ -246,6 +272,7 @@ export function apiBookingToDetail(rawPayload: any) {
         },
         detail: {
             bookingId: row.id,
+            bookingCode: row.bookingCode,
             member: {
                 id: pick(raw, ["userId", "studentId", "member.id"], 0),
                 name: row.member,
@@ -253,12 +280,14 @@ export function apiBookingToDetail(rawPayload: any) {
                 phone: pick<string>(raw, ["userPhone", "studentPhone", "member.phone", "user.phone"], "-"),
                 location: pick<string>(raw, ["userLocation", "studentLocation", "city", "member.location", "user.city"], "-"),
                 joinDate: pick<string>(raw, ["user.createdAt", "member.joinDate", "createdAt"], scheduled.toISOString()),
+                image: pick<string>(raw, ["userImage", "memberImage", "user.image", "member.image"], ""),
             },
             trainer: {
                 id: pick(raw, ["trainerId", "teacherId", "trainer.id", "course.trainerId"], 0),
                 name: row.guru,
                 email: pick<string>(raw, ["trainerEmail", "trainer.email"], ""),
-                avatar: pick<string>(raw, ["trainerAvatar", "trainer.avatar", "trainer.userImage"], ""),
+                username: pick<string>(raw, ["trainerUsername", "trainer.username", "trainer.userName"], row.guruUsername),
+                avatar: pick<string>(raw, ["trainerAvatar", "trainer.avatar", "trainer.userImage", "trainerImage"], ""),
                 rating: toNumber(pick(raw, ["trainer.rating", "trainer.averageRating", "course.averageRating"], 0), 0),
                 totalStudents: toNumber(pick(raw, ["trainer.totalStudents", "course.totalStudents"], 0), 0),
                 specialization: pick<string>(raw, ["trainer.specialization", "course.categoryName", "course.title"], "Pengajar Al-Qur'an"),
@@ -282,7 +311,16 @@ export function apiBookingToDetail(rawPayload: any) {
     }
 }
 
-export async function fetchAdminBookings(params?: { page?: number; pageSize?: number; dateFrom?: Date; dateTo?: Date }) {
+export async function fetchAdminBookings(params?: {
+    page?: number
+    pageSize?: number
+    dateFrom?: Date
+    dateTo?: Date
+    keyword?: string
+    status?: number
+    trainerId?: number
+    userId?: number
+}) {
     if (!getClientToken()) return []
 
     const query = new URLSearchParams()
@@ -290,6 +328,10 @@ export async function fetchAdminBookings(params?: { page?: number; pageSize?: nu
     query.set("PageSize", String(params?.pageSize ?? 100))
     if (params?.dateFrom) query.set("DateFrom", params.dateFrom.toISOString())
     if (params?.dateTo) query.set("DateTo", params.dateTo.toISOString())
+    if (params?.keyword) query.set("Keyword", params.keyword)
+    if (params?.status !== undefined && params.status >= 0) query.set("Status", String(params.status))
+    if (params?.trainerId) query.set("TrainerId", String(params.trainerId))
+    if (params?.userId) query.set("UserId", String(params.userId))
 
     try {
         const payload = await apiJson(`/api/v1/Bookings/search?${query.toString()}`)

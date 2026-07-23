@@ -2,9 +2,9 @@
 
 /**
  * Tickets Insert API
- * 
+ *
  * This module provides ticket creation functions using the MyQurani API.
- * Interface remains the same as before for backward compatibility.
+ * Supabase has been fully removed — API Qurani is the sole source of truth.
  */
 
 import { cookies } from 'next/headers';
@@ -14,7 +14,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_MYQURANI_API_URL || 'https://api.my
 export interface CreateTicketData {
   subject: string
   contact: string
-  department: string
+  department: string | number  // Accepts department ID (number) or name (string)
   project?: string
   service?: string
   priority?: string
@@ -44,19 +44,21 @@ function getPriorityNumber(priority?: string): number {
   return priorityMap[priority || 'Medium'] || 2;
 }
 
-// Map department name to number for API (placeholder - adjust as needed)
-function getDepartmentNumber(department: string): number {
-  const deptMap: Record<string, number> = {
+// Resolve department: if it's already a number use it directly,
+// otherwise fall back to 1 (first department).
+// The actual department list should come from GET /api/v1/tickets/config/categories
+// and the form should pass the numeric ID directly.
+function resolveDepartmentId(department: string | number): number {
+  if (typeof department === 'number') return department;
+  const parsed = parseInt(department, 10);
+  if (!isNaN(parsed)) return parsed;
+  // Legacy name fallback — categories should be fetched from API in the form
+  const legacyMap: Record<string, number> = {
     'Marketing': 1,
-    'Teknis': 2,
-    'Produk': 3,
-    'Engineering': 4,
-    'Data': 5,
-    'Audio': 6,
-    'Sales': 7,
-    'Support': 8,
+    'Billing': 2,
+    'Support': 3,
   };
-  return deptMap[department] || 8; // Default to Support
+  return legacyMap[department] ?? 1;
 }
 
 // ============================================
@@ -68,84 +70,62 @@ export async function createTicket(ticketData: CreateTicketData): Promise<{
   data?: { id: number; ticket_number: string }
   error?: string
 }> {
-  // ============================================
-  // PRIMARY: Save to Supabase first (always works, no API auth needed)
-  // ============================================
+  const token = await getAuthToken();
+
+  if (!token) {
+    console.error('[createTicket] No auth token found');
+    return { success: false, error: 'Not authenticated' };
+  }
+
   try {
-    const { createAdminClient } = await import('@/utils/supabase/server');
-    const supabase = await createAdminClient();
+    const payload = {
+      subject: ticketData.subject,
+      department: resolveDepartmentId(ticketData.department),
+      priority: getPriorityNumber(ticketData.priority),
+      message: ticketData.body,
+      name: ticketData.contact,
+    };
 
-    const now = new Date().toISOString();
-    const { data: inserted, error: sbError } = await supabase
-      .from('tickets')
-      .insert([{
-        ticket_number: `#SB-${Date.now()}`, // sementara, akan di-update setelah dapat ID
-        subject: ticketData.subject,
-        contact: ticketData.contact,
-        department: ticketData.department || 'Support',
-        project: ticketData.project || null,
-        service: ticketData.service || null,
-        priority: ticketData.priority || 'Medium',
-        status: 'Open',
-        submitted_date: now,
-        body: ticketData.body,
-      }])
-      .select('id')
-      .single();
+    console.log('[createTicket] Calling API POST /api/v1/tickets with payload:', payload);
 
-    if (sbError || !inserted) {
-      console.error('[createTicket] Supabase insert failed:', sbError);
-      return { success: false, error: sbError?.message || 'Failed to save ticket to database' };
+    const response = await fetch(`${API_BASE_URL}/api/v1/tickets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text().catch(() => '');
+    console.log('[createTicket] Response status:', response.status);
+    console.log('[createTicket] Response text:', responseText.substring(0, 300));
+
+    if (!response.ok) {
+      let errMsg = 'Failed to create ticket';
+      try {
+        const errJson = JSON.parse(responseText);
+        errMsg = errJson.message || errJson.error || errMsg;
+      } catch { /* ignore */ }
+      console.error('[createTicket] API error:', response.status, errMsg);
+      return { success: false, error: errMsg };
     }
 
-    // Update ticket_number menjadi format yang proper setelah dapat ID
-    const ticketNum = `#${inserted.id}`;
-    await supabase
-      .from('tickets')
-      .update({ ticket_number: ticketNum })
-      .eq('id', inserted.id);
-
-    console.log('[createTicket] ✅ Saved to Supabase, id:', inserted.id);
-
-    // ============================================
-    // SECONDARY: Try MyQurani API (non-blocking, ignore errors)
-    // ============================================
+    let result: any = {};
     try {
-      const token = await getAuthToken();
-      if (token) {
-        const response = await fetch(`${API_BASE_URL}/api/v1/tickets`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            subject: ticketData.subject,
-            department: getDepartmentNumber(ticketData.department),
-            priority: getPriorityNumber(ticketData.priority),
-            message: ticketData.body,
-            name: ticketData.contact,
-          }),
-        });
-        const responseText = await response.text().catch(() => '');
-        if (response.ok) {
-          console.log('[createTicket] API push also succeeded');
-        } else {
-          console.log('[createTicket] API push failed (ok, Supabase already saved):', response.status, responseText.substring(0, 100));
-        }
-      }
-    } catch (apiErr) {
-      // Ignore API errors — Supabase is primary
-      console.log('[createTicket] API push skipped/failed (non-critical):', apiErr);
-    }
+      result = JSON.parse(responseText);
+    } catch { /* empty response is OK */ }
+
+    const data = result.data || result;
+    const id = data?.id || data?.ticketId || 0;
+    const ticketNumber = data?.ticketKey || data?.ticket_number || `#${id}`;
+
+    console.log('[createTicket] ✅ Ticket created via API, id:', id);
 
     return {
       success: true,
-      data: {
-        id: inserted.id,
-        ticket_number: ticketNum,
-      },
+      data: { id, ticket_number: ticketNumber },
     };
   } catch (error) {
     console.error('[createTicket] Error:', error);
@@ -160,72 +140,52 @@ export async function createTicketReply(replyData: {
   attachments?: string
   isFromAdmin?: boolean
 }): Promise<{ success: boolean; data?: { id: number }; error?: string }> {
+  const token = await getAuthToken();
 
-  // ============================================
-  // PRIMARY: Save reply to Supabase
-  // ============================================
+  if (!token) {
+    console.error('[createTicketReply] No auth token found');
+    return { success: false, error: 'Not authenticated' };
+  }
+
   try {
-    const { createAdminClient } = await import('@/utils/supabase/server');
-    const supabase = await createAdminClient();
+    const payload = { message: replyData.message };
 
-    const now = new Date().toISOString();
-    const { data: inserted, error: sbError } = await supabase
-      .from('ticket_replies')
-      .insert([{
-        ticket_id: replyData.ticket_id,
-        author: replyData.author,
-        message: replyData.message,
-        date: now,
-        attachments: replyData.attachments || null,
-      }])
-      .select('id')
-      .single();
+    console.log('[createTicketReply] Calling API POST /api/v1/tickets/', replyData.ticket_id, '/reply');
 
-    if (sbError || !inserted) {
-      console.error('[createTicketReply] Supabase insert failed:', sbError);
-      // Fallback: masih coba ke API jika Supabase gagal
-    } else {
-      console.log('[createTicketReply] ✅ Reply saved to Supabase, id:', inserted.id);
+    const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${replyData.ticket_id}/reply`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-      // Update last_reply dan status di tabel tickets
-      await supabase
-        .from('tickets')
-        .update({
-          last_reply: now,
-          status: replyData.isFromAdmin ? 'Answered' : 'Open',
-        })
-        .eq('id', replyData.ticket_id);
-      console.log('[createTicketReply] ✅ Updated tickets.last_reply for ticket:', replyData.ticket_id);
+    const responseText = await response.text().catch(() => '');
+    console.log('[createTicketReply] Response status:', response.status);
+
+    if (!response.ok) {
+      let errMsg = 'Failed to send reply';
+      try {
+        const errJson = JSON.parse(responseText);
+        errMsg = errJson.message || errJson.error || errMsg;
+      } catch { /* ignore */ }
+      console.error('[createTicketReply] API error:', response.status, errMsg);
+      return { success: false, error: errMsg };
     }
 
-    // ============================================
-    // SECONDARY: Try MyQurani API (non-blocking)
-    // ============================================
+    let result: any = {};
     try {
-      const token = await getAuthToken();
-      if (token) {
-        const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${replyData.ticket_id}/reply`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ message: replyData.message }),
-        });
-        if (response.ok) {
-          console.log('[createTicketReply] API push also succeeded');
-        } else {
-          console.log('[createTicketReply] API push failed (non-critical):', response.status);
-        }
-      }
-    } catch (apiErr) {
-      console.log('[createTicketReply] API push skipped (non-critical):', apiErr);
-    }
+      result = JSON.parse(responseText);
+    } catch { /* empty response is OK */ }
 
-    const replyId = inserted?.id || Date.now();
-    return { success: true, data: { id: replyId } };
+    const data = result.data || result;
+    const id = data?.id || data?.replyId || Date.now();
 
+    console.log('[createTicketReply] ✅ Reply sent via API, id:', id);
+
+    return { success: true, data: { id } };
   } catch (error) {
     console.error('[createTicketReply] Error:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

@@ -31,6 +31,7 @@ import {
   CalendarDays,
   Star,
   KeyRound,
+  History,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -124,6 +125,11 @@ const getSidebarData = (
           title: t("navigation.wallet", "Wallet"),
           url: "/billing/wallet",
           icon: Wallet,
+        },
+        {
+          title: t("navigation.history", "History Transaksi"),
+          url: "/billing/history",
+          icon: History,
         },
         {
           title: t("billing.payments.title", "Payment"),

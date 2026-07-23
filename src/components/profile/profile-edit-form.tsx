@@ -22,11 +22,14 @@ interface ProfileEditFormProps {
     address: string
     timezone: string
     bio: string
+    language: number
+    dateFormat: string
+    timeFormat: string
   }
   displayTimezone: string
   usernameError: string
   isCheckingUsername: boolean
-  handleInputChange: (field: string, value: string) => void
+  handleInputChange: (field: string, value: string | number) => void
   // Location props
   countries: CountryData[]
   states: ProvinceData[]
@@ -208,6 +211,50 @@ export function ProfileEditForm({
           setOpenCity={setOpenCity}
           timezone={displayTimezone}
         />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* language */}
+        <div className="space-y-2">
+          <Label htmlFor="language">Language</Label>
+          <Select
+            value={profileData.language?.toString()}
+            onValueChange={(value) => handleInputChange("language", Number(value))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select Language" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="1">Indonesia</SelectItem>
+              <SelectItem value="2">English</SelectItem>
+              <SelectItem value="3">Arabic</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* date format */}
+        <div className="space-y-2">
+          <Label htmlFor="dateFormat">Date Format</Label>
+          <Input
+            id="dateFormat"
+            type="text"
+            value={profileData.dateFormat}
+            onChange={(e) => handleInputChange("dateFormat", e.target.value)}
+            placeholder="e.g. DD/MM/YYYY"
+          />
+        </div>
+
+        {/* time format */}
+        <div className="space-y-2">
+          <Label htmlFor="timeFormat">Time Format</Label>
+          <Input
+            id="timeFormat"
+            type="text"
+            value={profileData.timeFormat}
+            onChange={(e) => handleInputChange("timeFormat", e.target.value)}
+            placeholder="e.g. HH:mm:ss"
+          />
+        </div>
       </div>
 
       {/* Bio */}

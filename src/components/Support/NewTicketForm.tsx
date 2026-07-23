@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { fetchAdmins, type AdminUser } from "@/utils/api/users/fetch-admins"
 import { fetchRegularUsers, type RegularUser } from "@/utils/api/users/fetch-users"
+import { fetchTicketCategories, type TicketCategory } from "@/utils/api/tickets/fetch-categories"
 
 interface Attachment {
   name: string
@@ -37,7 +38,6 @@ interface Attachment {
 
 const STORAGE_KEY = "support_tickets_data"
 
-const departments = ["Marketing", "Teknis", "Produk", "Engineering", "Data", "Audio", "Sales", "Support"]
 const priorities = ["Low", "Medium", "High"]
 const services = ["Aplikasi Mobile", "Fitur Hafalan", "Pembaca Ayat", "Bookmark", "Sinkronisasi", "Streaming"]
 
@@ -71,8 +71,10 @@ export default function NewTicketForm() {
   // Data dari Supabase
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [users, setUsers] = useState<RegularUser[]>([])
+  const [departmentsData, setDepartmentsData] = useState<TicketCategory[]>([])
   const [loadingAdmins, setLoadingAdmins] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
+  const [loadingDepartments, setLoadingDepartments] = useState(true)
   
   const [subject, setSubject] = useState("")
   const [tags] = useState("")
@@ -115,6 +117,14 @@ export default function NewTicketForm() {
         setUsers(userResult.users)
       }
       setLoadingUsers(false)
+
+      // Fetch Departments (Categories)
+      setLoadingDepartments(true)
+      const deptResult = await fetchTicketCategories()
+      if (deptResult.success && deptResult.data) {
+        setDepartmentsData(deptResult.data)
+      }
+      setLoadingDepartments(false)
     }
 
     loadData()
@@ -488,10 +498,11 @@ export default function NewTicketForm() {
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white appearance-none pr-10"
+                    disabled={loadingDepartments}
                   >
-                    <option value="">Nothing selected</option>
-                    {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                    <option value="">{loadingDepartments ? 'Loading departments...' : 'Nothing selected'}</option>
+                    {departmentsData.map((d) => (
+                      <option key={d.id} value={d.id.toString()}>{d.name}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />

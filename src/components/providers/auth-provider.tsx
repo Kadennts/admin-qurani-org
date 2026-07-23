@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import useSWR from "swr"
-import { getStoredAuth, clearStoredAuth, authApi, API_BASE, type AuthData } from "@/lib/api"
+import { getStoredAuth, setStoredAuth, clearStoredAuth, authApi, API_BASE, type AuthData } from "@/lib/api"
 
 interface UserProfile {
     id: string
@@ -56,16 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[AuthProvider] Found stored auth in localStorage:', stored.username);
             setCustomUser(stored);
 
-            // Ensure cookies are set for middleware
-            const expires = new Date(stored.expiresAt).toUTCString();
-            document.cookie = `myqurani_access_token=${stored.accessToken}; expires=${expires}; path=/; SameSite=Lax`;
-            document.cookie = `myqurani_user=${encodeURIComponent(JSON.stringify({
-                id: stored.userId,
-                email: stored.email,
-                username: stored.username,
-                name: stored.name,
-                roles: stored.roles,
-            }))}; expires=${expires}; path=/; SameSite=Lax`;
+            // We can just call setStoredAuth to synchronize everything uniformly
+            setStoredAuth(stored);
         }
 
         setAuthLoading(false);
@@ -126,39 +118,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch user profile from API Qurani
     const fetchUserProfile = useCallback(
         async (authId: string): Promise<UserProfile | null> => {
-            // Priority 0: Check cached profile in localStorage
-            try {
-                const cachedProfile = localStorage.getItem('myqurani_user_profile_v2');
-                if (cachedProfile) {
-                    const parsed = JSON.parse(cachedProfile);
-                    if (
-                        (parsed.id?.toString() === authId || parsed.userId?.toString() === authId) &&
-                        parsed.timezone
-                    ) {
-                        console.log('[AuthProvider] Using cached user profile');
-                        return {
-                            id: parsed.id?.toString() || authId,
-                            name: parsed.name || parsed.username,
-                            username: parsed.username,
-                            email: parsed.email,
-                            avatar: normalizeAvatarUrl(parsed.avatar || parsed.image),
-                            role: parsed.role || "member",
-                            roles: parsed.roles || [],
-                            timezone: parsed.timezone,
-                        } as UserProfile;
-                    } else if (
-                        parsed.id?.toString() === authId ||
-                        parsed.userId?.toString() === authId
-                    ) {
-                        localStorage.removeItem('myqurani_user_profile_v2');
-                    }
-                }
-            } catch {
-                console.log('[AuthProvider] No valid cached profile, will fetch from API');
+            // No longer check cached profile from myqurani_user_profile_v2
+            // Priority 0 is now to just use what's inside customUser / getStoredAuth
+            const stored = getStoredAuth();
+            if (stored && stored.name) {
+                return {
+                    id: stored.userId?.toString() || authId,
+                    name: stored.name || stored.username,
+                    username: stored.username,
+                    email: stored.email,
+                    avatar: normalizeAvatarUrl(stored.image),
+                    role: stored.roles && stored.roles.length > 0 ? stored.roles[0] : "member",
+                    roles: stored.roles || [],
+                    timezone: (stored.timezone as string) || "",
+                } as UserProfile;
             }
 
             // Priority 1: Fetch from API Qurani
-            const stored = getStoredAuth();
             if (stored?.accessToken) {
                 try {
                     console.log('[AuthProvider] Fetching profile from API Qurani');
@@ -178,12 +154,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             timezone: userData.timezone || "",
                         };
 
-                        // Cache the profile
-                        localStorage.setItem('myqurani_user_profile_v2', JSON.stringify({
-                            ...profile,
-                            userId: authId,
-                            cachedAt: new Date().toISOString(),
-                        }));
+                        // Cache the profile back into auth context
+                        if (stored) {
+                            const newAuth = {
+                                ...stored,
+                                ...userData,
+                                // ensure critical fields are properly mapped
+                                name: userData.name || userData.username || stored.name,
+                                image: normalizeAvatarUrl(userData.avatar || userData.image || stored.image),
+                                timezone: userData.timezone || stored.timezone || "",
+                                cityName: userData.city || userData.cityName || stored.cityName,
+                                countryName: userData.country || userData.countryName || stored.countryName,
+                            };
+                            setStoredAuth(newAuth);
+                        }
 
                         return profile;
                     }
