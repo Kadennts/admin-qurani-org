@@ -2327,6 +2327,14 @@ export const paymentsApi = {
             body: data,
             token
         }),
+
+    // Send invoice to user (Admin) - Gambar 1
+    sendInvoice: (id: number | string, data: { email?: string | null; includeReceipt?: number }, token?: string) =>
+        apiRequest<any>(`/api/v1/Payments/${id}/send-invoice`, {
+            method: 'POST',
+            body: data,
+            token
+        }),
         
 };
 

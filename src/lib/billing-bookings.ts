@@ -356,6 +356,18 @@ export async function fetchBookingById(id: string | number) {
     }
 }
 
+export async function fetchBookingByCode(code: string) {
+    try {
+        const payload = await apiJson(`/api/v1/Bookings/code/${encodeURIComponent(code)}`)
+        if (!payload) return null
+        return apiBookingToDetail(payload)
+    } catch (err: any) {
+        // 404 = kode tidak ditemukan, 401 = belum login → kembalikan null
+        if (err?.message && /40[14]/.test(err.message)) return null
+        throw err
+    }
+}
+
 export async function fetchBookingAuditTrail(id: string | number) {
     try {
         const payload = await apiJson(`/api/v1/Bookings/${id}/audit-trail`)

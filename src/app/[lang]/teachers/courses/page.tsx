@@ -855,14 +855,14 @@ function BulkActionModal({
         {
             value: "publish",
             title: t("billing.courses.actions.publish", "Publish"),
-            description: t("billing.courses.bulk.publishDescription", "Make selected packages visible to users."),
+            description: t("billing.courses.bulk.publishDescription", "Make selected courses visible to users."),
             icon: UploadCloud,
             tone: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300",
         },
         {
             value: "unpublish",
             title: t("billing.courses.actions.unpublish", "Unpublish"),
-            description: t("billing.courses.bulk.unpublishDescription", "Hide selected packages from users."),
+            description: t("billing.courses.bulk.unpublishDescription", "Hide selected courses from users."),
             icon: X,
             tone: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300",
         },
@@ -1533,7 +1533,7 @@ function PaketContent() {
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("billing.courses.title", "Teacher Packages")}</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("billing.courses.title", "Teacher Courses")}</h1>
                         </div>
                     </div>
 
@@ -1575,7 +1575,7 @@ function PaketContent() {
                                         onKeyDown={event => {
                                             if (event.key === "Enter") applySearch()
                                         }}
-                                        placeholder={t("billing.courses.searchPlaceholder", "Search package...")}
+                                        placeholder={t("billing.courses.searchPlaceholder", "Search course...")}
                                         className="h-10 w-full bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none dark:bg-gray-800 dark:text-white"
                                     />
                                 </div>
@@ -1621,7 +1621,7 @@ function PaketContent() {
                                         </button>
                                     </th>
                                     <th onClick={() => handleSort("title")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-200">
-                                        {t("billing.courses.table.course", "Package")} <SortIcon field="title" />
+                                        {t("billing.courses.table.course", "Course")} <SortIcon field="title" />
                                     </th>
                                     <th onClick={() => handleSort("trainerName")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-200">
                                         {t("billing.courses.table.teacher", "Teacher")} <SortIcon field="trainerName" />

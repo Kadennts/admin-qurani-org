@@ -293,7 +293,11 @@ function GuruDetailContent() {
         }
 
         setLoading(true)
-        fetch(`${API_BASE_URL}/api/v1/Trainers/${id}`, { headers })
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+        fetch(`${API_BASE_URL}/api/v1/Trainers/${id}`, { headers, signal: controller.signal })
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`)
                 return res.json()
@@ -399,14 +403,20 @@ function GuruDetailContent() {
                     })
                 }
             })
-            .finally(() => setLoading(false))
+            .finally(() => {
+                clearTimeout(timeoutId)
+                setLoading(false)
+            })
 
         // Reset data dummy ke pending jika user melakukan hard refresh (F5)
         const handleBeforeUnload = () => {
             sessionStorage.removeItem("guruStatuses")
         }
         window.addEventListener("beforeunload", handleBeforeUnload)
-        return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload)
+            clearTimeout(timeoutId)
+        }
     }, [id])
 
     // ── Derived ───────────────────────────────────────────────────────────────

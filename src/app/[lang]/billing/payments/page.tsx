@@ -7,7 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { paymentsApi, type PaymentSearchParams } from "@/lib/api"
 import { formatTooltipDate } from "@/lib/date-utils"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
-import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download } from "lucide-react"
+import {
+    getSimPayments,
+    markSimPaymentAsPaidOut,
+} from "@/lib/sim-billing-store"
+import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download, Send, CheckSquare } from "lucide-react"
 import DisputesTab from "./DisputesTab"
 
 interface PaymentData {
@@ -28,7 +32,8 @@ interface PaymentData {
 
 const PAGE_SIZE = 10;
 
-// Mutable dummy data to simulate a database when API is down
+// Dummy mutable data hanya dipakai sebagai fallback awal saat store belum ada.
+// Selanjutnya data diambil dari sim-billing-store (persistent localStorage).
 let localDummyData: PaymentData[] = [
     {
         id: 1, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi",
@@ -120,7 +125,7 @@ function timeAgo(dateStr: string, locale: string = "id", timezone?: string): { r
 }
 
 // Action dropdown component to avoid clipping issues
-function ActionDropdown({ payment, onRefund, onPayout, onUpdateStatus }: { payment: PaymentData, onRefund: () => void, onPayout: () => void, onUpdateStatus: () => void }) {
+function ActionDropdown({ payment, onSendInvoice, onUpdateStatus }: { payment: PaymentData, onSendInvoice: () => void, onUpdateStatus: () => void }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -143,23 +148,19 @@ function ActionDropdown({ payment, onRefund, onPayout, onUpdateStatus }: { payme
                 <MoreHorizontal className="w-5 h-5" />
             </button>
             {open && (
-                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden">
+                <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden">
                     <button 
-                        onClick={() => { setOpen(false); onRefund(); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        onClick={() => { setOpen(false); onSendInvoice(); }}
+                        className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2"
                     >
-                        Process Refund
-                    </button>
-                    <button 
-                        onClick={() => { setOpen(false); onPayout(); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        Mark Payout
+                        <Send className="w-3.5 h-3.5" />
+                        Kirim Invoice
                     </button>
                     <button 
                         onClick={() => { setOpen(false); onUpdateStatus(); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                     >
+                        <CheckSquare className="w-3.5 h-3.5" />
                         Update Status
                     </button>
                 </div>
@@ -191,14 +192,11 @@ function PaymentsContent() {
     const [selectedIds, setSelectedIds] = useState<Array<number | string>>([])
 
     // Modals state
-    const [processRefundModal, setProcessRefundModal] = useState<PaymentData | null>(null)
-    const [markPayoutModal, setMarkPayoutModal] = useState<PaymentData | null>(null)
+    const [sendInvoiceModal, setSendInvoiceModal] = useState<PaymentData | null>(null)
     const [updateStatusModal, setUpdateStatusModal] = useState<PaymentData | null>(null)
-    const [bulkPayoutModal, setBulkPayoutModal] = useState(false)
     
     // Form fields
-    const [actionNotes, setActionNotes] = useState("")
-    const [payoutReference, setPayoutReference] = useState("")
+    const [invoiceIncludeReceipt, setInvoiceIncludeReceipt] = useState(true)
     const [statusUpdateValue, setStatusUpdateValue] = useState("paid")
     const [failureReason, setFailureReason] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -310,13 +308,13 @@ function PaymentsContent() {
         } catch (err: any) {
             console.warn("API Fetch Error:", err.message)
             setIsDemoMode(true)
-            // Error is suppressed in UI to avoid disrupting the user experience, dummy data is used instead.
-            let dummy = [...localDummyData];
+            // Gunakan sim-billing-store (persistent localStorage) sebagai fallback
+            let dummy = getSimPayments();
 
             if (activeSearch) {
                 const searchLower = activeSearch.toLowerCase();
-                dummy = dummy.filter(p => 
-                    (p.userName && p.userName.toLowerCase().includes(searchLower)) || 
+                dummy = dummy.filter(p =>
+                    (p.userName && p.userName.toLowerCase().includes(searchLower)) ||
                     (p.trainerName && p.trainerName.toLowerCase().includes(searchLower)) ||
                     (p.paymentMethod && p.paymentMethod.toLowerCase().includes(searchLower)) ||
                     String(p.userId).includes(searchLower) ||
@@ -336,8 +334,8 @@ function PaymentsContent() {
             setPayments(dummy)
             setTotalItems(dummy.length)
             setStats({
-                revenue: 250000,
-                pendingRefunds: 0
+                revenue: dummy.filter(p => p.status === 'paid').reduce((a, b) => a + b.amount, 0),
+                pendingRefunds: dummy.filter(p => p.status === 'pending_refund').length
             })
         } finally {
             setLoading(false)
@@ -362,91 +360,18 @@ function PaymentsContent() {
 
     const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
 
-    const handleProcessRefund = async (paymentId: string | number, approved: boolean) => {
+    const handleSendInvoice = async (paymentId: string | number, userEmail?: string) => {
         setIsSubmitting(true)
         try {
-            await paymentsApi.processRefund(paymentId, {
-                approved: approved ? 1 : 0,
-                notes: actionNotes
+            await paymentsApi.sendInvoice(paymentId, {
+                email: userEmail || null,
+                includeReceipt: invoiceIncludeReceipt ? 1 : 0
             })
-            showToast({ type: 'success', title: 'Refund Diproses', message: `Refund telah berhasil ${approved ? 'disetujui' : 'ditolak'}.` })
-            setProcessRefundModal(null)
-            setActionNotes("")
-            fetchPayments()
+            showToast({ type: 'success', title: 'Invoice Terkirim', message: `Invoice telah berhasil dikirim ke email user.` })
+            setSendInvoiceModal(null)
+            setInvoiceIncludeReceipt(true)
         } catch (err: any) {
-            // Update dummy data when API fails
-            localDummyData = localDummyData.map(p => 
-                p.id === paymentId ? { ...p, status: approved ? "refunded" : p.status } : p
-            )
-            showToast({ type: 'info', title: '[DEMO] Refund Diproses', message: `Refund telah berhasil ${approved ? 'disetujui' : 'ditolak'} (simulasi lokal).` })
-            setProcessRefundModal(null)
-            setActionNotes("")
-            fetchPayments()
-        } finally {
-            setIsSubmitting(false)
-        }
-    }
-
-    const handleMarkPayout = async (paymentId: string | number) => {
-        if (!payoutReference) {
-            showToast({ type: 'error', title: 'Referensi wajib diisi', message: 'Harap isi kolom Reference sebelum melanjutkan.' });
-            return;
-        }
-        setIsSubmitting(true)
-        try {
-            await paymentsApi.markPayout(paymentId, {
-                payoutReference,
-                notes: actionNotes
-            })
-            showToast({ type: 'success', title: 'Payout Ditandai', message: 'Pembayaran telah berhasil ditandai sebagai sudah dibayarkan.' })
-            setMarkPayoutModal(null)
-            setPayoutReference("")
-            setActionNotes("")
-            fetchPayments()
-        } catch (err: any) {
-            // Update dummy data when API fails
-            localDummyData = localDummyData.map(p => 
-                p.id === paymentId ? { ...p, isPaidOut: true, payoutReference } : p
-            )
-            showToast({ type: 'info', title: '[DEMO] Payout Ditandai', message: 'Pembayaran berhasil ditandai sebagai sudah dibayarkan (simulasi lokal).' })
-            setMarkPayoutModal(null)
-            setPayoutReference("")
-            setActionNotes("")
-            fetchPayments()
-        } finally {
-            setIsSubmitting(false)
-        }
-    }
-
-    const handleBulkPayout = async () => {
-        if (!payoutReference) {
-            showToast({ type: 'error', title: 'Referensi wajib diisi', message: 'Harap isi kolom Reference sebelum melanjutkan.' });
-            return;
-        }
-        setIsSubmitting(true)
-        try {
-            await paymentsApi.bulkPayout({
-                paymentIds: selectedIds,
-                payoutReference,
-                notes: actionNotes
-            })
-            showToast({ type: 'success', title: 'Bulk Payout Ditandai', message: `${selectedIds.length} pembayaran telah berhasil ditandai sebagai sudah dibayarkan.` })
-            setBulkPayoutModal(false)
-            setPayoutReference("")
-            setActionNotes("")
-            setSelectedIds([])
-            fetchPayments()
-        } catch (err: any) {
-            // Update dummy data when API fails
-            localDummyData = localDummyData.map(p => 
-                selectedIds.includes(p.id) ? { ...p, isPaidOut: true, payoutReference } : p
-            )
-            showToast({ type: 'info', title: '[DEMO] Bulk Payout Ditandai', message: `${selectedIds.length} pembayaran ditandai sebagai sudah dibayarkan (simulasi lokal).` })
-            setBulkPayoutModal(false)
-            setPayoutReference("")
-            setActionNotes("")
-            setSelectedIds([])
-            fetchPayments()
+            showToast({ type: 'error', title: 'Gagal Kirim Invoice', message: err?.message || 'Terjadi kesalahan saat mengirim invoice.' })
         } finally {
             setIsSubmitting(false)
         }
@@ -570,24 +495,8 @@ function PaymentsContent() {
                 <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                     {/* Main toolbar */}
                     <div className="flex flex-col sm:flex-row gap-3 p-4 items-center justify-between">
-                        {/* Left Side: Bulk Payout & Export */}
+                        {/* Left Side: Export */}
                         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                            <button
-                                onClick={() => setBulkPayoutModal(true)}
-                                disabled={selectedIds.length === 0}
-                                className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                                    selectedIds.length === 0 
-                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600" 
-                                    : "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50"
-                                }`}
-                            >
-                                {t("billing.payments.bulk.markPayout", "Bulk Mark Payout")}
-                                {selectedIds.length > 0 && (
-                                    <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                        {selectedIds.length}
-                                    </span>
-                                )}
-                            </button>
                             <button
                                 onClick={handleExportCSV}
                                 disabled={isExporting}
@@ -793,8 +702,7 @@ function PaymentsContent() {
                                             </span>
                                             <ActionDropdown 
                                                 payment={payment}
-                                                onRefund={() => setProcessRefundModal(payment)}
-                                                onPayout={() => setMarkPayoutModal(payment)}
+                                                onSendInvoice={() => setSendInvoiceModal(payment)}
                                                 onUpdateStatus={() => {
                                                     setStatusUpdateValue(payment.status);
                                                     setUpdateStatusModal(payment);
@@ -924,8 +832,7 @@ function PaymentsContent() {
                                             <td className="px-4 py-3 text-center">
                                                 <ActionDropdown 
                                                     payment={payment}
-                                                    onRefund={() => setProcessRefundModal(payment)}
-                                                    onPayout={() => setMarkPayoutModal(payment)}
+                                                    onSendInvoice={() => setSendInvoiceModal(payment)}
                                                     onUpdateStatus={() => {
                                                         setStatusUpdateValue(payment.status);
                                                         setUpdateStatusModal(payment);
@@ -975,173 +882,74 @@ function PaymentsContent() {
                 </div>
             )}
 
-            {/* Refund Modal */}
-            {processRefundModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                {t("billing.payments.modal.processRefundTitle", "Proses Refund")}
-                            </h3>
+            {/* Send Invoice Modal */}
+            {sendInvoiceModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Kirim Invoice</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Kirim bukti pembayaran ke email user</p>
+                            </div>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg text-sm mb-4 border border-gray-100 dark:border-gray-700">
-                                <p className="text-gray-500 dark:text-gray-400">Payment ID: <span className="font-medium text-gray-900 dark:text-white">#{processRefundModal.id}</span></p>
-                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-rose-600">{formatCurrency(processRefundModal.amount)}</span></p>
+                            {/* Info payment */}
+                            <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-xl text-sm border border-blue-100 dark:border-blue-800/50 space-y-1">
+                                <p className="text-gray-500 dark:text-gray-400">Payment ID: <span className="font-semibold text-gray-900 dark:text-white">#{sendInvoiceModal.id}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(sendInvoiceModal.amount)}</span></p>
+                                <p className="text-gray-500 dark:text-gray-400">User: <span className="font-semibold text-gray-900 dark:text-white">{sendInvoiceModal.userName}</span></p>
                             </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    {t("billing.payments.modal.notes", "Catatan (Opsional)")}
-                                </label>
-                                <textarea
-                                    value={actionNotes}
-                                    onChange={(e) => setActionNotes(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    rows={3}
-                                />
-                            </div>
-                            
-                            <div className="flex gap-3 pt-4">
-                                <button 
-                                    onClick={() => handleProcessRefund(processRefundModal.id, true)}
-                                    disabled={isSubmitting}
-                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    {t("billing.payments.modal.approve", "Setujui")}
-                                </button>
-                                <button 
-                                    onClick={() => handleProcessRefund(processRefundModal.id, false)}
-                                    disabled={isSubmitting}
-                                    className="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    {t("billing.payments.modal.reject", "Tolak")}
-                                </button>
-                            </div>
-                            <button 
-                                onClick={() => setProcessRefundModal(null)}
-                                className="w-full mt-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                {t("billing.payments.modal.cancel", "Batal")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
-            {/* Mark Payout Modal */}
-            {markPayoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                {t("billing.payments.modal.markPayoutTitle", "Tandai Payout")}
-                            </h3>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg text-sm mb-4 border border-gray-100 dark:border-gray-700">
-                                <p className="text-gray-500 dark:text-gray-400">Payment ID: <span className="font-medium text-gray-900 dark:text-white">#{markPayoutModal.id}</span></p>
-                                <p className="text-gray-500 dark:text-gray-400">Trainer: <span className="font-medium text-gray-900 dark:text-white">{markPayoutModal.trainerName}</span></p>
-                                <p className="text-gray-500 dark:text-gray-400">Nominal: <span className="font-bold text-emerald-600">{formatCurrency(markPayoutModal.amount)}</span></p>
-                            </div>
-                            
+                            {/* Email field (read-only dari data user) */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    {t("billing.payments.modal.payoutReference", "Referensi Payout (Wajib)")}
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Email Tujuan <span className="text-xs text-gray-400">(dari akun user)</span>
                                 </label>
                                 <input
-                                    type="text"
-                                    value={payoutReference}
-                                    onChange={(e) => setPayoutReference(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required
+                                    type="email"
+                                    value={sendInvoiceModal.userName ? `(email ${sendInvoiceModal.userName})` : 'Email user terdaftar'}
+                                    readOnly
+                                    disabled
+                                    className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-sm cursor-not-allowed"
                                 />
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Invoice akan dikirim ke email yang terdaftar pada akun user.</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    {t("billing.payments.modal.notes", "Catatan (Opsional)")}
-                                </label>
-                                <textarea
-                                    value={actionNotes}
-                                    onChange={(e) => setActionNotes(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    rows={2}
-                                />
-                            </div>
-                            
-                            <div className="flex gap-3 pt-4">
-                                <button 
-                                    onClick={() => handleMarkPayout(markPayoutModal.id)}
-                                    disabled={isSubmitting || !payoutReference.trim()}
-                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-2 rounded-lg font-medium transition-colors"
+                            {/* Toggle include receipt */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Sertakan Struk / Receipt</p>
+                                    <p className="text-xs text-gray-400">Lampirkan detail transaksi ke email</p>
+                                </div>
+                                <button
+                                    onClick={() => setInvoiceIncludeReceipt(!invoiceIncludeReceipt)}
+                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                        invoiceIncludeReceipt ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'
+                                    }`}
                                 >
-                                    {t("billing.payments.modal.submit", "Simpan")}
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                                        invoiceIncludeReceipt ? 'translate-x-5' : 'translate-x-0'
+                                    }`} />
                                 </button>
-                                <button 
-                                    onClick={() => setMarkPayoutModal(null)}
-                                    className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    {t("billing.payments.modal.cancel", "Batal")}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Bulk Payout Modal */}
-            {bulkPayoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                {t("billing.payments.modal.bulkPayoutTitle", "Bulk Payout")}
-                            </h3>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg text-sm mb-4 border border-gray-100 dark:border-gray-700">
-                                <p className="text-gray-500 dark:text-gray-400">Total Terpilih: <span className="font-bold text-emerald-600">{selectedIds.length} Pembayaran</span></p>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    {t("billing.payments.modal.payoutReference", "Referensi Payout (Wajib)")}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={payoutReference}
-                                    onChange={(e) => setPayoutReference(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required
-                                />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    {t("billing.payments.modal.notes", "Catatan (Opsional)")}
-                                </label>
-                                <textarea
-                                    value={actionNotes}
-                                    onChange={(e) => setActionNotes(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    rows={2}
-                                />
-                            </div>
-                            
-                            <div className="flex gap-3 pt-4">
-                                <button 
-                                    onClick={handleBulkPayout}
-                                    disabled={isSubmitting || !payoutReference.trim()}
-                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-2 rounded-lg font-medium transition-colors"
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => handleSendInvoice(sendInvoiceModal.id)}
+                                    disabled={isSubmitting}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 text-sm"
                                 >
-                                    {t("billing.payments.modal.submit", "Simpan")}
+                                    <Send className="w-4 h-4" />
+                                    {isSubmitting ? 'Mengirim...' : 'Kirim Sekarang'}
                                 </button>
-                                <button 
-                                    onClick={() => setBulkPayoutModal(false)}
-                                    className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 rounded-lg font-medium transition-colors"
+                                <button
+                                    onClick={() => { setSendInvoiceModal(null); setInvoiceIncludeReceipt(true); }}
+                                    className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl font-semibold transition-colors text-sm"
                                 >
-                                    {t("billing.payments.modal.cancel", "Batal")}
+                                    Batal
                                 </button>
                             </div>
                         </div>

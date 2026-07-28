@@ -45,6 +45,13 @@ import { walletApi } from "@/lib/api"
 import { formatTooltipDate } from "@/lib/date-utils"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import DUMMY_DATA from "@/data/dummy-wallet.json"
+import { 
+    getSimPendingTopups, 
+    getSimTopupHistory, 
+    getSimWalletStats,
+    confirmSimTopup,
+    rejectSimTopup
+} from "@/lib/sim-wallet-store"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,13 +238,13 @@ function WalletPageContent() {
             }
 
             if (!fetchedStats) {
-                fetchedStats = DUMMY_DATA.statistics;
+                fetchedStats = getSimWalletStats();
                 setIsDemoMode(true);
             } else {
                 setIsDemoMode(false);
             }
             if (fetchedTopups.length === 0) {
-                fetchedTopups = DUMMY_DATA.pendingTopups;
+                fetchedTopups = getSimPendingTopups();
                 setIsDemoMode(true);
             }
 
@@ -254,8 +261,9 @@ function WalletPageContent() {
 
         } catch (error) {
             console.error("Error fetching wallet data:", error);
-            setStats(DUMMY_DATA.statistics);
-            setTopups(DUMMY_DATA.pendingTopups);
+            setStats(getSimWalletStats());
+            setTopups(getSimPendingTopups());
+            setIsDemoMode(true);
         } finally {
             setLoading(false);
         }
@@ -276,7 +284,7 @@ function WalletPageContent() {
 
             // Fallback ke dummy data jika API kosong
             if (items.length === 0) {
-                const dummyItems = DUMMY_DATA.topupHistory || [];
+                const dummyItems = getSimTopupHistory();
                 setTopupHistory(dummyItems);
                 setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / TOPUP_PAGE_SIZE)));
             } else {
@@ -286,7 +294,7 @@ function WalletPageContent() {
         } catch (err: any) {
             console.error("Error fetching topup history:", err);
             // Fallback ke dummy data saat error
-            const dummyItems = DUMMY_DATA.topupHistory || [];
+            const dummyItems = getSimTopupHistory();
             setTopupHistory(dummyItems);
             setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / TOPUP_PAGE_SIZE)));
             setTopupError(null); // hilangkan pesan error karena ada dummy
@@ -314,12 +322,24 @@ function WalletPageContent() {
 
         if (isDemoMode) {
             if (type === 'confirm_topup') {
-                setTopups(prev => prev.filter(tp => tp.id !== item.id));
+                confirmSimTopup(item.id, modalInput.ref);
                 showToast({ type: 'success', title: '[DEMO] Topup Dikonfirmasi', message: `Saldo ${item.user?.name || 'User'} +${formatCurrency(item.amount)} (simulasi)` });
             } else if (type === 'reject_topup') {
-                setTopups(prev => prev.filter(tp => tp.id !== item.id));
+                if (!modalInput.reason.trim()) {
+                    showToast({ type: 'error', title: 'Alasan wajib diisi', message: 'Harap isi alasan penolakan topup.' });
+                    return;
+                }
+                rejectSimTopup(item.id, modalInput.reason.trim());
                 showToast({ type: 'info', title: '[DEMO] Topup Ditolak', message: `Permintaan topup ${item.user?.name || 'User'} ditolak (simulasi)` });
             }
+            
+            // Reload local data
+            setTopups(getSimPendingTopups());
+            setStats(getSimWalletStats());
+            if (activeTab === 'riwayat_topup') {
+                setTopupHistory(getSimTopupHistory());
+            }
+
             setActionModal({ isOpen: false, type: null, item: null });
             setModalInput({ reason: "", extId: "", ref: "" });
             return;
@@ -330,7 +350,11 @@ function WalletPageContent() {
                 await walletApi.confirmTopup(item.id, modalInput.ref);
                 showToast({ type: 'success', title: 'Topup Dikonfirmasi', message: `Saldo ${item.user?.name || 'User'} berhasil ditambahkan.` });
             } else if (type === 'reject_topup') {
-                await walletApi.rejectTopup(item.id);
+                if (!modalInput.reason.trim()) {
+                    showToast({ type: 'error', title: 'Alasan wajib diisi', message: 'Harap isi alasan penolakan topup.' });
+                    return;
+                }
+                await walletApi.rejectTopup(item.id, modalInput.reason.trim());
                 showToast({ type: 'info', title: 'Topup Ditolak', message: `Permintaan topup ${item.user?.name || 'User'} telah ditolak.` });
             }
             fetchData();
@@ -455,7 +479,7 @@ function WalletPageContent() {
                             <div className="relative group flex items-center">
                                 <input
                                     type="text"
-                                    placeholder="Cari nama, kategori..."
+                                    placeholder="Cari nama, metode pembayaran..."
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
@@ -544,6 +568,7 @@ function WalletPageContent() {
                                                     <span title={formatTooltipDate(item.createdAt)} className="text-xs text-gray-500 cursor-default border-b border-dashed border-gray-400 pb-px">{ta.relative}</span>
                                                 ); })()}
                                             </div>
+                                            <div className="pt-1">{getStatusBadge(item.status || 'pending')}</div>
                                         </div>
                                     ))
                                 )}
@@ -557,15 +582,16 @@ function WalletPageContent() {
                                             <th className="px-6 py-4 text-left">ID</th>
                                             <th className="px-6 py-4 text-left">Tanggal</th>
                                             <th className="px-6 py-4 text-left">User</th>
-                                            <th className="px-6 py-4 text-left">Kategori</th>
+                                            <th className="px-6 py-4 text-left">Metode Pembayaran</th>
                                             <th className="px-6 py-4 text-right">Nominal</th>
+                                            <th className="px-6 py-4 text-center">Status</th>
                                             <th className="px-6 py-4 text-center">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                                         {loading && (
                                             <tr>
-                                                <td colSpan={6}>
+                                                <td colSpan={7}>
                                                     <div className="space-y-3 py-4 px-6">
                                                         {[...Array(4)].map((_, i) => (
                                                             <div key={i} className="flex items-center gap-4 animate-pulse">
@@ -574,6 +600,7 @@ function WalletPageContent() {
                                                                 <Skeleton className="h-3 w-full max-w-[100px]" />
                                                                 <Skeleton className="h-3 w-full max-w-[60px]" />
                                                                 <Skeleton className="h-3 w-full max-w-[90px]" />
+                                                                <Skeleton className="h-3 w-full max-w-[60px]" />
                                                                 <Skeleton className="h-3 w-full max-w-[50px]" />
                                                             </div>
                                                         ))}
@@ -583,7 +610,7 @@ function WalletPageContent() {
                                         )}
                                         {!loading && pagedTopups.length === 0 && (
                                             <tr>
-                                                <td colSpan={6} className="py-8 text-center text-gray-500">Tidak ada data topup pending.</td>
+                                                <td colSpan={7} className="py-8 text-center text-gray-500">Tidak ada data topup pending.</td>
                                             </tr>
                                         )}
                                         {!loading && pagedTopups.map((item) => {
@@ -616,6 +643,9 @@ function WalletPageContent() {
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(item.amount)}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        {getStatusBadge(item.status || 'pending')}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex justify-center items-center gap-2">
@@ -863,9 +893,23 @@ function WalletPageContent() {
                                     </div>
                                 )}
                                 {actionModal.type === 'reject_topup' && (
-                                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                                        Apakah Anda yakin ingin melanjutkan aksi ini? Tindakan ini tidak dapat dibatalkan.
-                                    </p>
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                                            Masukkan alasan penolakan topup untuk pengguna ini.
+                                        </p>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                                                Alasan Penolakan <span className="text-red-500">*</span>
+                                            </label>
+                                            <textarea
+                                                value={modalInput.reason}
+                                                onChange={(e) => setModalInput({ ...modalInput, reason: e.target.value })}
+                                                rows={3}
+                                                placeholder="Contoh: Bukti transfer tidak valid, nominal tidak sesuai..."
+                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                                            />
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-800">

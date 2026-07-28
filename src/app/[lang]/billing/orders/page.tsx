@@ -22,7 +22,7 @@ import {
     nextSimId, saveSimOrder, updateSimOrderPayment,
     type SimOrder,
 } from "@/lib/sim-store"
-import { SimToast, SimNotifBell } from "@/components/sim-notif"
+
 import { formatTooltipDate } from "@/lib/date-utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -658,22 +658,36 @@ function PesananContent() {
 
         const numId = typeof id === "number" ? id : parseInt(String(id)) || 0
 
-        if (prev === "baru" && next === "lunas") {
-            addSimNotif({ type: "new_order", message: `Pesanan #${id} diproses — Sesi dimulai`, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
-            addSimNotif({ type: "payment_success", message: `Pembayaran Lunas — ${order.member}`, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
-            return
+        const timestamp = new Date().toISOString()
+        const logMap: Record<PipelineStatus, string> = {
+            lunas: "Pembayaran terkonfirmasi (Lunas).",
+            aktif: "Pesanan aktif dan sesi dijadwalkan.",
+            gagal: "Pesanan dibatalkan.",
+            selesai: "Semua sesi selesai, pesanan ditandai selesai.",
+            menunggu_guru: "Menunggu konfirmasi guru.",
+            baru: "Pesanan baru."
         }
-
-        const msgs: Record<PipelineStatus, { msg: string; type: "new_order" | "payment_success" | "order_cancelled" }> = {
-            lunas:         { msg: `Pembayaran Lunas — ${order.member}`,            type: "payment_success" },
-            aktif:         { msg: `Pesanan Aktif — ${order.member}`,               type: "payment_success" },
-            gagal:         { msg: `Pesanan Dibatalkan — ${order.member}`,          type: "order_cancelled" },
-            selesai:       { msg: `Pesanan Selesai — ${order.member}`,             type: "payment_success" },
-            menunggu_guru: { msg: `Menunggu Persetujuan Guru — ${order.member}`,   type: "new_order"       },
-            baru:          { msg: "", type: "new_order" },
+        const titleMap: Record<PipelineStatus, string> = {
+            lunas: "Lunas",
+            aktif: "Aktif",
+            gagal: "Dibatalkan",
+            selesai: "Selesai",
+            menunggu_guru: "Menunggu Guru",
+            baru: "Pending"
         }
-        const { msg, type } = msgs[next]
-        if (msg) addSimNotif({ type, message: msg, subMessage: `${order.paket} • ${order.guru} • ${formatRupiah(order.harga)}`, isRead: false, orderId: numId })
+        
+        try {
+            const key = `sim_audit_trail_${id}`
+            const existingStr = localStorage.getItem(key)
+            const existing = existingStr ? JSON.parse(existingStr) : []
+            const newLog = {
+                statusName: titleMap[next] || "Diubah",
+                createdAt: timestamp,
+                notes: logMap[next] || `Status diubah menjadi ${next}`,
+                changedBy: "Admin"
+            }
+            localStorage.setItem(key, JSON.stringify([newLog, ...existing]))
+        } catch (e) {}
     }
 
     async function handleBulkStatus(next: PipelineStatus) {
@@ -693,6 +707,40 @@ function PesananContent() {
                 selected.forEach(o => { updated[o.id] = next })
                 return updated
             })
+            
+            const timestamp = new Date().toISOString()
+            const logMap: Record<PipelineStatus, string> = {
+                lunas: "Pembayaran terkonfirmasi (Lunas).",
+                aktif: "Pesanan aktif dan sesi dijadwalkan.",
+                gagal: "Pesanan dibatalkan.",
+                selesai: "Semua sesi selesai, pesanan ditandai selesai.",
+                menunggu_guru: "Menunggu konfirmasi guru.",
+                baru: "Pesanan baru."
+            }
+            const titleMap: Record<PipelineStatus, string> = {
+                lunas: "Lunas",
+                aktif: "Aktif",
+                gagal: "Dibatalkan",
+                selesai: "Selesai",
+                menunggu_guru: "Menunggu Guru",
+                baru: "Pending"
+            }
+            
+            selected.forEach(o => {
+                try {
+                    const key = `sim_audit_trail_${o.id}`
+                    const existingStr = localStorage.getItem(key)
+                    const existing = existingStr ? JSON.parse(existingStr) : []
+                    const newLog = {
+                        statusName: titleMap[next] || "Diubah",
+                        createdAt: timestamp,
+                        notes: logMap[next] || `Status diubah secara bulk menjadi ${next}`,
+                        changedBy: "Admin"
+                    }
+                    localStorage.setItem(key, JSON.stringify([newLog, ...existing]))
+                } catch (e) {}
+            })
+
             setSelectedIds([])
             setBulkOpen(false)
         } catch (err) {
@@ -794,7 +842,6 @@ function PesananContent() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
-            <SimToast />
 
             <div className="max-w-[1600px] mx-auto">
 
@@ -851,7 +898,7 @@ function PesananContent() {
                                 <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                             </button>
                         )}
-                        <SimNotifBell />
+                        
                         <button onClick={() => setShowSim(true)}
                             title="Simulasi pesanan untuk testing"
                             className="flex items-center justify-center w-[48px] h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none transition-all cursor-pointer group">
@@ -969,11 +1016,11 @@ function PesananContent() {
                                                 />
                                             </td>
                                             {/* Kode Pesanan */}
-                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                                                <div className="flex flex-col gap-0.5">
+                                            <td className="px-4 py-3 w-auto" onClick={e => e.stopPropagation()}>
+                                                <div className="flex flex-col gap-0.5 items-start">
                                                     <span
                                                         onClick={() => router.push(`/billing/orders/${order.id}`)}
-                                                        className="inline-flex items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap cursor-pointer hover:bg-emerald-100 transition-colors"
+                                                        className="inline-flex w-fit items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap cursor-pointer hover:bg-emerald-100 transition-colors"
                                                     >
                                                         {order.bookingCode}
                                                     </span>

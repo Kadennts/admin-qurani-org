@@ -32,6 +32,8 @@ import {
   Star,
   KeyRound,
   History,
+  RotateCcw,
+  ArrowDownToLine,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -127,8 +129,8 @@ const getSidebarData = (
           icon: Wallet,
         },
         {
-          title: t("navigation.history", "History Transaksi"),
-          url: "/billing/history",
+          title: t("navigation.transaksi", "Transaksi"),
+          url: "/billing/transaction",
           icon: History,
         },
         {
@@ -140,6 +142,16 @@ const getSidebarData = (
           title: t("navigation.trainer_payout", "Payout"),
           url: "/billing/payout",
           icon: Banknote,
+        },
+        {
+          title: t("navigation.refund", "Refund"),
+          url: "/billing/refund",
+          icon: RotateCcw,
+        },
+        {
+          title: t("navigation.withdraw", "Withdraw"),
+          url: "/billing/withdraw",
+          icon: ArrowDownToLine,
         },
       ],
     },
@@ -258,8 +270,8 @@ const getSidebarData = (
           icon: Star,
         },
         {
-          title: t("navigation.packages", "Packages"),
-          url: "/teachers/packages",
+          title: t("navigation.packages", "Courses"),
+          url: "/teachers/courses",
           icon: Package,
         },
       ],

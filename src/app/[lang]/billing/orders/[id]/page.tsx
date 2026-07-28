@@ -13,8 +13,6 @@ import {
     CheckCircle2,
     Clock,
     XCircle,
-    MapPin,
-    Phone,
     Mail,
     Calendar,
     ChevronDown,
@@ -29,7 +27,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import dummyData from "@/data/billing-dummy.json"
-import { fetchBookingById, fetchBookingAuditTrail } from "@/lib/billing-bookings"
+import { fetchBookingById, fetchBookingAuditTrail, fetchBookingByCode } from "@/lib/billing-bookings"
 import { getSimOrderById, type SimOrder } from "@/lib/sim-store"
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -370,6 +368,12 @@ function BookingDetailContent({ id }: { id: number }) {
     const [apiError, setApiError] = useState<string | null>(null)
     const [openFeedback, setOpenFeedback] = useState<Record<number, boolean>>({})
     const [activeTab, setActiveTab] = useState<"info" | "log">("info")
+    
+    // --- Local Storage Overrides for Simulation ---
+    const [localSessionsOverride, setLocalSessionsOverride] = useState<any[] | null>(null)
+    const [localAuditTrailOverride, setLocalAuditTrailOverride] = useState<any[] | null>(null)
+    const [localOrderCompleted, setLocalOrderCompleted] = useState<boolean>(false)
+    
     const toggleFeedback = (no: number) => setOpenFeedback(prev => ({ ...prev, [no]: !prev[no] }))
 
     useEffect(() => {
@@ -378,6 +382,18 @@ function BookingDetailContent({ id }: { id: number }) {
         } else {
             setSimOrder(null)
         }
+        
+        // Load local overrides
+        try {
+            const savedSessions = localStorage.getItem(`sim_sessions_${id}`)
+            if (savedSessions) setLocalSessionsOverride(JSON.parse(savedSessions))
+            
+            const savedAudit = localStorage.getItem(`sim_audit_trail_${id}`)
+            if (savedAudit) setLocalAuditTrailOverride(JSON.parse(savedAudit))
+
+            const savedCompleted = localStorage.getItem(`sim_order_completed_${id}`)
+            if (savedCompleted === "true") setLocalOrderCompleted(true)
+        } catch (e) {}
     }, [id])
 
     useEffect(() => {
@@ -386,28 +402,48 @@ function BookingDetailContent({ id }: { id: number }) {
         setApiLoading(true)
         setApiError(null)
         Promise.all([
-            fetchBookingById(id),
+            fetchBookingById(id)
+                .then(async (data) => {
+                    if (!data) {
+                        // Fallback: coba via booking code (format BK-QUR-{id})
+                        const derivedCode = `BK-QUR-${id}`
+                        return await fetchBookingByCode(derivedCode)
+                    }
+                    return data
+                }),
             fetchBookingAuditTrail(id).catch(() => [])
         ])
             .then(([data, trail]) => {
                 setApiDetail(data)
                 
-                // Add dummy data for log if empty and id is 3099, 3098, 3010
-                if (trail.length === 0 && id === 3099) {
-                    setApiAuditTrail([
-                        { statusName: "Pending", createdAt: "2026-04-01T09:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Rahma Aulia" }
-                    ]);
-                } else if (trail.length === 0 && id === 3098) {
-                    setApiAuditTrail([
-                        { statusName: "Menunggu Guru", createdAt: "2026-04-02T10:35:00.000Z", notes: "Pembayaran terkonfirmasi, menunggu konfirmasi guru.", changedBy: "System" },
-                        { statusName: "Pending", createdAt: "2026-04-02T10:30:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Fauzia Nurrohma" }
-                    ]);
-                } else if (trail.length === 0 && id === 3010) {
-                     setApiAuditTrail([
-                        { statusName: "Selesai", createdAt: "2026-01-24T09:00:00.000Z", notes: "Semua sesi telah selesai.", changedBy: "System" },
-                        { statusName: "Aktif", createdAt: "2026-01-10T08:05:22.000Z", notes: "Pembayaran terkonfirmasi.", changedBy: "System" },
-                        { statusName: "Pending", createdAt: "2026-01-10T08:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Zulfa Hanum" }
-                    ]);
+                if (trail.length === 0) {
+                    if (id === 3006) {
+                        setApiAuditTrail([
+                            { statusName: "Dibatalkan", createdAt: "2026-03-04T10:00:00.000Z", notes: "Pesanan dibatalkan oleh pengguna (alasan: Penampilan Tidak Sesuai). Seluruh jadwal sesi dibatalkan.", changedBy: "Nur Hidayah" },
+                            { statusName: "Aktif", createdAt: "2025-12-01T08:05:00.000Z", notes: "Pembayaran terkonfirmasi. Sesi dijadwalkan.", changedBy: "System" },
+                            { statusName: "Pending", createdAt: "2025-12-01T08:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "Nur Hidayah" }
+                        ]);
+                    } else if (id === 3009) {
+                        setApiAuditTrail([
+                            { statusName: "Sesi Selesai", createdAt: "2026-03-10T14:00:00.000Z", notes: "Sesi ke-4 telah diselesaikan.", changedBy: "Indi fitriani" },
+                            { statusName: "Sesi Selesai", createdAt: "2026-03-03T14:00:00.000Z", notes: "Sesi ke-3 telah diselesaikan.", changedBy: "Indi fitriani" },
+                            { statusName: "Sesi Selesai", createdAt: "2026-02-24T14:00:00.000Z", notes: "Sesi ke-2 telah diselesaikan.", changedBy: "Indi fitriani" },
+                            { statusName: "Sesi Selesai", createdAt: "2026-02-21T14:00:00.000Z", notes: "Sesi ke-1 telah diselesaikan.", changedBy: "Indi fitriani" },
+                            { statusName: "Aktif", createdAt: "2026-02-20T09:05:00.000Z", notes: "Pembayaran terkonfirmasi.", changedBy: "System" },
+                            { statusName: "Pending", createdAt: "2026-02-20T09:00:00.000Z", notes: "Pesanan baru dibuat.", changedBy: "Muhammad Yusuf" }
+                        ]);
+                    } else if (id === 3010 || id === 3003) {
+                         setApiAuditTrail([
+                            { statusName: "Selesai", createdAt: "2026-01-24T09:00:00.000Z", notes: "Semua sesi telah selesai.", changedBy: "System" },
+                            { statusName: "Aktif", createdAt: "2026-01-10T08:05:22.000Z", notes: "Pembayaran terkonfirmasi.", changedBy: "System" },
+                            { statusName: "Pending", createdAt: "2026-01-10T08:00:00.000Z", notes: "Pesanan baru dibuat, menunggu pembayaran.", changedBy: "System" }
+                        ]);
+                    } else {
+                        // Default fallback
+                        setApiAuditTrail([
+                            { statusName: "Pending", createdAt: "2026-04-01T09:00:00.000Z", notes: "Pesanan baru dibuat, menunggu konfirmasi.", changedBy: "System" }
+                        ]);
+                    }
                 } else {
                     setApiAuditTrail(trail)
                 }
@@ -493,7 +529,7 @@ function BookingDetailContent({ id }: { id: number }) {
         )
     }
 
-    const sessions = detail.sessions as Array<{
+    const initialSessions = detail.sessions as Array<{
         no: number
         date: string
         time: string
@@ -501,24 +537,55 @@ function BookingDetailContent({ id }: { id: number }) {
         feedback?: { rating: number; pesan: string }
     }>
     
-    const isBookingCancelled = booking.status === "cancelled"
-    const isBookingActive = !isBookingCancelled && booking.status === "active" && booking.completedSessions > 0
+    const finalSessions = localSessionsOverride || initialSessions;
+    const finalAuditTrail = localAuditTrailOverride || apiAuditTrail;
+    const finalBookingStatus = localOrderCompleted ? "completed" : booking.status;
+    const isBookingCancelled = finalBookingStatus === "cancelled"
+    const isBookingActive = !isBookingCancelled && finalBookingStatus === "active" && booking.completedSessions > 0
+    const isPaid = detail.payment.status === "paid"
     const paidStr = isBookingCancelled ? "Dibatalkan"
-        : detail.payment.status === "paid"
+        : isPaid
             ? (isBookingActive ? "Aktif" : "Lunas")
             : "Belum Dibayar"
     
     const paidCls = isBookingCancelled
         ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
-        : detail.payment.status === "paid"
+        : isPaid
             ? (isBookingActive
                 ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 border border-sky-200 dark:border-sky-800"
                 : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800")
             : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
             
-    const sessCompleted = sessions.filter(s => s.status === "completed").length
+    const sessCompleted = finalSessions.filter(s => s.status === "completed").length
     const pct = Math.round((sessCompleted / Math.max(1, booking.totalSessions)) * 100)
-    const isPaid = detail.payment.status === "paid"
+    
+    const handleMarkSessionCompleted = (sessionNo: number) => {
+        const newSessions = finalSessions.map(s => s.no === sessionNo ? { ...s, status: "completed" } : s);
+        const newLog = { 
+            statusName: "Sesi Selesai", 
+            createdAt: new Date().toISOString(), 
+            notes: `Sesi ${sessionNo} telah diselesaikan.`, 
+            changedBy: "Admin (Simulasi)" 
+        };
+        let newAudit = [newLog, ...finalAuditTrail];
+
+        const isAllCompleted = newSessions.every(s => s.status === "completed");
+        if (isAllCompleted && !localOrderCompleted) {
+            newAudit = [{
+                statusName: "Selesai",
+                createdAt: new Date().toISOString(),
+                notes: "Semua sesi telah selesai, pesanan ditandai Selesai.",
+                changedBy: "System (Simulasi)"
+            }, ...newAudit];
+            setLocalOrderCompleted(true);
+            localStorage.setItem(`sim_order_completed_${id}`, "true");
+        }
+
+        setLocalSessionsOverride(newSessions);
+        setLocalAuditTrailOverride(newAudit);
+        localStorage.setItem(`sim_sessions_${id}`, JSON.stringify(newSessions));
+        localStorage.setItem(`sim_audit_trail_${id}`, JSON.stringify(newAudit));
+    }
 
     return (
         <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 p-4 sm:p-6 lg:p-8">
@@ -538,9 +605,9 @@ function BookingDetailContent({ id }: { id: number }) {
                         className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === "log" ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
                     >
                         <Activity className="w-4 h-4" /> Log & Aktivitas
-                        {apiAuditTrail.length > 0 && (
+                        {finalAuditTrail.length > 0 && (
                             <span className="ml-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 py-0.5 px-2 rounded-full text-[10px]">
-                                {apiAuditTrail.length}
+                                {finalAuditTrail.length}
                             </span>
                         )}
                     </button>
@@ -591,11 +658,11 @@ function BookingDetailContent({ id }: { id: number }) {
                                     <Calendar className="w-5 h-5 text-emerald-500" /> Jadwal Pertemuan
                                 </h3>
                                 <span className="text-xs font-semibold bg-white dark:bg-gray-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
-                                    {sessions.length} Terjadwal
+                                    {finalSessions.length} Terjadwal
                                 </span>
                             </div>
                             
-                            {sessions.length === 0 ? (
+                            {finalSessions.length === 0 ? (
                                 <div className="p-8 text-center">
                                     <Calendar className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
                                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Jadwal belum ditentukan</p>
@@ -603,7 +670,7 @@ function BookingDetailContent({ id }: { id: number }) {
                                 </div>
                             ) : (
                                 <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
-                                    {sessions.map(s => {
+                                    {finalSessions.map(s => {
                                         const sc = SESSION_STATUS[s.status as keyof typeof SESSION_STATUS]
                                         const Icon = sc?.icon ?? Clock
                                         const isDone = s.status === "completed"
@@ -624,16 +691,28 @@ function BookingDetailContent({ id }: { id: number }) {
                                                         <div className="flex items-center gap-2.5 flex-wrap mb-1">
                                                             <h4 className="text-sm font-bold text-gray-900 dark:text-white">Sesi {s.no}</h4>
                                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                                                booking.status === "cancelled"
+                                                                finalBookingStatus === "cancelled"
                                                                     ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20"
                                                                     : s.status === "completed"
                                                                         ? sc?.bg + " border-emerald-200 dark:border-emerald-500/20"
-                                                                        : (booking.status === "pending" || booking.status === "menunggu_guru")
+                                                                        : (finalBookingStatus === "pending" || finalBookingStatus === "menunggu_guru")
                                                                             ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
                                                                             : sc?.bg + " border-sky-200 dark:border-sky-500/20"
                                                             }`}>
-                                                                {booking.status === "cancelled" ? "Dibatalkan" : s.status === "completed" ? "Selesai" : (booking.status === "pending" || booking.status === "menunggu_guru") ? "Pending" : sc?.label}
+                                                                {finalBookingStatus === "cancelled" ? "Dibatalkan" : s.status === "completed" ? "Selesai" : (finalBookingStatus === "pending" || finalBookingStatus === "menunggu_guru") ? "Pending" : sc?.label}
                                                             </span>
+                                                            
+                                                            {!isDone && isPaid && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleMarkSessionCompleted(s.no);
+                                                                    }}
+                                                                    className="ml-2 px-2.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] font-bold rounded border border-emerald-200 transition-colors shadow-sm"
+                                                                >
+                                                                    Tandai Selesai (Testing)
+                                                                </button>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 font-medium">
                                                             <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {s.date}</span>
@@ -676,7 +755,7 @@ function BookingDetailContent({ id }: { id: number }) {
                         </div>
 
                         {/* Catatan Kelulusan */}
-                        {booking.status === "completed" && (detail as any).graduationNote && (
+                        {finalBookingStatus === "completed" && (detail as any).graduationNote && (
                             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl border border-emerald-200 dark:border-emerald-800/50 p-6 shadow-sm">
                                 <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2 mb-3 uppercase tracking-wider">
                                     <GraduationCap className="w-5 h-5" /> Catatan Kelulusan
@@ -718,38 +797,37 @@ function BookingDetailContent({ id }: { id: number }) {
                     {/* ── RIGHT column (5 cols) ── */}
                     <div className="lg:col-span-5 space-y-6">
                         
-                        {/* Member Info */}
+                        {/* Murid Info */}
                         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow">
                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
                                 <User className="w-4 h-4" /> Informasi Murid
                             </h3>
-                            <div className="flex items-center gap-4 mb-5">
-                                <div className="w-16 h-16 rounded-full border-4 border-emerald-50 dark:border-emerald-900/30 overflow-hidden shadow-sm flex-shrink-0">
-                                    <img src={detail.member.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(detail.member.name || "M")}&background=10b981&color=fff&size=128`} alt={detail.member.name} className="w-full h-full object-cover" />
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-14 h-14 rounded-full border-4 border-emerald-50 dark:border-emerald-900/30 overflow-hidden shadow-sm flex-shrink-0">
+                                    <img
+                                        src={detail.member.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(detail.member.name || "M")}&background=10b981&color=fff&size=128`}
+                                        alt={detail.member.name}
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
-                                <div>
-                                    <h4 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{detail.member.name || "—"}</h4>
-                                    <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">ID: {detail.member.id}</p>
+                                <div className="min-w-0">
+                                    <h4 className="text-base font-black text-gray-900 dark:text-white leading-tight truncate">{detail.member.name || "—"}</h4>
+                                    {/* Username: derive dari email jika ada, atau dari nama */}
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                                        @{detail.member.email
+                                            ? detail.member.email.split("@")[0].toLowerCase()
+                                            : (detail.member.name || "murid").toLowerCase().replace(/\s+/g, "")}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                                 <div className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-sm">
-                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm text-emerald-500">
+                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm text-emerald-500 flex-shrink-0">
                                         <Mail className="w-4 h-4" />
                                     </div>
-                                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate">{detail.member.email || "—"}</span>
-                                </div>
-                                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-sm">
-                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm text-emerald-500">
-                                        <Phone className="w-4 h-4" />
-                                    </div>
-                                    <span className="font-medium text-gray-700 dark:text-gray-300">{detail.member.phone || "—"}</span>
-                                </div>
-                                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-sm">
-                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm text-emerald-500">
-                                        <MapPin className="w-4 h-4" />
-                                    </div>
-                                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate">{detail.member.location || "—"}</span>
+                                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate text-xs">
+                                        {detail.member.email || "—"}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -865,14 +943,14 @@ function BookingDetailContent({ id }: { id: number }) {
                                 <Activity className="w-6 h-6 text-emerald-500" /> Riwayat & Aktivitas
                             </h3>
                             
-                            {apiAuditTrail.length === 0 ? (
+                            {finalAuditTrail.length === 0 ? (
                                 <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 border-dashed">
                                     <History className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                                     <p className="text-gray-500 dark:text-gray-400 font-medium">Belum ada aktivitas tercatat untuk pesanan ini.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-0 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 dark:before:via-gray-800 before:to-transparent">
-                                    {apiAuditTrail.map((log: any, idx: number) => {
+                                    {finalAuditTrail.map((log: any, idx: number) => {
                                         // Determine styling based on action
                                         const actionStr = String(log.action || log.statusName || log.statusText || "").toLowerCase();
                                         let dotColor = "bg-gray-200 border-gray-300 dark:bg-gray-800 dark:border-gray-700";
