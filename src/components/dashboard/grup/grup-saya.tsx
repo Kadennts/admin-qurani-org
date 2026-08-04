@@ -1153,36 +1153,39 @@ export function GrupSaya() {
       <div className="flex-1 w-full md:max-w-7xl mx-auto p-3 sm:p-4 md:p-6 bg-white dark:bg-gray-800 rounded-2xl md:rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xl shadow-gray-200/20 dark:shadow-gray-800/25 space-y-4 md:space-y-6 overflow-visible min-h-0">
         {/* Search Input */}
         <div className="flex w-full">
-          <div className="relative flex w-full gap-2">
-            <div className="flex items-center w-full md:w-96 h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
-              <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder={t('grup saya.search.placeholder', 'Search groups...')}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setSearchQuery(searchInput);
-                    setCurrentPage(1);
-                  }
-                }}
-                className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
-              />
-              <button
-                onClick={() => { setSearchQuery(searchInput); setCurrentPage(1); }}
-                className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" /> Cari
-              </button>
+          <div className="flex flex-col sm:flex-row w-full gap-2 items-center">
+            <div className="flex items-center w-full md:w-64">
+              <div className="flex w-full rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
+                <input
+                  type="text"
+                  placeholder={t('grup saya.search.placeholder', 'Search groups...')}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(searchInput);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
+                />
+                <button
+                  onClick={() => { setSearchQuery(searchInput); setCurrentPage(1); }}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+            
             <Button
-              variant={"default"}
-              size={"sm"}
+              variant="outline"
+              size="sm"
               onClick={() => handleOpenFilterModal()}
-              className="flex items-center justify-center gap-1 h-10 w-10 rounded-lg font-medium transition-all duration-300 text-sm whitespace-nowrap bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md hover:shadow-lg transform hover:scale-105 border-0 relative flex-shrink-0"
+              className={`h-9 w-full sm:w-auto border-dashed whitespace-nowrap text-xs ${selectedCategoryFilter !== "all" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : ""}`}
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="h-3.5 w-3.5 mr-2" />
+              {t('filters', 'Filter')}
               {selectedCategoryFilter !== "all" && (
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>
               )}

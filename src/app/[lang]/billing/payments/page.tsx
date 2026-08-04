@@ -1,4 +1,5 @@
 "use client"
+import { useRouter, useParams } from "next/navigation";
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
@@ -13,7 +14,6 @@ import {
 } from "@/lib/sim-billing-store"
 import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download, Send, CheckSquare } from "lucide-react"
 import DisputesTab from "./DisputesTab"
-
 interface PaymentData {
     id: number | string;
     userId: number | string;
@@ -170,6 +170,9 @@ function ActionDropdown({ payment, onSendInvoice, onUpdateStatus }: { payment: P
 }
 
 function PaymentsContent() {
+    const params = useParams();
+    const router = useRouter();
+    const lang = params?.lang as string || 'en';
     const { t } = useI18n()
     const [payments, setPayments] = useState<PaymentData[]>([])
     const [loading, setLoading] = useState(true)
@@ -191,6 +194,8 @@ function PaymentsContent() {
     // Bulk action state
     const [selectedIds, setSelectedIds] = useState<Array<number | string>>([])
 
+    // User wallet modal state
+        
     // Modals state
     const [sendInvoiceModal, setSendInvoiceModal] = useState<PaymentData | null>(null)
     const [updateStatusModal, setUpdateStatusModal] = useState<PaymentData | null>(null)
@@ -494,25 +499,9 @@ function PaymentsContent() {
                 {/* Filters & Search */}
                 <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                     {/* Main toolbar */}
-                    <div className="flex flex-col sm:flex-row gap-3 p-4 items-center justify-between">
-                        {/* Left Side: Export */}
-                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                            <button
-                                onClick={handleExportCSV}
-                                disabled={isExporting}
-                                className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                                    isExporting 
-                                    ? "bg-gray-100 text-gray-400 cursor-wait dark:bg-gray-800 dark:text-gray-600" 
-                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800"
-                                }`}
-                            >
-                                <Download className="w-4 h-4" />
-                                {isExporting ? "Mengekspor..." : "Export CSV"}
-                            </button>
-                        </div>
-
-                        {/* Right Side: Search + Filter Button */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex flex-col-reverse sm:flex-row gap-3 p-4 items-center justify-between">
+                        {/* Left Side: Search + Filter Button */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                             <div className="flex flex-1 sm:w-[420px] shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-shadow">
                                 <div className="relative flex-1 bg-white dark:bg-gray-900">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -536,7 +525,7 @@ function PaymentsContent() {
                             {/* Filter Modal Button */}
                             <button
                                 onClick={() => setShowFilterPanel(true)}
-                                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+                                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
                                     statusFilter || methodFilter
                                         ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400'
                                         : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
@@ -549,6 +538,22 @@ function PaymentsContent() {
                                         {[statusFilter, methodFilter].filter(Boolean).length}
                                     </span>
                                 )}
+                            </button>
+                        </div>
+
+                        {/* Right Side: Export */}
+                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+                            <button
+                                onClick={handleExportCSV}
+                                disabled={isExporting}
+                                className={`w-full sm:w-auto px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                                    isExporting 
+                                    ? "bg-gray-100 text-gray-400 cursor-wait dark:bg-gray-800 dark:text-gray-600" 
+                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800"
+                                }`}
+                            >
+                                <Download className="w-4 h-4" />
+                                {isExporting ? "Mengekspor..." : "Export CSV"}
                             </button>
                         </div>
                     </div>
@@ -712,7 +717,7 @@ function PaymentsContent() {
                                     </div>
                                     <div>
                                         <div className="text-xs text-gray-500">
-                                            {t("billing.payments.table.user", "User")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.userName || '-'}</span>
+                                            {t("billing.payments.table.user", "User")}: <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/users/manage/${payment.userId}`); }} className="font-medium text-gray-900 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{payment.userName || '-'}</button>
                                         </div>
                                         <div className="text-xs text-gray-500 mt-0.5">
                                             {t("billing.payments.table.trainer", "Trainer")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.trainerName || '-'}</span>
@@ -801,7 +806,7 @@ function PaymentsContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900 dark:text-white">{payment.userName || '-'}</div>
+                                                <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/users/manage/${payment.userId}`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>
@@ -1022,6 +1027,8 @@ function PaymentsContent() {
                     </div>
                 </div>
             )}
+
+            
         </div>
     )
 }

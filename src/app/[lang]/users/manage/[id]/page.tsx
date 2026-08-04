@@ -12,13 +12,14 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
     Mail, Phone, MapPin, Shield, CreditCard, 
-    Clock, Activity, Calendar, ArrowLeft, Loader2 
+    Clock, Activity, Calendar, ArrowLeft, Loader2, User as UserIcon
 } from "lucide-react"
 
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { walletApi, auditApi, API_BASE } from "@/lib/api"
 import { getKycAll } from "@/utils/api/kyc/fetch"
 import { toast } from "sonner"
+import { UserWalletDetail } from "@/components/Wallet/UserWalletDetail"
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("id-ID", {
@@ -93,36 +94,9 @@ export default function UserDetailPage() {
     const [logsForbidden, setLogsForbidden] = useState(false)
     const [isProcessingWallet, setIsProcessingWallet] = useState(false)
 
-    const handleSuspendWallet = async () => {
-        if (!walletData?.id) return
-        if (!confirm('Apakah Anda yakin ingin menangguhkan (suspend) dompet ini?')) return
-        setIsProcessingWallet(true)
-        try {
-            // Note: Since we are in mock mode due to 403, this will also fail, but we update the mock data so the UI reflects the change
-            await walletApi.suspendWallet(walletData.id, "Suspended by admin").catch(() => {})
-            setWalletData({ ...walletData, status: 'suspended' })
-            toast.success("Status dompet berhasil diubah menjadi Suspended")
-        } catch (error) {
-            toast.error("Gagal melakukan suspend dompet")
-        } finally {
-            setIsProcessingWallet(false)
-        }
-    }
-
-    const handleActivateWallet = async () => {
-        if (!walletData?.id) return
-        setIsProcessingWallet(true)
-        try {
-            // Note: Since we are in mock mode due to 403, this will also fail, but we update the mock data so the UI reflects the change
-            await walletApi.activateWallet(walletData.id).catch(() => {})
-            setWalletData({ ...walletData, status: 'active' })
-            toast.success("Status dompet berhasil diaktifkan kembali")
-        } catch (error) {
-            toast.error("Gagal mengaktifkan dompet")
-        } finally {
-            setIsProcessingWallet(false)
-        }
-    }
+    // We now manage wallet entirely via UserWalletDetail in mock mode.
+    // The previous state 'walletData' etc. for fetching wallet are kept as-is 
+    // to not break other things, but we'll render UserWalletDetail.
 
     useEffect(() => {
         if (user && userId) {
@@ -287,7 +261,7 @@ export default function UserDetailPage() {
                             <div className="mt-8">
                                 {/* OVERVIEW TAB */}
                                 <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                         <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Mail className="w-4 h-4 text-gray-400" />
@@ -301,6 +275,57 @@ export default function UserDetailPage() {
                                                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nomor Telepon</span>
                                             </div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{user.hp || user.noHp || user.phone || '-'}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <UserIcon className="w-4 h-4 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Jenis Kelamin</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.gender === 'm' ? 'Laki-laki' : user.gender === 'f' ? 'Perempuan' : '-'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal Lahir</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.dob ? formatDate(user.dob) : '-'}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pekerjaan</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.job || '-'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Clock className="w-4 h-4 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Timezone</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.timezone || '-'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Shield className="w-4 h-4 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status Akun</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                {user.isBlocked ? (
+                                                    <span className="text-red-500 font-bold">Terblokir</span>
+                                                ) : (
+                                                    <span className="text-emerald-500 font-bold">Aktif</span>
+                                                )}
+                                                {user.isVerify ? (
+                                                    <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Verified</span>
+                                                ) : (
+                                                    <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Unverified</span>
+                                                )}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
@@ -382,77 +407,7 @@ export default function UserDetailPage() {
 
                                 {/* WALLET TAB */}
                                 <TabsContent value="wallet" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    {loadingWallet ? (
-                                        <div className="space-y-3 py-4">
-                                            <Skeleton className="h-40 w-full rounded-2xl" />
-                                            <div className="flex gap-3"><Skeleton className="h-10 w-24 rounded-lg" /><Skeleton className="h-10 w-24 rounded-lg" /></div>
-                                        </div>
-                                    ) : walletData ? (
-                                        <div className="max-w-md">
-                                            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-                                                <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl"></div>
-                                                <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-teal-300 opacity-20 rounded-full blur-2xl"></div>
-                                                <div className="flex justify-between items-start mb-10 relative z-10">
-                                                    <div>
-                                                        <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider mb-2">Saldo Tersedia</p>
-                                                        <h3 className="text-4xl font-bold tracking-tight">{formatCurrency(walletData.balance || 0)}</h3>
-                                                    </div>
-                                                    <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm border border-white/10 shadow-sm">
-                                                        <CreditCard className="w-8 h-8 text-white" />
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-between text-sm relative z-10">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-emerald-100 font-medium">Status:</span>
-                                                        <Badge variant="outline" className={`px-3 py-1 bg-white/20 border-white/10 text-white shadow-sm ${walletData.status?.toLowerCase() === 'suspended' ? 'bg-red-500/40 border-red-500/20 text-red-50' : ''}`}>
-                                                            {walletData.status?.toUpperCase() || 'ACTIVE'}
-                                                        </Badge>
-                                                    </div>
-                                                    <span className="text-emerald-100/80 font-mono text-xs opacity-80">ID: {walletData.id || '-'}</span>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Wallet Actions */}
-                                            <div className="flex gap-3 justify-end mt-4">
-                                                {walletData.status?.toLowerCase() === 'suspended' ? (
-                                                    <Button 
-                                                        variant="outline" 
-                                                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 w-full sm:w-auto"
-                                                        onClick={handleActivateWallet}
-                                                        disabled={isProcessingWallet}
-                                                    >
-                                                        {isProcessingWallet ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                                        Aktifkan Wallet
-                                                    </Button>
-                                                ) : (
-                                                    <Button 
-                                                        variant="destructive" 
-                                                        className="bg-red-500 hover:bg-red-600 w-full sm:w-auto"
-                                                        onClick={handleSuspendWallet}
-                                                        disabled={isProcessingWallet}
-                                                    >
-                                                        {isProcessingWallet ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                                        Suspend Wallet
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : walletForbidden ? (
-                                        <div className="flex flex-col items-center justify-center py-16 text-amber-600 gap-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800 border-dashed max-w-md">
-                                            <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
-                                                <CreditCard className="w-12 h-12 text-amber-400" />
-                                            </div>
-                                            <p className="text-base font-medium text-amber-700 dark:text-amber-400">Tidak memiliki izin untuk mengakses data dompet</p>
-                                            <p className="text-sm text-amber-500/70">Hubungi admin sistem untuk memberikan akses wallet</p>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-4 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-800 border-dashed max-w-md">
-                                            <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
-                                                <CreditCard className="w-12 h-12 text-gray-300 dark:text-gray-600" />
-                                            </div>
-                                            <p className="text-base font-medium text-gray-600 dark:text-gray-400">Data Dompet User tidak ditemukan</p>
-                                        </div>
-                                    )}
+                                    <UserWalletDetail userId={userId} userData={user} hideProfileCard={true} hideLimitFeature={true} />
                                 </TabsContent>
 
                                 {/* ACTIVITY TAB */}

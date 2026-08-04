@@ -145,7 +145,7 @@ export function CategoriesManager() {
     // Pagination
     const [page, setPage] = useState(1)
     const [totalCount, setTotalCount] = useState(0)
-    const pageSize = 10
+    const [pageSize, setPageSize] = useState(10)
 
     // CRUD modals
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -493,128 +493,128 @@ export function CategoriesManager() {
             </div>
 
             {/* ── Search & Filter ──────────────────────────────────────────── */}
-            <div className="mb-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                {/* LEFT: Combined Filter Dropdown */}
-                <div className="relative shrink-0">
-                    <button
-                        onClick={() => setFilterDropdownOpen(o => !o)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all min-w-[140px] justify-between ${
-                            filterActive !== "all" || filterFeatured !== "all"
-                                ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
-                                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
-                        }`}
-                    >
-                        <span className="flex items-center gap-2">
-                            <Filter className="w-4 h-4" />
-                            {filterActive !== "all" || filterFeatured !== "all"
-                                ? [
-                                    filterActive !== "all" ? (filterActive === "active" ? t("masterdata.categories.filter_active", "Aktif") : t("masterdata.categories.filter_inactive", "Nonaktif")) : "",
-                                    filterFeatured !== "all" ? (filterFeatured === "featured" ? t("masterdata.categories.filter_featured", "Featured") : t("masterdata.categories.filter_regular", "Regular")) : "",
-                                ].filter(Boolean).join(" · ")
-                                : t("masterdata.categories.filter_all", "Semua")
-                            }
-                        </span>
-                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${filterDropdownOpen ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {/* Dropdown Panel */}
-                    {filterDropdownOpen && (
-                        <>
-                            {/* Backdrop */}
-                            <div className="fixed inset-0 z-10" onClick={() => setFilterDropdownOpen(false)} />
-                            <div className="absolute left-0 top-full mt-2 z-20 w-52 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl overflow-hidden">
-                                {/* Semua */}
-                                <button
-                                    onClick={() => { setFilterActive("all"); setFilterFeatured("all"); setPage(1); setFilterDropdownOpen(false) }}
-                                    className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors ${
-                                        filterActive === "all" && filterFeatured === "all"
-                                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
-                                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                    }`}
-                                >
-                                    {t("masterdata.categories.filter_all", "Semua")}
+            <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:min-w-[300px] flex">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder={t("masterdata.categories.search_placeholder", "Cari kategori, slug...")}
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") { setSearchQuery(searchInput); setPage(1); } }}
+                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-l-md focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all h-10"
+                            />
+                            {searchInput && (
+                                <button onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1) }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <X className="w-4 h-4" />
                                 </button>
+                            )}
+                        </div>
+                        <button onClick={() => { setSearchQuery(searchInput); setPage(1) }} className="flex items-center justify-center gap-1.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-r-md transition-colors shrink-0 h-10 border border-emerald-500 border-l-0">
+                            <Search className="w-4 h-4" /> <span className="hidden sm:inline">{t("masterdata.categories.search", "Search")}</span>
+                        </button>
+                    </div>
 
-                                {/* Divider + Status */}
-                                <div className="px-4 pt-2 pb-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t("masterdata.categories.filter_group_status", "STATUS")}</p>
-                                </div>
-                                {(["active", "inactive"] as const).map(f => (
+                    <div className="relative shrink-0">
+                        <button
+                            onClick={() => setFilterDropdownOpen(o => !o)}
+                            className={`flex items-center justify-between gap-2 px-4 h-10 rounded-md border text-sm font-medium transition-all min-w-[140px] ${
+                                filterActive !== "all" || filterFeatured !== "all"
+                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Filter className="w-4 h-4" />
+                                {filterActive !== "all" || filterFeatured !== "all"
+                                    ? [
+                                        filterActive !== "all" ? (filterActive === "active" ? t("masterdata.categories.filter_active", "Aktif") : t("masterdata.categories.filter_inactive", "Nonaktif")) : "",
+                                        filterFeatured !== "all" ? (filterFeatured === "featured" ? t("masterdata.categories.filter_featured", "Featured") : t("masterdata.categories.filter_regular", "Regular")) : "",
+                                    ].filter(Boolean).join(" · ")
+                                    : t("masterdata.categories.filter", "Filter")
+                                }
+                            </span>
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${filterDropdownOpen ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {/* Dropdown Panel */}
+                        {filterDropdownOpen && (
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 z-10" onClick={() => setFilterDropdownOpen(false)} />
+                                <div className="absolute left-0 top-full mt-2 z-20 w-52 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl overflow-hidden">
+                                    {/* Semua */}
                                     <button
-                                        key={f}
-                                        onClick={() => { setFilterActive(f === filterActive ? "all" : f); setPage(1); }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
-                                            filterActive === f
-                                                ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-medium"
-                                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                        onClick={() => { setFilterActive("all"); setFilterFeatured("all"); setPage(1); setFilterDropdownOpen(false) }}
+                                        className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors ${
+                                            filterActive === "all" && filterFeatured === "all"
+                                                ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+                                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                         }`}
                                     >
-                                        <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                            f === "active" ? "bg-emerald-400" : "bg-red-400"
-                                        }`} />
-                                        {f === "active" ? t("masterdata.categories.filter_active", "Aktif") : t("masterdata.categories.filter_inactive", "Nonaktif")}
+                                        {t("masterdata.categories.filter_all", "Semua")}
                                     </button>
-                                ))}
 
-                                {/* Divider + Featured */}
-                                <div className="px-4 pt-3 pb-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t("masterdata.categories.filter_group_featured", "FEATURED")}</p>
-                                </div>
-                                {(["featured", "regular"] as const).map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => { setFilterFeatured(f === filterFeatured ? "all" : f); setPage(1); }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
-                                            filterFeatured === f
-                                                ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-medium"
-                                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                        }`}
-                                    >
-                                        {f === "featured"
-                                            ? <Star className={`w-3.5 h-3.5 shrink-0 ${filterFeatured === "featured" ? "fill-current" : ""}`} />
-                                            : <span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center text-gray-400">—</span>
-                                        }
-                                        {f === "featured" ? t("masterdata.categories.filter_featured", "Featured") : t("masterdata.categories.filter_regular", "Regular")}
-                                    </button>
-                                ))}
-
-                                {/* Reset if any filter is active */}
-                                {(filterActive !== "all" || filterFeatured !== "all") && (
-                                    <div className="p-3 border-t border-gray-100 dark:border-gray-800">
-                                        <button
-                                            onClick={() => { setFilterActive("all"); setFilterFeatured("all"); setPage(1); setFilterDropdownOpen(false) }}
-                                            className="w-full text-xs text-center text-red-500 hover:text-red-600 font-medium py-1"
-                                        >
-                                            {t("masterdata.categories.filter_reset", "Reset Filter")}
-                                        </button>
+                                    {/* Divider + Status */}
+                                    <div className="px-4 pt-2 pb-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t("masterdata.categories.filter_group_status", "STATUS")}</p>
                                     </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
+                                    {(["active", "inactive"] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => { setFilterActive(f === filterActive ? "all" : f); setPage(1); }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
+                                                filterActive === f
+                                                    ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-medium"
+                                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                f === "active" ? "bg-emerald-400" : "bg-red-400"
+                                            }`} />
+                                            {f === "active" ? t("masterdata.categories.filter_active", "Aktif") : t("masterdata.categories.filter_inactive", "Nonaktif")}
+                                        </button>
+                                    ))}
 
-                {/* RIGHT: Search bar */}
-                <div className="relative flex sm:max-w-sm w-full sm:ml-auto">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder={t("masterdata.categories.search_placeholder", "Cari kategori, slug...")}
-                            value={searchInput}
-                            onChange={e => setSearchInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") { setSearchQuery(searchInput); setPage(1); } }}
-                            className="w-full pl-10 pr-10 py-2.5 rounded-l-xl border border-gray-200 border-r-0 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                        />
-                        {searchInput && (
-                            <button onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1) }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                <X className="w-4 h-4" />
-                            </button>
+                                    {/* Divider + Featured */}
+                                    <div className="px-4 pt-3 pb-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t("masterdata.categories.filter_group_featured", "FEATURED")}</p>
+                                    </div>
+                                    {(["featured", "regular"] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => { setFilterFeatured(f === filterFeatured ? "all" : f); setPage(1); }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
+                                                filterFeatured === f
+                                                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-medium"
+                                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            }`}
+                                        >
+                                            {f === "featured"
+                                                ? <Star className={`w-3.5 h-3.5 shrink-0 ${filterFeatured === "featured" ? "fill-current" : ""}`} />
+                                                : <span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center text-gray-400">—</span>
+                                            }
+                                            {f === "featured" ? t("masterdata.categories.filter_featured", "Featured") : t("masterdata.categories.filter_regular", "Regular")}
+                                        </button>
+                                    ))}
+
+                                    {/* Reset if any filter is active */}
+                                    {(filterActive !== "all" || filterFeatured !== "all") && (
+                                        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
+                                            <button
+                                                onClick={() => { setFilterActive("all"); setFilterFeatured("all"); setPage(1); setFilterDropdownOpen(false) }}
+                                                className="w-full text-xs text-center text-red-500 hover:text-red-600 font-medium py-1"
+                                            >
+                                                {t("masterdata.categories.filter_reset", "Reset Filter")}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
-                    <button onClick={() => { setSearchQuery(searchInput); setPage(1) }} className="flex items-center justify-center gap-1.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-r-xl transition-colors shrink-0">
-                        <Search className="w-4 h-4" /> <span className="hidden sm:inline">{t("masterdata.categories.search", "Cari")}</span>
-                    </button>
                 </div>
             </div>
 
@@ -766,30 +766,69 @@ export function CategoriesManager() {
 
                 {/* Pagination */}
                 {!loading && filtered.length > 0 && (
-                    <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-800/30 flex-wrap gap-3">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {t("masterdata.categories.pagination_showing", "Menampilkan")} <span className="font-semibold text-gray-700 dark:text-gray-300">{paginated.length}</span> {t("masterdata.categories.pagination_of", "dari")}{" "}
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">{filtered.length}</span> {t("masterdata.categories.pagination_categories", "kategori")}
-                        </p>
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(p => (
-                                <button key={p} onClick={() => setPage(p)}
-                                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${p === page
-                                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                                        : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        }`}>
-                                    {p}
-                                </button>
-                            ))}
-                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 flex-wrap justify-center sm:justify-start">
+                            <span>{t("masterdata.categories.pagination_showing", "Menampilkan")} <span className="font-bold text-emerald-600">{(page - 1) * pageSize + 1}-{Math.min(page * pageSize, filtered.length)}</span> {t("masterdata.categories.pagination_of", "dari")} <span className="font-bold text-gray-700 dark:text-gray-200">{filtered.length}</span> {t("masterdata.categories.pagination_categories", "data")}</span>
+                            <div className="flex items-center gap-2">
+                                <span>Baris:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                                    className="h-8 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-2 outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
                         </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={() => setPage(Math.max(1, page - 1))} 
+                                    disabled={page <= 1}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                
+                                {/* Page Numbers */}
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum: number
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1
+                                    } else if (page <= 3) {
+                                        pageNum = i + 1
+                                    } else if (page >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i
+                                    } else {
+                                        pageNum = page - 2 + i
+                                    }
+                                    return (
+                                        <button 
+                                            key={pageNum} 
+                                            onClick={() => setPage(pageNum)}
+                                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors border ${
+                                                page === pageNum
+                                                    ? "bg-emerald-500 text-white shadow-sm border-emerald-500"
+                                                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    )
+                                })}
+
+                                <button 
+                                    onClick={() => setPage(Math.min(totalPages, page + 1))} 
+                                    disabled={page >= totalPages}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

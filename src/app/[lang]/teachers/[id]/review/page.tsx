@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useLocalizedRouter as useRouter } from "@/hooks/use-localized-router"
+import { LocalizedLink as Link } from "@/components/ui/localized-link"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -248,7 +249,7 @@ function FieldRow({ label, value, empty }: { label: string; value?: string | nul
 // ── GuruDetailContent ─────────────────────────────────────────────────────────
 function GuruDetailContent() {
     const params = useParams()
-    const id = Number(params?.id)
+    const id = params?.id as string
     const router = useRouter()
 
     const [loading, setLoading] = useState(true)
@@ -295,7 +296,7 @@ function GuruDetailContent() {
         setLoading(true)
 
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        const timeoutId = setTimeout(() => controller.abort(), 500)
 
         fetch(`${API_BASE_URL}/api/v1/Trainers/${id}`, { headers, signal: controller.signal })
             .then((res) => {

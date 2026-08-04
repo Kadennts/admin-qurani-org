@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,6 +13,7 @@ import {
     History, Banknote, AlertCircle
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 import { walletApi } from "@/lib/api"
 import {
     getSimWithdrawPending,
@@ -103,6 +105,7 @@ type ModalType = 'approve' | 'reject' | 'complete' | null;
 function WithdrawContent() {
     const { t, locale } = useTranslation(['billing', 'common'])
     const { profile } = useAuth()
+    const router = useRouter();
 
     const resolveTimezone = useCallback(() => {
         const isValid = (tz: string) => { try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date()); return true; } catch { return false; } }
@@ -129,15 +132,29 @@ function WithdrawContent() {
     const [activeSearch, setActiveSearch] = useState("");
     const [page, setPage] = useState(1);
     const [historyPage, setHistoryPage] = useState(1);
-    const PAGE_SIZE = 10;
+    const [pageSize, setPageSize] = useState(10);
+    const [historyPageSize, setHistoryPageSize] = useState(10);
 
     const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, completedCount: 0 });
 
+    // User wallet modal
+        
     // Modal
     const [actionModal, setActionModal] = useState<{ open: boolean; item: WithdrawItem | null; type: ModalType }>({ open: false, item: null, type: null });
     const [viewModal, setViewModal] = useState<{ open: boolean; item: WithdrawItem | null }>({ open: false, item: null });
     const [modalInput, setModalInput] = useState({ reason: "", extId: "", ref: "" });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (viewModal.open) setViewModal({ open: false, item: null });
+                if (actionModal.open) setActionModal({ open: false, item: null, type: null });
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [viewModal.open, actionModal.open]);
 
     // ── Fetch pending withdraws ───────────────────────────────────────────────
     const fetchPending = useCallback(async () => {
@@ -271,10 +288,10 @@ function WithdrawContent() {
         }
     };
 
-    const paged = withdraws.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const totalPages = Math.max(1, Math.ceil(withdraws.length / PAGE_SIZE));
-    const pagedHistory = history.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE);
-    const totalHistoryPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
+    const paged = withdraws.slice((page - 1) * pageSize, page * pageSize);
+    const totalPages = Math.max(1, Math.ceil(withdraws.length / pageSize));
+    const pagedHistory = history.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+    const totalHistoryPages = Math.max(1, Math.ceil(history.length / historyPageSize));
 
     const modalTitleMap: Record<string, string> = {
         approve: 'Setujui Withdraw',
@@ -328,31 +345,34 @@ function WithdrawContent() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 
                         {/* Tab Header */}
-                        <div className="flex items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-0">
-                            {[
-                                { key: 'pending' as const, label: 'Pending Withdraw', count: withdraws.filter(w => w.status === 'pending').length },
-                                { key: 'history' as const, label: 'Riwayat Withdraw' },
-                            ].map(tab => (
-                                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px ${activeTab === tab.key ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
-                                    {tab.label}
-                                    {tab.count !== undefined && tab.count > 0 && (
-                                        <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
-                                    )}
-                                </button>
-                            ))}
-
-                            {/* Search */}
-                            <div className="ml-auto py-2">
-                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-blue-500 transition-shadow">
-                                    <div className="relative bg-white dark:bg-gray-900">
+                        <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
+                            {/* Toolbar (Search) - Left Side */}
+                            <div className="py-2 w-full sm:w-auto flex flex-wrap items-center gap-2">
+                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-blue-500 transition-shadow w-full sm:w-auto">
+                                    <div className="relative bg-white dark:bg-gray-900 flex-1">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                                         <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleKeyDown}
                                             placeholder="Cari nama, bank..."
-                                            className="w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
+                                            className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
                                     </div>
                                     <button onClick={handleSearch} className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition-colors">Cari</button>
                                 </div>
+                            </div>
+
+                            {/* Tabs - Right Side */}
+                            <div className="flex items-center gap-0 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
+                                {[
+                                    { key: 'pending' as const, label: 'Pending Withdraw', count: withdraws.filter(w => w.status === 'pending').length },
+                                    { key: 'history' as const, label: 'Riwayat Withdraw' },
+                                ].map(tab => (
+                                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${activeTab === tab.key ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                                        {tab.label}
+                                        {tab.count !== undefined && tab.count > 0 && (
+                                            <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -372,7 +392,7 @@ function WithdrawContent() {
                                             {getWithdrawStatusBadge(w.status)}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-gray-900 dark:text-white text-sm">{w.user?.name || `User ID: ${w.userId}`}</p>
+                                            <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button>
                                             <p className="text-xs text-gray-500 mt-0.5">{w.bankName} • {w.accountNumber}</p>
                                             <p className="text-[10px] text-gray-400 uppercase mt-0.5">{w.accountName}</p>
                                         </div>
@@ -440,7 +460,7 @@ function WithdrawContent() {
                                                                 }
                                                             </div>
                                                             <div>
-                                                                <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{w.user?.name || `User ID: ${w.userId}`}</p>
+                                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
                                                                 {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
                                                             </div>
                                                         </div>
@@ -504,16 +524,14 @@ function WithdrawContent() {
                             </div>
 
                             {/* Pagination */}
-                            {!loading && withdraws.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                    <span className="text-xs text-gray-500 font-medium">Menampilkan {Math.min((page - 1) * PAGE_SIZE + 1, withdraws.length)}–{Math.min(page * PAGE_SIZE, withdraws.length)} dari {withdraws.length}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft className="w-4 h-4" /></button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{page} / {totalPages}</span>
-                                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={withdraws.length}
+                                page={page}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                                loading={loading}
+                            />
                         </>
                         )}
 
@@ -553,7 +571,7 @@ function WithdrawContent() {
                                                         <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800">#{w.id}</span>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <p className="font-bold text-gray-900 dark:text-white text-sm">{w.user?.name || `User ID: ${w.userId}`}</p>
+                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
                                                         {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
                                                     </td>
                                                     <td className="px-4 py-3 hidden md:table-cell">
@@ -602,7 +620,7 @@ function WithdrawContent() {
                                             {getWithdrawStatusBadge(w.status)}
                                         </div>
                                         <div className="text-xs text-gray-500 space-y-0.5">
-                                            <div className="font-medium text-gray-800 dark:text-gray-200">{w.user?.name || `User ID: ${w.userId}`}</div>
+                                            <div><button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button></div>
                                             <div>{w.bankName ? `${w.bankName} • ${w.accountNumber}` : '—'}</div>
                                             {w.notes && <div className="text-gray-400 italic text-[11px]">"{w.notes}"</div>}
                                         </div>
@@ -615,16 +633,14 @@ function WithdrawContent() {
                             </div>
 
                             {/* Pagination Riwayat */}
-                            {!historyLoading && history.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                    <span className="text-xs text-gray-500 font-medium">{history.length} total riwayat</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft className="w-4 h-4" /></button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{historyPage} / {totalHistoryPages}</span>
-                                        <button onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))} disabled={historyPage === totalHistoryPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={history.length}
+                                page={historyPage}
+                                pageSize={historyPageSize}
+                                onPageChange={setHistoryPage}
+                                onPageSizeChange={(s) => { setHistoryPageSize(s); setHistoryPage(1); }}
+                                loading={historyLoading}
+                            />
                         </>
                         )}
                     </div>
@@ -638,9 +654,9 @@ function WithdrawContent() {
                                     <button onClick={() => setViewModal({ open: false, item: null })} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan/Alasan Admin:</p>
-                                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
+                                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan/Alasan Admin:</p>
+                                        <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
                                     </div>
                                     <div className="flex justify-end pt-2">
                                         <button onClick={() => setViewModal({ open: false, item: null })} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl font-semibold transition-colors text-sm">Tutup</button>
@@ -740,6 +756,8 @@ function WithdrawContent() {
 
                 </div>
             </div>
+
+            
         </TooltipProvider>
     )
 }

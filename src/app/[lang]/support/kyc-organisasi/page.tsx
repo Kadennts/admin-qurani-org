@@ -745,47 +745,56 @@ function KycOrganisasiContent() {
 
 
             <div className="max-w-[1600px] mx-auto">
+                {/* ── Header ── */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">KYC Organisasi</h1>
+                    </div>
+                </div>
 
                 {/* ── Search + Filter Bar ── */}
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center w-[360px] h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
-                        <div className="relative flex-1 h-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Cari nama organisasi"
-                                value={searchInput}
-                                onChange={e => setSearchInput(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === "Enter") {
-                                        setSearch(searchInput)
-                                        setPage(1)
-                                    }
-                                }}
-                                className="w-full h-full pl-9 pr-4 text-sm focus:outline-none bg-transparent text-gray-900 dark:text-white placeholder:text-gray-400 border-none"
-                            />
+                <div className="flex flex-col sm:flex-row items-center justify-start gap-2 w-full xl:w-auto mb-3">
+                    {/* Left Side: Search + Filter */}
+                    <div className="flex flex-col sm:flex-row items-center justify-start gap-2 w-full sm:w-auto">
+                        {/* Search Bar Joined Format */}
+                        <div className="flex items-center w-full sm:w-auto order-2 sm:order-1">
+                            <div className="flex w-full sm:w-64 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama organisasi"
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter") {
+                                            setSearch(searchInput)
+                                            setPage(1)
+                                        }
+                                    }}
+                                    className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
+                                />
+                                <button
+                                    onClick={() => { setSearch(searchInput); setPage(1) }}
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
+                                >
+                                    <Search className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         </div>
                         <button
-                            onClick={() => { setSearch(searchInput); setPage(1) }}
-                            className="h-full px-5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                            onClick={() => setShowFilter(true)}
+                            className={`relative flex items-center justify-center w-full sm:w-auto gap-1.5 h-9 px-3 text-xs font-medium rounded-lg transition-colors border order-1 sm:order-2 ${activeFiltersCount > 0
+                                ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20"
+                                : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
+                                }`}
                         >
-                            <Search className="w-3.5 h-3.5" /> Cari
+                            <Filter className="w-4 h-4" /> Filter
+                            {activeFiltersCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">
+                                    {activeFiltersCount}
+                                </span>
+                            )}
                         </button>
                     </div>
-                    <button
-                        onClick={() => setShowFilter(true)}
-                        className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors border ${activeFiltersCount > 0
-                            ? "border-emerald-400 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
-                            : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                            }`}
-                    >
-                        <Filter className="w-4 h-4" /> Filter
-                        {activeFiltersCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">
-                                {activeFiltersCount}
-                            </span>
-                        )}
-                    </button>
                 </div>
 
                 {/* ── Tabs ── */}

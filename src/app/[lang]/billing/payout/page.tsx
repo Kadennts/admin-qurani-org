@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -13,6 +14,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 import { paymentsApi } from "@/lib/api"
 import {
     getSimPayoutPending,
@@ -132,6 +134,7 @@ const DUMMY_COMPLETED: PendingPayout[] = [
 function PayoutContent() {
     const { t, locale } = useTranslation(['billing', 'common'])
     const { profile } = useAuth()
+    const router = useRouter();
 
     const resolveTimezone = useCallback(() => {
         const isValidTimezone = (tz: string) => {
@@ -165,7 +168,8 @@ function PayoutContent() {
     const [activeSearch, setActiveSearch] = useState("");
     const [page, setPage] = useState(1);
     const [completedPage, setCompletedPage] = useState(1);
-    const PAGE_SIZE = 10;
+    const [pageSize, setPageSize] = useState(10);
+    const [completedPageSize, setCompletedPageSize] = useState(10);
 
     // Stats
     const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, completedCount: 0 });
@@ -181,6 +185,8 @@ function PayoutContent() {
     const [payoutNotes, setPayoutNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // User wallet modal
+        
     // ── Fetch Pending Payouts ────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -331,11 +337,11 @@ function PayoutContent() {
         }
     };
 
-    const totalPages = Math.max(1, Math.ceil(payouts.length / PAGE_SIZE));
-    const paged = payouts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(payouts.length / pageSize));
+    const paged = payouts.slice((page - 1) * pageSize, page * pageSize);
 
-    const totalCompletedPages = Math.max(1, Math.ceil(completedPayouts.length / PAGE_SIZE));
-    const pagedCompleted = completedPayouts.slice((completedPage - 1) * PAGE_SIZE, completedPage * PAGE_SIZE);
+    const totalCompletedPages = Math.max(1, Math.ceil(completedPayouts.length / completedPageSize));
+    const pagedCompleted = completedPayouts.slice((completedPage - 1) * completedPageSize, completedPage * completedPageSize);
 
     const toggleSelectAll = () => {
         if (selectedIds.length === paged.length) setSelectedIds([]);
@@ -397,51 +403,20 @@ function PayoutContent() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 
                         {/* Tab Header */}
-                        <div className="flex items-center border-b border-gray-100 dark:border-gray-700 px-4 pt-0 gap-0">
-                            {[
-                                { key: 'pending' as ActivePayoutTab, label: 'Pending Payout', count: payouts.length },
-                                { key: 'selesai' as ActivePayoutTab, label: 'Sudah Dibayar' },
-                            ].map(tab => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px ${
-                                        activeTab === tab.key
-                                            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                    }`}
-                                >
-                                    {tab.label}
-                                    {tab.count !== undefined && tab.count > 0 && (
-                                        <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">
-                                            {tab.count}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
-
-                            {/* Toolbar right side */}
-                            <div className="flex items-center gap-2 ml-auto py-2">
+                        <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
+                            {/* Toolbar (Search, Bulk Payout, Refresh) - Left Side */}
+                            <div className="py-2 w-full sm:w-auto flex flex-wrap items-center gap-2">
                                 {activeTab === 'pending' && (
                                     <>
-                                        {selectedIds.length > 0 && (
-                                            <button
-                                                onClick={() => setBulkPayoutModal(true)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors"
-                                            >
-                                                <CheckSquare className="w-3.5 h-3.5" />
-                                                Bulk Payout ({selectedIds.length})
-                                            </button>
-                                        )}
-                                        <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
-                                            <div className="relative bg-white dark:bg-gray-900">
+                                        <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow w-full sm:w-auto">
+                                            <div className="relative bg-white dark:bg-gray-900 flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                                                 <input
                                                     value={searchInput}
                                                     onChange={e => setSearchInput(e.target.value)}
                                                     onKeyDown={handleKeyDown}
                                                     placeholder="Cari nama guru, user..."
-                                                    className="w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                                    className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
                                                 />
                                             </div>
                                             <button
@@ -451,16 +426,50 @@ function PayoutContent() {
                                                 Cari
                                             </button>
                                         </div>
+                                        {selectedIds.length > 0 && (
+                                            <button
+                                                onClick={() => setBulkPayoutModal(true)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors w-full sm:w-auto justify-center"
+                                            >
+                                                <CheckSquare className="w-3.5 h-3.5" />
+                                                Bulk Payout ({selectedIds.length})
+                                            </button>
+                                        )}
                                     </>
                                 )}
                                 {activeTab === 'selesai' && (
                                     <button
                                         onClick={() => fetchCompleted()}
-                                        className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 transition-colors"
+                                        className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 transition-colors w-full sm:w-auto justify-center"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" /> Refresh
                                     </button>
                                 )}
+                            </div>
+
+                            {/* Tabs - Right Side */}
+                            <div className="flex items-center gap-0 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
+                                {[
+                                    { key: 'pending' as ActivePayoutTab, label: 'Pending Payout', count: payouts.length },
+                                    { key: 'selesai' as ActivePayoutTab, label: 'Sudah Dibayar' },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${
+                                            activeTab === tab.key
+                                                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                        {tab.count !== undefined && tab.count > 0 && (
+                                            <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">
+                                                {tab.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -497,7 +506,7 @@ function PayoutContent() {
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-500 space-y-1">
-                                        <div>User: <span className="font-medium text-gray-900 dark:text-white">{p.userName || `ID: ${p.userId}`}</span></div>
+                                        <div>User: <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
                                         <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName || `Trainer ID: ${p.trainerId}`}</span></div>
                                         <div>Metode: <span className="font-medium text-gray-900 dark:text-white">{p.paymentMethod || '—'}</span></div>
                                     </div>
@@ -563,7 +572,7 @@ function PayoutContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900 dark:text-white text-sm">{p.userName || `User ID: ${p.userId}`}</div>
+                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `User ID: ${p.userId}`}</button>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white text-sm">{p.trainerName || `Trainer ID: ${p.trainerId}`}</div>
@@ -613,26 +622,14 @@ function PayoutContent() {
                         </div>
 
                         {/* Pagination Pending */}
-                        {!loading && payouts.length > 0 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                    Menampilkan {Math.min((page - 1) * PAGE_SIZE + 1, payouts.length)}–{Math.min(page * PAGE_SIZE, payouts.length)} dari {payouts.length} data
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                        {page} / {totalPages}
-                                    </span>
-                                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        <SmartPagination
+                            total={payouts.length}
+                            page={page}
+                            pageSize={pageSize}
+                            onPageChange={setPage}
+                            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                            loading={loading}
+                        />
                         </>
                         )}
 
@@ -672,7 +669,9 @@ function PayoutContent() {
                                                     #{p.bookingId || p.id}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 font-medium text-sm text-gray-900 dark:text-white">{p.userName || `ID: ${p.userId}`}</td>
+                                            <td className="px-4 py-3 font-medium text-sm text-gray-900 dark:text-white">
+                                                <button onClick={(e) => { e.stopPropagation(); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `ID: ${p.userId}`}</button>
+                                            </td>
                                             <td className="px-4 py-3 font-medium text-sm text-gray-900 dark:text-white">{p.trainerName || `ID: ${p.trainerId}`}</td>
                                             <td className="px-4 py-3 text-right pr-8">
                                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
@@ -708,6 +707,7 @@ function PayoutContent() {
                                         {getPayoutStatusBadge(p.status)}
                                     </div>
                                     <div className="text-xs text-gray-500 space-y-1">
+                                        <div>User: <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
                                         <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName}</span></div>
                                         {p.payoutReference && <div>Ref: <span className="font-mono text-gray-700 dark:text-gray-300">{p.payoutReference}</span></div>}
                                     </div>
@@ -720,24 +720,14 @@ function PayoutContent() {
                         </div>
 
                         {/* Pagination Selesai */}
-                        {!completedLoading && completedPayouts.length > 0 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                <span className="text-xs text-gray-500 font-medium">{completedPayouts.length} data selesai</span>
-                                <div className="flex items-center gap-1.5">
-                                    <button onClick={() => setCompletedPage(p => Math.max(1, p - 1))} disabled={completedPage === 1}
-                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                        {completedPage} / {totalCompletedPages}
-                                    </span>
-                                    <button onClick={() => setCompletedPage(p => Math.min(totalCompletedPages, p + 1))} disabled={completedPage === totalCompletedPages}
-                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        <SmartPagination
+                            total={completedPayouts.length}
+                            page={completedPage}
+                            pageSize={completedPageSize}
+                            onPageChange={setCompletedPage}
+                            onPageSizeChange={(s) => { setCompletedPageSize(s); setCompletedPage(1); }}
+                            loading={completedLoading}
+                        />
                         </>
                         )}
                     </div>
@@ -891,6 +881,8 @@ function PayoutContent() {
 
                 </div>
             </div>
+
+            
         </TooltipProvider>
     )
 }

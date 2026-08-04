@@ -12,6 +12,7 @@ import {
     Check, X, Banknote, Receipt
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 import { paymentsApi } from "@/lib/api"
 import {
     getSimRefundPending,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { formatDistanceToNowStrict } from "date-fns"
 import { id, enUS } from "date-fns/locale"
+import { useRouter } from "next/navigation"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function formatRupiah(n: number) {
@@ -94,6 +96,7 @@ function getStatusBadge(status: string) {
 function RefundContent() {
     const { t, locale } = useTranslation(['billing', 'common'])
     const { profile } = useAuth()
+    const router = useRouter()
 
     const resolveTimezone = useCallback(() => {
         const isValidTimezone = (tz: string) => { try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date()); return true; } catch { return false; } }
@@ -120,15 +123,31 @@ function RefundContent() {
     const [activeSearch, setActiveSearch] = useState("");
     const [page, setPage] = useState(1);
     const [processedPage, setProcessedPage] = useState(1);
-    const PAGE_SIZE = 10;
+    const [pageSize, setPageSize] = useState(10);
+    const [processedPageSize, setProcessedPageSize] = useState(10);
 
     const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, processedCount: 0 });
+
+    // User wallet modal
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+    const [selectedUserName, setSelectedUserName] = useState<string>("");
 
     // Modal
     const [actionModal, setActionModal] = useState<{ open: boolean; item: RefundItem | null; type: 'approve' | 'reject' }>({ open: false, item: null, type: 'approve' });
     const [viewModal, setViewModal] = useState<{ open: boolean; item: RefundItem | null }>({ open: false, item: null });
     const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (viewModal.open) setViewModal({ open: false, item: null });
+                if (actionModal.open) setActionModal({ open: false, item: null, type: 'approve' });
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [viewModal.open, actionModal.open]);
 
     // ── Fetch pending refunds ─────────────────────────────────────────────────
     const fetchPending = useCallback(async () => {
@@ -150,12 +169,12 @@ function RefundContent() {
             }
 
             setPendingRefunds(items);
-            setStats(prev => ({ ...prev, pendingCount: items.length, pendingTotal: items.reduce((a, b) => a + (b.refundAmount ?? b.amount), 0) }));
+            setStats(prev => ({ ...prev, pendingCount: items.length, pendingTotal: items.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0) }));
         } catch {
             const fallback = getSimRefundPending();
             setPendingRefunds(fallback);
             setIsDemoMode(true);
-            setStats(prev => ({ ...prev, pendingCount: fallback.length, pendingTotal: fallback.reduce((a, b) => a + b.amount, 0) }));
+            setStats(prev => ({ ...prev, pendingCount: fallback.length, pendingTotal: fallback.reduce((a: number, b: any) => a + b.amount, 0) }));
         } finally {
             setLoading(false);
         }
@@ -229,7 +248,7 @@ function RefundContent() {
             setStats(prev => ({
                 ...prev,
                 pendingCount: newPending.length,
-                pendingTotal: newPending.reduce((a, b) => a + (b.refundAmount ?? b.amount), 0),
+                pendingTotal: newPending.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0),
                 processedCount: newProcessed.length,
             }));
 
@@ -244,10 +263,10 @@ function RefundContent() {
         }
     };
 
-    const paged = pendingRefunds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const totalPages = Math.max(1, Math.ceil(pendingRefunds.length / PAGE_SIZE));
-    const pagedProcessed = processedRefunds.slice((processedPage - 1) * PAGE_SIZE, processedPage * PAGE_SIZE);
-    const totalProcessedPages = Math.max(1, Math.ceil(processedRefunds.length / PAGE_SIZE));
+    const paged = pendingRefunds.slice((page - 1) * pageSize, page * pageSize);
+    const totalPages = Math.max(1, Math.ceil(pendingRefunds.length / pageSize));
+    const pagedProcessed = processedRefunds.slice((processedPage - 1) * processedPageSize, processedPage * processedPageSize);
+    const totalProcessedPages = Math.max(1, Math.ceil(processedRefunds.length / processedPageSize));
 
     return (
         <TooltipProvider>
@@ -295,31 +314,34 @@ function RefundContent() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 
                         {/* Tab Header */}
-                        <div className="flex items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-0">
-                            {[
-                                { key: 'pending' as const, label: 'Pending Refund', count: pendingRefunds.length },
-                                { key: 'processed' as const, label: 'Sudah Diproses' },
-                            ].map(tab => (
-                                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px ${activeTab === tab.key ? 'border-rose-500 text-rose-600 dark:text-rose-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
-                                    {tab.label}
-                                    {tab.count !== undefined && tab.count > 0 && (
-                                        <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
-                                    )}
-                                </button>
-                            ))}
-
-                            {/* Search */}
-                            <div className="ml-auto py-2">
-                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-rose-500 transition-shadow">
-                                    <div className="relative bg-white dark:bg-gray-900">
+                        <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
+                            {/* Toolbar (Search) - Left Side */}
+                            <div className="py-2 w-full sm:w-auto flex flex-wrap items-center gap-2">
+                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-rose-500 transition-shadow w-full sm:w-auto">
+                                    <div className="relative bg-white dark:bg-gray-900 flex-1">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                                         <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleKeyDown}
                                             placeholder="Cari nama, alasan..."
-                                            className="w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
+                                            className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
                                     </div>
                                     <button onClick={handleSearch} className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold transition-colors">Cari</button>
                                 </div>
+                            </div>
+
+                            {/* Tabs - Right Side */}
+                            <div className="flex items-center gap-0 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
+                                {[
+                                    { key: 'pending' as const, label: 'Pending Refund', count: pendingRefunds.length },
+                                    { key: 'processed' as const, label: 'Sudah Diproses' },
+                                ].map(tab => (
+                                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${activeTab === tab.key ? 'border-rose-500 text-rose-600 dark:text-rose-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                                        {tab.label}
+                                        {tab.count !== undefined && tab.count > 0 && (
+                                            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -339,7 +361,7 @@ function RefundContent() {
                                             {getStatusBadge(r.status)}
                                         </div>
                                         <div className="text-xs text-gray-500 space-y-1">
-                                            <div>User: <span className="font-medium text-gray-900 dark:text-white">{r.userName}</span></div>
+                                            <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-rose-600 dark:hover:text-rose-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
                                             <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
                                             {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
                                         </div>
@@ -388,7 +410,7 @@ function RefundContent() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">{r.userName || `ID: ${r.userId}`}</div>
+                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-rose-600 dark:hover:text-rose-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell">
                                                     <div className="font-medium text-gray-900 dark:text-white text-sm">{r.trainerName || `ID: ${r.trainerId}`}</div>
@@ -435,16 +457,14 @@ function RefundContent() {
                                 </table>
                             </div>
 
-                            {!loading && pendingRefunds.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                    <span className="text-xs text-gray-500 font-medium">Menampilkan {Math.min((page - 1) * PAGE_SIZE + 1, pendingRefunds.length)}–{Math.min(page * PAGE_SIZE, pendingRefunds.length)} dari {pendingRefunds.length}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{page} / {totalPages}</span>
-                                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={pendingRefunds.length}
+                                page={page}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                                loading={loading}
+                            />
                         </>
                         )}
 
@@ -472,7 +492,9 @@ function RefundContent() {
                                         ) : pagedProcessed.map(r => (
                                             <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
                                                 <td className="px-4 py-3"><span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-800">#{r.bookingId || r.id}</span></td>
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{r.userName || `ID: ${r.userId}`}</td>
+                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="hover:text-rose-600 dark:hover:text-rose-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
+                                                </td>
                                                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hidden md:table-cell">{r.trainerName || '—'}</td>
                                                 <td className="px-4 py-3 text-right pr-8 font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</td>
                                                 <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 hidden lg:table-cell">{formatDate(r.updatedAt || r.createdAt, 'relative', tz, locale)}</td>
@@ -491,16 +513,14 @@ function RefundContent() {
                                     </tbody>
                                 </table>
                             </div>
-                            {!processedLoading && processedRefunds.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                                    <span className="text-xs text-gray-500 font-medium">{processedRefunds.length} data diproses</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setProcessedPage(p => Math.max(1, p - 1))} disabled={processedPage === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{processedPage} / {totalProcessedPages}</span>
-                                        <button onClick={() => setProcessedPage(p => Math.min(totalProcessedPages, p + 1))} disabled={processedPage === totalProcessedPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={processedRefunds.length}
+                                page={processedPage}
+                                pageSize={processedPageSize}
+                                onPageChange={setProcessedPage}
+                                onPageSizeChange={(s) => { setProcessedPageSize(s); setProcessedPage(1); }}
+                                loading={processedLoading}
+                            />
                         </>
                         )}
                     </div>
@@ -514,9 +534,9 @@ function RefundContent() {
                                     <button onClick={() => setViewModal({ open: false, item: null })} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan/Alasan Admin:</p>
-                                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
+                                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan/Alasan Admin:</p>
+                                        <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
                                     </div>
                                     <div className="flex justify-end pt-2">
                                         <button onClick={() => setViewModal({ open: false, item: null })} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl font-semibold transition-colors text-sm">Tutup</button>
@@ -585,6 +605,7 @@ function RefundContent() {
                     )}
                 </div>
             </div>
+
         </TooltipProvider>
     )
 }

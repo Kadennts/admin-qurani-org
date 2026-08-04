@@ -254,11 +254,12 @@ function HistoryPageContent() {
                 <div className="flex items-center gap-2 min-w-0">
                     <span className="font-mono text-[10px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 shrink-0">#{item.id}</span>
                     <div className="min-w-0">
-                        <div
-                            className="font-bold text-gray-900 dark:text-white text-sm text-left"
+                        <button
+                            onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${item.userId}/wallet`); }}
+                            className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left"
                         >
                             {item.user?.name || `User ID: ${item.userId}`}
-                        </div>
+                        </button>
                         {item.user?.username && (
                             <p className="text-[10px] text-gray-400">@{item.user.username}</p>
                         )}
@@ -292,18 +293,32 @@ function HistoryPageContent() {
                 {/* ── Header ── */}
                 <div className="flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Transaksi</h1>
-                    <button onClick={() => fetchTransactions(txPage, activeSearch, activeFilters)} className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors border border-emerald-200 dark:border-emerald-800">
-                        <RefreshCw className="w-3.5 h-3.5" /> Refresh
-                    </button>
                 </div>
 
                 {/* ── Main Content ── */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
                     
                     {/* Toolbar */}
-                    <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-end items-center gap-3">
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        {/* Kiri: Search & Filter */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1 flex-1">
                             
+                            <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                                <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        value={searchInput}
+                                        onChange={e => setSearchInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Cari user, ref..."
+                                        className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                    />
+                                </div>
+                                <button onClick={handleSearch} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors">
+                                    Cari
+                                </button>
+                            </div>
+
                             <button 
                                 onClick={() => setIsFilterOpen(true)}
                                 className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -417,22 +432,13 @@ function HistoryPageContent() {
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
-
-                            <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
-                                <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        value={searchInput}
-                                        onChange={e => setSearchInput(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        placeholder="Cari user, ref..."
-                                        className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
-                                    />
-                                </div>
-                                <button onClick={handleSearch} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors">
-                                    Cari
-                                </button>
-                            </div>
+                        </div>
+                        
+                        {/* Kanan: Refresh dll */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
+                            <button onClick={() => fetchTransactions(txPage, activeSearch, activeFilters)} className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors border border-emerald-200 dark:border-emerald-800">
+                                <RefreshCw className="w-4 h-4" /> Refresh
+                            </button>
                         </div>
                     </div>
 
@@ -587,7 +593,6 @@ function HistoryPageContent() {
                         </div>
                     )}
                 </div>
-
             </div>
         </div>
     );

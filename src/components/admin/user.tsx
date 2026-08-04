@@ -1060,23 +1060,6 @@ export default function Users() {
                                                     >
                                                         <Shield className="w-4 h-4" />
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleManageWallet(user)}
-                                                        title="Limit Wallet"
-                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                                                    >
-                                                        <Wallet className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleEdit(getUserId(user))}
-                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>

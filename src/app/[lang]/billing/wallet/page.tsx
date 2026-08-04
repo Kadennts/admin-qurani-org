@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -45,6 +46,7 @@ import { walletApi } from "@/lib/api"
 import { formatTooltipDate } from "@/lib/date-utils"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import DUMMY_DATA from "@/data/dummy-wallet.json"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 import { 
     getSimPendingTopups, 
     getSimTopupHistory, 
@@ -177,17 +179,20 @@ function getStatusBadge(status: string | undefined) {
 
 function WalletPageContent() {
     const { t } = useI18n();
+    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [topups, setTopups] = useState<PendingTopup[]>([]);
     const [activeTab, setActiveTab] = useState<ActiveTab>('pending_topup');
     const [page, setPage] = useState(1);
-    const PAGE_SIZE = 10;
+    const [pageSize, setPageSize] = useState(10);
 
     // Search states
     const [searchInput, setSearchInput] = useState("");
     const [activeSearch, setActiveSearch] = useState("");
 
+    // User wallet modal state
+        
     // Modal states
     const [actionModal, setActionModal] = useState<{
         isOpen: boolean;
@@ -205,6 +210,17 @@ function WalletPageContent() {
         amount: number;
     }>({ isOpen: false, reason: "", userName: "", amount: 0 });
 
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (rejectionModal.isOpen) setRejectionModal(prev => ({ ...prev, isOpen: false }));
+                if (actionModal.isOpen) setActionModal({ isOpen: false, type: null, item: null });
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [rejectionModal.isOpen, actionModal.isOpen]);
+
     // Track if currently showing demo/dummy data
     const [isDemoMode, setIsDemoMode] = useState(false);
 
@@ -215,7 +231,7 @@ function WalletPageContent() {
     const [topupError, setTopupError] = useState<string | null>(null);
     const [topupPage, setTopupPage] = useState(1);
     const [topupTotalPages, setTopupTotalPages] = useState(1);
-    const TOPUP_PAGE_SIZE = 10;
+    const [topupPageSize, setTopupPageSize] = useState(10);
 
     // ── Fetch pending topups (Tab 1) ─────────────────────────────────────────
     const fetchData = useCallback(async () => {
@@ -271,22 +287,22 @@ function WalletPageContent() {
 
 
     // ── Fetch Riwayat Topup (Tab 3) ──────────────────────────────────────────
-    const fetchTopupHistory = useCallback(async (page: number) => {
+    const fetchTopupHistory = useCallback(async (page: number, size?: number) => {
         setTopupLoading(true);
         setTopupError(null);
         try {
-            const res = await walletApi.getTopupHistory({ page, pageSize: TOPUP_PAGE_SIZE });
+            const res = await walletApi.getTopupHistory({ page, pageSize: size ?? topupPageSize });
             const data = res?.data || res;
             const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
             const total = data?.totalPages || data?.totalCount
-                ? Math.ceil((data.totalCount || items.length) / TOPUP_PAGE_SIZE)
-                : Math.max(1, Math.ceil(items.length / TOPUP_PAGE_SIZE));
+                ? Math.ceil((data.totalCount || items.length) / (size ?? topupPageSize))
+                : Math.max(1, Math.ceil(items.length / (size ?? topupPageSize)));
 
             // Fallback ke dummy data jika API kosong
             if (items.length === 0) {
                 const dummyItems = getSimTopupHistory();
                 setTopupHistory(dummyItems);
-                setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / TOPUP_PAGE_SIZE)));
+                setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / (size ?? topupPageSize))));
             } else {
                 setTopupHistory(items);
                 setTopupTotalPages(total);
@@ -296,7 +312,7 @@ function WalletPageContent() {
             // Fallback ke dummy data saat error
             const dummyItems = getSimTopupHistory();
             setTopupHistory(dummyItems);
-            setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / TOPUP_PAGE_SIZE)));
+            setTopupTotalPages(Math.max(1, Math.ceil(dummyItems.length / (size ?? topupPageSize))));
             setTopupError(null); // hilangkan pesan error karena ada dummy
         } finally {
             setTopupLoading(false);
@@ -420,26 +436,17 @@ function WalletPageContent() {
             <div className="max-w-[1400px] mx-auto space-y-8">
 
                 {/* ── Header ── */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallet</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Wallet className="w-6 h-6 text-emerald-500" />
+                            Wallet
+                        </h1>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setActiveTab(activeTab === 'pending_topup' ? 'riwayat_topup' : 'pending_topup')}
-                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
-                        >
-                            {activeTab === 'pending_topup' ? (
-                                <>
-                                    <History className="w-4 h-4 text-gray-500" />
-                                    <span>Lihat Riwayat Topup</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Clock className="w-4 h-4 text-gray-500" />
-                                    <span>Lihat Antrean Pending</span>
-                                </>
-                            )}
+                        <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
+                            <RefreshCw className="w-4 h-4 text-gray-500" />
+                            Refresh
                         </button>
                     </div>
                 </div>
@@ -469,50 +476,41 @@ function WalletPageContent() {
                 </div>
 
                 {/* ── Tab Section ── */}
-                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
 
                     {/* Tab Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-end border-b border-gray-100 dark:border-gray-800 px-4 pt-3 pb-3 gap-4 min-h-[64px]">
-
-                        {/* Search (only for pending topup tab) */}
-                        {activeTab === 'pending_topup' && (
-                            <div className="relative group flex items-center">
-                                <input
-                                    type="text"
-                                    placeholder="Cari nama, metode pembayaran..."
-                                    value={searchInput}
-                                    onChange={(e) => setSearchInput(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className="pl-9 pr-4 py-1.5 w-full md:w-56 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-l-lg focus:outline-none focus:border-emerald-500 transition-colors shadow-sm"
-                                />
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                    <Search className="w-3.5 h-3.5 text-gray-400" />
+                    <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
+                        {/* Search (Kiri) */}
+                        <div className="py-2 w-full sm:w-auto">
+                            <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                                <div className="relative bg-white dark:bg-gray-900 flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                    <input value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={handleKeyDown}
+                                        placeholder="Cari nama, metode..."
+                                        className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
                                 </div>
-                                <button
-                                    onClick={handleSearch}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 rounded-r-lg transition-colors text-sm font-medium shadow-sm"
-                                >
-                                    Cari
-                                </button>
+                                <button onClick={handleSearch} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors">Cari</button>
                             </div>
-                        )}
+                        </div>
 
-                        {activeTab === 'riwayat_topup' && (
-                            <div className="flex items-center justify-end">
-                                <button 
-                                    onClick={() => fetchTopupHistory(topupPage)} 
-                                    className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 transition-colors"
-                                >
-                                    <RefreshCw className="w-3.5 h-3.5" /> Refresh Data
+                        {/* Tabs (Kanan) */}
+                        <div className="flex items-center gap-0 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
+                            {TABS.map(tab => (
+                                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${activeTab === tab.key ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                                    {tab.label}
+                                    {tab.count !== undefined && tab.count > 0 && (
+                                        <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
+                                    )}
                                 </button>
-                            </div>
-                        )}
+                            ))}
+                        </div>
                     </div>
 
                     {/* ══════════════ TAB 1: PENDING TOPUP ══════════════ */}
                     {activeTab === 'pending_topup' && (() => {
-                        const totalPages = Math.max(1, Math.ceil(topups.length / PAGE_SIZE));
-                        const pagedTopups = topups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+                        const totalPages = Math.max(1, Math.ceil(topups.length / pageSize));
+                        const pagedTopups = topups.slice((page - 1) * pageSize, page * pageSize);
                         return (
                         <>
                             {/* MOBILE CARD VIEW (<640px) */}
@@ -556,7 +554,7 @@ function WalletPageContent() {
                                                 </DropdownMenu>
                                             </div>
                                             <div>
-                                                <div className="font-bold text-gray-900 dark:text-white text-sm">{item.user?.name || `User ID: ${item.userId}`}</div>
+                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
                                                 <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-[11px] font-medium text-gray-700 dark:text-gray-300">
                                                     <CreditCard className="w-3 h-3" />
                                                     {item.paymentMethod || 'Transfer/Payment Gateway'}
@@ -632,7 +630,7 @@ function WalletPageContent() {
                                                         ); })()}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-gray-900 dark:text-white text-sm">{item.user?.name || `User ID: ${item.userId}`}</div>
+                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
                                                         {userUsername && <div className="text-[11px] text-gray-400 mt-0.5">{userUsername}</div>}
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -678,24 +676,14 @@ function WalletPageContent() {
                             </div>
 
                             {/* Pagination Pending Topup */}
-                            {!loading && topups.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                        Menampilkan {Math.min((page - 1) * PAGE_SIZE + 1, topups.length)}–{Math.min(page * PAGE_SIZE, topups.length)} dari {topups.length} data
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{page} / {totalPages}</span>
-                                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={topups.length}
+                                page={page}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                                loading={loading}
+                            />
                         </>
                         );
                     })()}
@@ -732,7 +720,7 @@ function WalletPageContent() {
                                             <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">#{item.id}</span>
                                             {getStatusBadge(item.status)}
                                         </div>
-                                        <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{item.user?.name || `User ID: ${item.userId}`}</div>
+                                        <button onClick={(e) => { e.stopPropagation(); }} className="text-sm font-semibold text-gray-800 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
                                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
                                             <CreditCard className="w-3 h-3" />{item.paymentMethod || '—'}
                                         </div>
@@ -787,7 +775,7 @@ function WalletPageContent() {
                                                 <p>Belum ada riwayat topup</p>
                                             </td></tr>
                                         )}
-                                        {!topupLoading && topupHistory.slice((topupPage - 1) * TOPUP_PAGE_SIZE, topupPage * TOPUP_PAGE_SIZE).map(item => {
+                                        {!topupLoading && topupHistory.slice((topupPage - 1) * topupPageSize, topupPage * topupPageSize).map(item => {
                                             const userUsername = item.user?.username
                                                 ? `@${item.user.username}`
                                                 : item.user?.email
@@ -808,7 +796,7 @@ function WalletPageContent() {
                                                         ) : '—'}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-gray-900 dark:text-white text-sm">{item.user?.name || `User ID: ${item.userId}`}</div>
+                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
                                                         {userUsername && <div className="text-[11px] text-gray-400 mt-0.5">{userUsername}</div>}
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -843,24 +831,14 @@ function WalletPageContent() {
                             </div>
 
                             {/* Pagination Topup History */}
-                            {!topupLoading && topupHistory.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                        Menampilkan {Math.min((topupPage - 1) * TOPUP_PAGE_SIZE + 1, topupHistory.length)}–{Math.min(topupPage * TOPUP_PAGE_SIZE, topupHistory.length)} dari {topupHistory.length} data
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button onClick={() => setTopupPage(p => Math.max(1, p - 1))} disabled={topupPage === 1}
-                                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </button>
-                                        <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">{topupPage} / {topupTotalPages}</span>
-                                        <button onClick={() => setTopupPage(p => Math.min(topupTotalPages, p + 1))} disabled={topupPage === topupTotalPages}
-                                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <SmartPagination
+                                total={topupHistory.length}
+                                page={topupPage}
+                                pageSize={topupPageSize}
+                                onPageChange={setTopupPage}
+                                onPageSizeChange={(s) => { setTopupPageSize(s); setTopupPage(1); }}
+                                loading={topupLoading}
+                            />
                         </>
                     )}
 
@@ -930,36 +908,24 @@ function WalletPageContent() {
                     </div>
                 )}
 
+                
+
                 {/* ── Rejection Reason Modal ── */}
                 {rejectionModal.isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))}>
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                            <div className="p-6 border-b border-gray-100 dark:border-gray-800">
-                                <div className="flex items-center gap-3 mb-1">
-                                    <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                                        <XCircle className="w-5 h-5 text-red-500" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-base font-bold text-gray-900 dark:text-white">Alasan Penolakan Topup</h3>
-                                        <p className="text-xs text-gray-400 mt-0.5">
-                                            {rejectionModal.userName} · {formatCurrency(rejectionModal.amount)}
-                                        </p>
-                                    </div>
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Alasan Penolakan Topup</h3>
+                                <button onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
                             </div>
-                            <div className="p-6">
-                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/60 rounded-xl p-4">
-                                    <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed">{rejectionModal.reason}</p>
+                            <div className="p-6 space-y-4">
+                                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan/Alasan Admin:</p>
+                                    <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{rejectionModal.reason || 'Tidak ada catatan.'}</p>
                                 </div>
-                                <p className="text-xs text-gray-400 mt-3 text-center">Hubungi pengguna jika diperlukan untuk informasi lebih lanjut.</p>
-                            </div>
-                            <div className="px-6 pb-6 flex justify-end">
-                                <button
-                                    onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))}
-                                    className="px-5 py-2 text-sm font-semibold bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl hover:opacity-80 transition-opacity"
-                                >
-                                    Tutup
-                                </button>
+                                <div className="flex justify-end pt-2">
+                                    <button onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl font-semibold transition-colors text-sm">Tutup</button>
+                                </div>
                             </div>
                         </div>
                     </div>

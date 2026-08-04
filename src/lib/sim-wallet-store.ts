@@ -4,124 +4,295 @@ const PENDING_TOPUPS_KEY = "qurani_sim_pending_topups"
 const TOPUP_HISTORY_KEY = "qurani_sim_topup_history"
 const TRANSACTIONS_KEY = "qurani_sim_transactions_v2"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
+const WALLETS_KEY = "qurani_sim_wallets_v2"
 
 const DUMMY_TRANSACTIONS = [
+    // --- 5 PENDING TRANSACTIONS ---
     {
-        id: 101,
-        userId: 1,
-        user: { name: "Budi Santoso", email: "budi@example.com", username: "budisan" },
+        id: "1785723001901",
+        userId: 101,
+        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         type: 1,
         typeName: "TopUp",
-        description: "Top up via Bank BCA",
-        amount: 500000,
-        balanceBefore: 100000,
-        balanceAfter: 600000,
-        status: "completed",
-        paymentMethod: "Bank BCA",
-        referenceId: "TXN-TOPUP-001",
+        description: "Top up via VA Mandiri",
+        amount: 300000,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        status: "pending",
+        paymentMethod: "VA Mandiri",
+        referenceId: "TXN-P-001",
         createdAt: new Date(Date.now() - 3600000).toISOString()
     },
     {
-        id: 102,
-        userId: 2,
-        user: { name: "Siti Aminah", email: "siti@example.com", username: "siti_a" },
-        type: 4,
-        typeName: "Payment",
-        description: "Pembayaran kelas privat",
-        amount: -150000,
-        balanceBefore: 400000,
-        balanceAfter: 250000,
-        status: "completed",
-        paymentMethod: "Qurani Wallet",
-        referenceId: "TXN-PAY-002",
-        createdAt: new Date(Date.now() - 7200000).toISOString()
-    },
-    {
-        id: 103,
-        userId: 1,
-        user: { name: "Budi Santoso", email: "budi@example.com", username: "budisan" },
-        type: 2,
-        typeName: "Withdraw",
-        description: "Penarikan ke Bank Mandiri",
-        amount: 200000,
-        balanceBefore: 250000,
-        balanceAfter: 50000,
-        status: "pending",
-        paymentMethod: "Bank Mandiri",
-        referenceId: "TXN-WD-003",
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-    },
-    {
-        id: 104,
-        userId: 3,
-        user: { name: "Ahmad Fulan", email: "ahmad@example.com", username: "ahmadf" },
-        type: 1,
-        typeName: "TopUp",
-        description: "Top up via Virtual Account BNI",
-        amount: 1000000,
-        balanceBefore: 0,
-        balanceAfter: 1000000,
-        status: "completed",
-        paymentMethod: "Bank BNI",
-        referenceId: "TXN-TOPUP-004",
-        createdAt: new Date(Date.now() - 172800000).toISOString()
-    },
-    {
-        id: 105,
-        userId: 4,
-        user: { name: "Dewi Lestari", email: "dewi@example.com", username: "dewil" },
-        type: 4,
-        typeName: "Payment",
-        description: "Pembayaran paket bulanan",
-        amount: -350000,
-        balanceBefore: 500000,
-        balanceAfter: 150000,
-        status: "rejected",
-        paymentMethod: "Qurani Wallet",
-        referenceId: "TXN-PAY-005",
-        createdAt: new Date(Date.now() - 259200000).toISOString()
-    },
-    {
-        id: 106,
-        userId: 5,
-        user: { name: "Eko Prasetyo", email: "eko@example.com", username: "ekop" },
+        id: "1785723001902",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         type: 2,
         typeName: "Withdraw",
         description: "Penarikan ke Bank BCA",
-        amount: 1500000,
-        balanceBefore: 2000000,
+        amount: -150000,
+        balanceBefore: 450000,
+        balanceAfter: 450000,
+        status: "pending",
+        paymentMethod: "Bank BCA",
+        referenceId: "TXN-P-002",
+        createdAt: new Date(Date.now() - 7200000).toISOString()
+    },
+    {
+        id: "1785723001903",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pembayaran kelas",
+        amount: -250000,
+        balanceBefore: 500000,
         balanceAfter: 500000,
+        status: "waiting",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-P-003",
+        createdAt: new Date(Date.now() - 86400000).toISOString()
+    },
+    {
+        id: "1785723001904",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        type: 5,
+        typeName: "Refund",
+        description: "Refund kelas dibatalkan",
+        amount: 200000,
+        balanceBefore: 100000,
+        balanceAfter: 100000,
+        status: "pending",
+        paymentMethod: "GoPay",
+        referenceId: "TXN-P-004",
+        createdAt: new Date(Date.now() - 172800000).toISOString()
+    },
+    {
+        id: "1785723001905",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via Bank BNI",
+        amount: 500000,
+        balanceBefore: 50000,
+        balanceAfter: 50000,
+        status: "pending",
+        paymentMethod: "Bank BNI",
+        referenceId: "TXN-P-005",
+        createdAt: new Date(Date.now() - 259200000).toISOString()
+    },
+    
+    // --- 5 HISTORY TRANSACTIONS ---
+    {
+        id: "1785723001906",
+        userId: 101,
+        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via VA Mandiri",
+        amount: 300000,
+        balanceBefore: 0,
+        balanceAfter: 300000,
         status: "completed",
-        paymentMethod: "Bank BRI",
-        referenceId: "TXN-WD-006",
+        paymentMethod: "VA Mandiri",
+        referenceId: "TXN-H-101",
         createdAt: new Date(Date.now() - 345600000).toISOString()
     },
     {
-        id: 107,
-        userId: 6,
-        user: { name: "Farida Hanum", email: "farida@example.com", username: "faridah" },
-        type: 1,
-        typeName: "TopUp",
-        description: "Top up via GoPay",
-        amount: 300000,
-        balanceBefore: 50000,
-        balanceAfter: 350000,
+        id: "1785723001907",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pembayaran kelas",
+        amount: -150000,
+        balanceBefore: 600000,
+        balanceAfter: 450000,
         status: "completed",
-        paymentMethod: "GoPay",
-        referenceId: "TXN-TOPUP-007",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-H-102",
         createdAt: new Date(Date.now() - 432000000).toISOString()
+    },
+    {
+        id: "1785723001908",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke Bank BNI",
+        amount: -250000,
+        balanceBefore: 750000,
+        balanceAfter: 500000,
+        status: "completed",
+        paymentMethod: "Bank BNI",
+        referenceId: "TXN-H-103",
+        createdAt: new Date(Date.now() - 518400000).toISOString()
+    },
+    {
+        id: "1785723001909",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        type: 5,
+        typeName: "Refund",
+        description: "Refund ke Bank Transfer",
+        amount: 200000,
+        balanceBefore: 100000,
+        balanceAfter: 300000,
+        status: "completed",
+        paymentMethod: "Bank Transfer",
+        referenceId: "TXN-H-104",
+        createdAt: new Date(Date.now() - 604800000).toISOString()
+    },
+    {
+        id: "1785723001910",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pembayaran kelas batal",
+        amount: -175000,
+        balanceBefore: 50000,
+        balanceAfter: 50000,
+        status: "rejected",
+        paymentMethod: "OVO",
+        referenceId: "TXN-H-105",
+        createdAt: new Date(Date.now() - 691200000).toISOString()
     }
 ];
 
-export function initSimWalletStore() {
+const DUMMY_PENDING_TOPUPS = [
+    {
+        id: "1785723002001",
+        userId: 101,
+        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
+        amount: 300000,
+        status: "PENDING",
+        paymentMethod: "VA Mandiri",
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+        externalReference: null
+    },
+    {
+        id: "1785723002002",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
+        amount: 200000,
+        status: "PENDING",
+        paymentMethod: "BCA Virtual Account",
+        createdAt: new Date(Date.now() - 7200000).toISOString(),
+        externalReference: null
+    },
+    {
+        id: "1785723002003",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        amount: 250000,
+        status: "PENDING",
+        paymentMethod: "Bank Transfer",
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+        externalReference: null
+    },
+    {
+        id: "1785723002004",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        amount: 150000,
+        status: "PENDING",
+        paymentMethod: "GoPay",
+        createdAt: new Date(Date.now() - 172800000).toISOString(),
+        externalReference: null
+    },
+    {
+        id: "1785723002005",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        amount: 500000,
+        status: "PENDING",
+        paymentMethod: "Bank BNI",
+        createdAt: new Date(Date.now() - 259200000).toISOString(),
+        externalReference: null
+    }
+];
+
+const DUMMY_TOPUP_HISTORY = [
+    {
+        id: "1785723002101",
+        userId: 101,
+        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
+        amount: 300000,
+        status: "COMPLETED",
+        paymentMethod: "VA Mandiri",
+        createdAt: new Date(Date.now() - 345600000).toISOString(),
+        completedAt: new Date(Date.now() - 345500000).toISOString(),
+        externalReference: "EXT-TOP-001",
+        rejectionReason: null
+    },
+    {
+        id: "1785723002102",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
+        amount: 200000,
+        status: "COMPLETED",
+        paymentMethod: "BCA Virtual Account",
+        createdAt: new Date(Date.now() - 432000000).toISOString(),
+        completedAt: new Date(Date.now() - 431000000).toISOString(),
+        externalReference: "EXT-TOP-002",
+        rejectionReason: null
+    },
+    {
+        id: "1785723002103",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        amount: 250000,
+        status: "REJECTED",
+        paymentMethod: "Bank Transfer",
+        createdAt: new Date(Date.now() - 518400000).toISOString(),
+        completedAt: new Date(Date.now() - 518000000).toISOString(),
+        externalReference: null,
+        rejectionReason: "Data tidak valid"
+    },
+    {
+        id: "1785723002104",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        amount: 150000,
+        status: "COMPLETED",
+        paymentMethod: "GoPay",
+        createdAt: new Date(Date.now() - 604800000).toISOString(),
+        completedAt: new Date(Date.now() - 604000000).toISOString(),
+        externalReference: "EXT-TOP-004",
+        rejectionReason: null
+    },
+    {
+        id: "1785723002105",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        amount: 500000,
+        status: "COMPLETED",
+        paymentMethod: "Bank BNI",
+        createdAt: new Date(Date.now() - 691200000).toISOString(),
+        completedAt: new Date(Date.now() - 691000000).toISOString(),
+        externalReference: "EXT-TOP-005",
+        rejectionReason: null
+    }
+];
+
+export function initSimWalletStore(forceReset = false) {
     if (typeof window === "undefined") return;
 
+    if (forceReset) {
+        localStorage.removeItem(PENDING_TOPUPS_KEY);
+        localStorage.removeItem(TOPUP_HISTORY_KEY);
+        localStorage.removeItem(TRANSACTIONS_KEY);
+    }
+
     if (!localStorage.getItem(PENDING_TOPUPS_KEY)) {
-        localStorage.setItem(PENDING_TOPUPS_KEY, JSON.stringify(DUMMY_DATA.pendingTopups || []));
+        localStorage.setItem(PENDING_TOPUPS_KEY, JSON.stringify(DUMMY_PENDING_TOPUPS));
     }
     
     if (!localStorage.getItem(TOPUP_HISTORY_KEY)) {
-        localStorage.setItem(TOPUP_HISTORY_KEY, JSON.stringify(DUMMY_DATA.topupHistory || []));
+        localStorage.setItem(TOPUP_HISTORY_KEY, JSON.stringify(DUMMY_TOPUP_HISTORY));
     }
     
     if (!localStorage.getItem(TRANSACTIONS_KEY)) {
@@ -130,6 +301,10 @@ export function initSimWalletStore() {
 
     if (!localStorage.getItem(WALLET_STATS_KEY)) {
         localStorage.setItem(WALLET_STATS_KEY, JSON.stringify(DUMMY_DATA.statistics || {}));
+    }
+    
+    if (!localStorage.getItem(WALLETS_KEY)) {
+        localStorage.setItem(WALLETS_KEY, JSON.stringify({}));
     }
 }
 
@@ -247,4 +422,74 @@ export function rejectSimTopup(id: number | string, reason?: string): void {
     localStorage.setItem(PENDING_TOPUPS_KEY, JSON.stringify(pending));
     localStorage.setItem(TOPUP_HISTORY_KEY, JSON.stringify(history));
     localStorage.setItem(WALLET_STATS_KEY, JSON.stringify(stats));
+}
+
+export function getSimWallet(userId: string | number): any {
+    if (typeof window === "undefined") return {};
+    try {
+        initSimWalletStore();
+        const wallets = JSON.parse(localStorage.getItem(WALLETS_KEY) || "{}");
+        if (!wallets[userId]) {
+            wallets[userId] = {
+                id: `W-MOCK-${userId.toString().slice(0, 6)}`,
+                status: "active",
+                limits: {
+                    dailyTopupLimit: 10000000,
+                    dailyWithdrawLimit: 5000000,
+                    dailyTransferLimit: 5000000,
+                    minWithdrawAmount: 50000,
+                    maxBalance: 100000000
+                },
+                suspendReason: null,
+                createdAt: new Date().toISOString()
+            };
+            localStorage.setItem(WALLETS_KEY, JSON.stringify(wallets));
+        }
+        return wallets[userId];
+    } catch { return {}; }
+}
+
+export function updateSimWallet(userId: string | number, updates: any): any {
+    if (typeof window === "undefined") return {};
+    try {
+        const wallets = JSON.parse(localStorage.getItem(WALLETS_KEY) || "{}");
+        if (!wallets[userId]) {
+            wallets[userId] = { 
+                id: `W-MOCK-${userId.toString().slice(0, 6)}`, 
+                status: "active", 
+                limits: {
+                    dailyTopupLimit: 10000000,
+                    dailyWithdrawLimit: 5000000,
+                    dailyTransferLimit: 5000000,
+                    minWithdrawAmount: 50000,
+                    maxBalance: 100000000
+                },
+                suspendReason: null
+            };
+        }
+        wallets[userId] = { ...wallets[userId], ...updates };
+        localStorage.setItem(WALLETS_KEY, JSON.stringify(wallets));
+        return wallets[userId];
+    } catch { return {}; }
+}
+
+export function getSimWalletBalances(userId: string | number) {
+    const txs = getSimTransactions().filter((tx: any) => String(tx.userId) === String(userId));
+    
+    let activeBalance = 0;
+    let pendingBalance = 0;
+
+    for (const tx of txs) {
+        if (tx.status === 'completed') {
+            activeBalance += tx.amount;
+        } else if (tx.status === 'pending' || tx.status === 'waiting') {
+            pendingBalance += Math.abs(tx.amount); // Treat pending amounts as positive pending balance
+        }
+    }
+
+    return { 
+        balance: activeBalance, 
+        activeBalance, 
+        pendingBalance 
+    };
 }

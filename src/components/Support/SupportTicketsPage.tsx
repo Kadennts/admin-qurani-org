@@ -632,6 +632,11 @@ export default function SupportTicketsPage() {
         </div>
       )}
 
+      {/* --- PAGE TITLE --- */}
+      <div className="mb-4">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Support Tickets</h1>
+      </div>
+
       {/* --- HEADER --- */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-1">
         {/* Scrollable Tabs */}
@@ -692,7 +697,6 @@ export default function SupportTicketsPage() {
 
       {/* --- TOOLBAR SECTION --- */}
       <div className="flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between bg-white dark:bg-gray-900 p-2 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-
         {/* Left Side: Bulk, Export */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 xl:pb-0 scrollbar-hide">
           <DropdownMenu>
@@ -730,17 +734,14 @@ export default function SupportTicketsPage() {
           </DropdownMenu>
         </div>
 
-        {/* Right Side: Search, Date, Filters */}
-        <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
-          {/* Search Bar Reverted to Standard */}
-          <div className="flex items-center gap-2 w-full sm:w-64 order-2 sm:order-1">
-            <div className="relative w-full">
-              <div className="absolute left-1 top-1 bottom-1 w-7 flex items-center justify-center bg-emerald-500 rounded-md">
-                <Search className="h-4 w-4 text-white" />
-              </div>
+        {/* Right Side: Search, Filter, Date */}
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full xl:w-auto ml-auto">
+          {/* Search Bar Joined Format */}
+          <div className="flex items-center w-full sm:w-auto order-3 sm:order-1">
+            <div className="flex w-full sm:w-64 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
               <input
                 type="text"
-                placeholder={t('search_placeholder')}
+                placeholder={t('search_placeholder') || "Cari ticket..."}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -749,17 +750,44 @@ export default function SupportTicketsPage() {
                     setCurrentPage(1)
                   }
                 }}
-                className="w-full pl-10 pr-4 h-9 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-950 focus:bg-white dark:focus:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
               />
+              <button 
+                  onClick={() => {
+                    setSearchQuery(searchInput)
+                    setCurrentPage(1)
+                  }}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
+              >
+                  <Search className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto sm:overflow-visible order-1 sm:order-2">
+            {/* Main Filter Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-9 w-full sm:w-auto border-dashed whitespace-nowrap text-xs",
+                (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) && "border-emerald-500 bg-emerald-50 text-emerald-700"
+              )}
+              onClick={() => {
+                setTempStatusFilters([...statusFilters])
+                setTempPriorityFilters([...priorityFilters])
+                setTempDepartmentFilters([...departmentFilters])
+                setShowFilterPanel(true)
+              }}
+            >
+              <Filter className="w-3.5 h-3.5 mr-2" />
+              {t('filters')}
+            </Button>
 
             {/* Date Filter Enhanced */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-8 w-full sm:w-auto justify-start sm:justify-center whitespace-nowrap text-xs", (dateRange.start || dateRange.end) && "border-emerald-500 text-emerald-700 bg-emerald-50")}>
+                <Button variant="outline" size="sm" className={cn("h-9 w-full sm:w-auto justify-start sm:justify-center whitespace-nowrap text-xs", (dateRange.start || dateRange.end) && "border-emerald-500 text-emerald-700 bg-emerald-50")}>
                   <CalendarIcon className="w-3.5 h-3.5 mr-2 text-emerald-600" />
                   {dateRange.start ? (
                     <span>{dateRange.start}{dateRange.end ? ` - ${dateRange.end}` : ''}</span>
@@ -807,26 +835,7 @@ export default function SupportTicketsPage() {
               </PopoverContent>
             </Popover>
 
-            {/* Main Filter Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "h-8 w-full sm:w-auto border-dashed whitespace-nowrap text-xs",
-                (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) && "border-emerald-500 bg-emerald-50 text-emerald-700"
-              )}
-              onClick={() => {
-                setTempStatusFilters([...statusFilters])
-                setTempPriorityFilters([...priorityFilters])
-                setTempDepartmentFilters([...departmentFilters])
-                setShowFilterPanel(true)
-              }}
-            >
-              <Filter className="w-3 h-3 mr-2" />
-              {t('filters')}
-            </Button>
-
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-emerald-600" onClick={() => loadTickets()} disabled={isLoading}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-500 hover:text-emerald-600" onClick={() => loadTickets()} disabled={isLoading}>
               <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
             </Button>
           </div>

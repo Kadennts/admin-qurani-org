@@ -88,42 +88,66 @@ export interface SimPayment {
 // ── Dummy Data ─────────────────────────────────────────────────────────────────
 
 const DUMMY_PAYOUT_PENDING: SimPayout[] = [
-    { id: 501, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi", bookingId: 5001, amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date().toISOString() },
-    { id: 502, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Ustadzah Aisyah", bookingId: 5002, amount: 250000, status: "paid", paymentMethod: "Bank Transfer", createdAt: new Date().toISOString() },
-    { id: 503, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Ustadz Budi", bookingId: 5003, amount: 100000, status: "paid", paymentMethod: "OVO", createdAt: new Date().toISOString() },
-]
+    { id: "178572300220100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "178572300220200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "178572300220300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, status: "paid", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 86400000).toISOString() },
+    { id: "178572300220400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, status: "paid", paymentMethod: "DANA", createdAt: new Date(Date.now() - 172800000).toISOString() },
+    { id: "178572300220500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, status: "paid", paymentMethod: "OVO", createdAt: new Date(Date.now() - 259200000).toISOString() }
+];
 
 const DUMMY_PAYOUT_HISTORY: SimPayout[] = [
-    { id: 510, userId: 104, userName: "Yusuf", trainerId: 203, trainerName: "Ustadz Hamid", bookingId: 5010, amount: 200000, status: "paid_out", paymentMethod: "QRIS", createdAt: new Date(Date.now() - 86400000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
-]
+    { id: "178572300230100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, status: "paid_out", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
+    { id: "178572300230200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString(), payoutReference: "PAY-2026-002" },
+    { id: "178572300230300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, status: "paid_out", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 518400000).toISOString(), payoutReference: "PAY-2026-003" },
+    { id: "178572300230400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString(), payoutReference: "PAY-2026-004" },
+    { id: "178572300230500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, status: "paid_out", paymentMethod: "OVO", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-005" }
+];
 
 const DUMMY_REFUND_PENDING: SimRefund[] = [
-    { id: 601, userId: 101, userName: "Ahmad Fauzi", trainerName: "Ustadz Budi", bookingId: 6001, amount: 150000, refundAmount: 150000, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Jadwal tidak sesuai", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 602, userId: 102, userName: "Siti Aminah", trainerName: "Ustadzah Aisyah", bookingId: 6002, amount: 250000, refundAmount: 250000, status: "pending_refund", paymentMethod: "Bank Transfer", refundReason: "Guru tidak tersedia", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: 603, userId: 103, userName: "Rizky Pratama", trainerName: "Ustadz Hamid", bookingId: 6003, amount: 100000, refundAmount: 100000, status: "pending_refund", paymentMethod: "OVO", refundReason: "Kesalahan pembayaran", createdAt: new Date(Date.now() - 10800000).toISOString() },
-]
+    { id: "178572300240100000", userId: 101, userName: "Siti Rahmawati", trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, refundAmount: 300000, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Jadwal tidak sesuai", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "178572300240200000", userId: 102, userName: "Ahmad Fauzan", trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, refundAmount: 150000, status: "pending_refund", paymentMethod: "Bank Transfer", refundReason: "Guru tidak tersedia", createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "178572300240300000", userId: 103, userName: "Siti Aminah", trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, refundAmount: 250000, status: "pending_refund", paymentMethod: "OVO", refundReason: "Kesalahan pembayaran", createdAt: new Date(Date.now() - 10800000).toISOString() },
+    { id: "178572300240400000", userId: 104, userName: "Ahmad Fauzi", trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, refundAmount: 200000, status: "pending_refund", paymentMethod: "DANA", refundReason: "Materi tidak sesuai", createdAt: new Date(Date.now() - 172800000).toISOString() },
+    { id: "178572300240500000", userId: 105, userName: "Budi Santoso", trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, refundAmount: 175000, status: "pending_refund", paymentMethod: "Bank BCA", refundReason: "Jadwal bentrok", createdAt: new Date(Date.now() - 259200000).toISOString() }
+];
 
 const DUMMY_REFUND_PROCESSED: SimRefund[] = [
-    { id: 610, userId: 104, userName: "Fatimah", trainerName: "Ustadz Zaki", bookingId: 6010, amount: 200000, refundAmount: 200000, status: "refunded", paymentMethod: "QRIS", createdAt: new Date(Date.now() - 86400000).toISOString(), notes: "Refund disetujui" },
-    { id: 611, userId: 105, userName: "Yusuf", trainerName: "Ustadzah Hana", bookingId: 6011, amount: 75000, refundAmount: 0, status: "rejected", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 172800000).toISOString(), notes: "Melebihi batas waktu pengajuan refund" },
-]
+    { id: "178572300250100000", userId: 101, userName: "Siti Rahmawati", trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, refundAmount: 400000, status: "refunded", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 345600000).toISOString(), notes: "Refund disetujui" },
+    { id: "178572300250200000", userId: 102, userName: "Ahmad Fauzan", trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, refundAmount: 250000, status: "refunded", paymentMethod: "Bank Transfer", createdAt: new Date(Date.now() - 432000000).toISOString(), notes: "Refund disetujui" },
+    { id: "178572300250300000", userId: 103, userName: "Siti Aminah", trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, refundAmount: 0, status: "rejected", paymentMethod: "OVO", createdAt: new Date(Date.now() - 518400000).toISOString(), notes: "Melebihi batas waktu" },
+    { id: "178572300250400000", userId: 104, userName: "Ahmad Fauzi", trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, refundAmount: 350000, status: "refunded", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString(), notes: "Refund disetujui" },
+    { id: "178572300250500000", userId: 105, userName: "Budi Santoso", trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, refundAmount: 0, status: "rejected", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 691200000).toISOString(), notes: "Bukti tidak valid" }
+];
 
 const DUMMY_WITHDRAW_PENDING: SimWithdraw[] = [
-    { id: 701, userId: 101, user: { name: "Ahmad Fauzi", email: "ahmad@email.com" }, amount: 150000, bankName: "BCA", accountNumber: "1234567890", accountName: "AHMAD FAUZI", status: "pending", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 702, userId: 102, user: { name: "Siti Rahma", email: "siti@email.com" }, amount: 300000, bankName: "Mandiri", accountNumber: "0987654321", accountName: "SITI RAHMA", status: "approved", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: 703, userId: 103, user: { name: "Rizky Pratama" }, amount: 75000, bankName: "BNI", accountNumber: "1122334455", accountName: "RIZKY PRATAMA", status: "pending", createdAt: new Date(Date.now() - 14400000).toISOString() },
-]
+    { id: "178572300260100000", userId: 101, user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" }, amount: 500000, bankName: "Bank BCA", accountNumber: "1234567890", accountName: "Siti Rahmawati", status: "pending", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "178572300260200000", userId: 102, user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" }, amount: 300000, bankName: "Mandiri", accountNumber: "0987654321", accountName: "Ahmad Fauzan", status: "approved", createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "178572300260300000", userId: 103, user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" }, amount: 750000, bankName: "Bank BNI", accountNumber: "1122334455", accountName: "Siti Aminah", status: "pending", createdAt: new Date(Date.now() - 86400000).toISOString() },
+    { id: "178572300260400000", userId: 104, user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" }, amount: 200000, bankName: "Bank BRI", accountNumber: "6677889900", accountName: "Ahmad Fauzi", status: "pending", createdAt: new Date(Date.now() - 172800000).toISOString() },
+    { id: "178572300260500000", userId: 105, user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" }, amount: 450000, bankName: "GoPay", accountNumber: "081234567890", accountName: "Budi Santoso", status: "approved", createdAt: new Date(Date.now() - 259200000).toISOString() }
+];
 
 const DUMMY_WITHDRAW_HISTORY: SimWithdraw[] = [
-    { id: 710, userId: 104, user: { name: "Yusuf Abdullah" }, amount: 200000, bankName: "BRI", accountNumber: "5566778899", accountName: "YUSUF ABDULLAH", status: "completed", createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: 711, userId: 105, user: { name: "Fatimah Zahra" }, amount: 100000, bankName: "BCA", accountNumber: "9988776655", accountName: "FATIMAH ZAHRA", status: "rejected", notes: "Rekening tidak valid", createdAt: new Date(Date.now() - 172800000).toISOString() },
-]
+    { id: "178572300270100000", userId: 101, user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" }, amount: 1000000, bankName: "Bank BCA", accountNumber: "1234567890", accountName: "Siti Rahmawati", status: "completed", gatewayReference: "WD-REF-001", createdAt: new Date(Date.now() - 345600000).toISOString() },
+    { id: "178572300270200000", userId: 102, user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" }, amount: 300000, bankName: "Mandiri", accountNumber: "0987654321", accountName: "Ahmad Fauzan", status: "rejected", notes: "Rekening tidak valid", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    { id: "178572300270300000", userId: 103, user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" }, amount: 500000, bankName: "Bank BNI", accountNumber: "1122334455", accountName: "Siti Aminah", status: "completed", gatewayReference: "WD-REF-003", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    { id: "178572300270400000", userId: 104, user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" }, amount: 250000, bankName: "Bank BRI", accountNumber: "6677889900", accountName: "Ahmad Fauzi", status: "completed", gatewayReference: "WD-REF-004", createdAt: new Date(Date.now() - 604800000).toISOString() },
+    { id: "178572300270500000", userId: 105, user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" }, amount: 400000, bankName: "GoPay", accountNumber: "081234567890", accountName: "Budi Santoso", status: "rejected", notes: "Nama tidak sesuai", createdAt: new Date(Date.now() - 691200000).toISOString() }
+];
 
 const DUMMY_PAYMENTS: SimPayment[] = [
-    { id: 801, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi", amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date().toISOString() },
-    { id: 802, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Ustadzah Aisyah", amount: 250000, status: "pending", paymentMethod: "Bank Transfer", createdAt: new Date().toISOString() },
-    { id: 803, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Ustadz Budi", amount: 100000, status: "paid", paymentMethod: "OVO", createdAt: new Date().toISOString() },
-]
+    { id: "178572300280100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "178572300280200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "178572300280300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, status: "pending", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 86400000).toISOString() },
+    { id: "178572300280400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, status: "pending", paymentMethod: "DANA", createdAt: new Date(Date.now() - 172800000).toISOString() },
+    { id: "178572300280500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, status: "pending", paymentMethod: "OVO", createdAt: new Date(Date.now() - 259200000).toISOString() },
+    
+    { id: "178572300280600000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString() },
+    { id: "178572300280700000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    { id: "178572300280800000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, status: "paid", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    { id: "178572300280900000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString() },
+    { id: "178572300281000000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, status: "paid", paymentMethod: "OVO", createdAt: new Date(Date.now() - 691200000).toISOString() }
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -154,14 +178,25 @@ function addToTransactions(entry: object): void {
     } catch { /* no-op */ }
 }
 
-function nextId(): number {
-    return Date.now() + Math.floor(Math.random() * 1000)
+function nextId(): string {
+    return Date.now().toString() + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
-export function initSimBillingStore(): void {
+export function initSimBillingStore(forceReset = false): void {
     if (typeof window === "undefined") return
+    
+    if (forceReset) {
+        localStorage.removeItem(PAYOUT_PENDING_KEY)
+        localStorage.removeItem(PAYOUT_HISTORY_KEY)
+        localStorage.removeItem(REFUND_PENDING_KEY)
+        localStorage.removeItem(REFUND_PROCESSED_KEY)
+        localStorage.removeItem(WITHDRAW_PENDING_KEY)
+        localStorage.removeItem(WITHDRAW_HISTORY_KEY)
+        localStorage.removeItem(PAYMENT_LIST_KEY)
+    }
+
     if (!localStorage.getItem(PAYOUT_PENDING_KEY))
         localStorage.setItem(PAYOUT_PENDING_KEY, JSON.stringify(DUMMY_PAYOUT_PENDING))
     if (!localStorage.getItem(PAYOUT_HISTORY_KEY))

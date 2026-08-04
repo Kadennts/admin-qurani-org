@@ -49,6 +49,8 @@ import {
     Eye,
     Pencil,
     Trash2,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -70,7 +72,7 @@ export function LanguagesManager() {
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 15
+    const [itemsPerPage, setItemsPerPage] = useState(10)
 
     // Filter state (applied)
     const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all")
@@ -400,61 +402,54 @@ export function LanguagesManager() {
     return (
         <>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                            Languages
-                        </h1>
-                    </div>
-                    <Button
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={() => setIsCreateModalOpen(true)}
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create
-                    </Button>
-                </div>
-
-                {/* Search Bar */}
-                <div className="flex gap-2 sm:gap-3 items-center mb-6">
-                    <div className="relative flex-1 flex">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <Input
-                                placeholder="Search by name, code, or language family..."
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                onKeyDown={handleSearchKeyDown}
-                                className="pl-9 pr-4 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
-                            />
+                {/* Header and Toolbar */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:min-w-[300px] flex">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Input
+                                    placeholder="Search by name, code, or language family..."
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onKeyDown={handleSearchKeyDown}
+                                    className="pl-9 pr-4 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
+                                />
+                            </div>
+                            <Button
+                                onClick={handleSearch}
+                                className="rounded-l-none bg-emerald-500 hover:bg-emerald-600 text-white transition-colors h-10 px-4 gap-2 border border-emerald-500 border-l-0"
+                            >
+                                <Search className="w-4 h-4" />
+                                <span className="hidden sm:inline">Search</span>
+                            </Button>
                         </div>
                         <Button
-                            onClick={handleSearch}
-                            variant="ghost"
-                            className="rounded-l-none border border-gray-200 dark:border-gray-700 border-l-0 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-colors h-10 px-4 gap-2"
+                            variant="outline"
+                            onClick={handleOpenFilter}
+                            className={cn(
+                                "flex items-center gap-2 shrink-0 h-10 bg-white dark:bg-gray-900",
+                                isFilterActive
+                                    ? "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20"
+                                    : "border-gray-200 dark:border-gray-700"
+                            )}
                         >
-                            <Search className="w-4 h-4" />
-                            Search
+                            <Filter className="w-4 h-4" />
+                            <span className="hidden sm:inline">
+                                {isFilterActive ? "Filtered" : "Filter"}
+                            </span>
                         </Button>
                     </div>
-
-                    {/* Filter Button */}
-                    <Button
-                        variant="outline"
-                        onClick={handleOpenFilter}
-                        className={cn(
-                            "flex items-center gap-2 shrink-0 h-10",
-                            isFilterActive
-                                ? "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20"
-                                : "border-gray-200 dark:border-gray-700"
-                        )}
-                    >
-                        <Filter className="w-4 h-4" />
-                        <span className="hidden sm:inline">
-                            {isFilterActive ? "Filtered" : "Filter"}
-                        </span>
-                    </Button>
+                    
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                        <Button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Table */}
@@ -594,25 +589,35 @@ export function LanguagesManager() {
                 </div>
 
                 {/* Pagination */}
-                {filteredLanguages.length > 0 && totalPages > 1 && (
-                    <div className="mt-10 flex justify-center">
-                        <Pagination>
-                            <PaginationContent className="gap-2">
-                                <PaginationItem>
-                                    <PaginationPrevious
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            if (currentPage > 1) goToPage(currentPage - 1)
-                                        }}
-                                        className={cn(
-                                            currentPage === 1
-                                                ? "pointer-events-none opacity-50"
-                                                : "cursor-pointer"
-                                        )}
-                                    />
-                                </PaginationItem>
+                {filteredLanguages.length > 0 && (
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 flex-wrap justify-center sm:justify-start">
+                            <span>Menampilkan <span className="font-bold text-emerald-600">{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredLanguages.length)}</span> dari <span className="font-bold text-gray-700 dark:text-gray-200">{filteredLanguages.length}</span> data</span>
+                            <div className="flex items-center gap-2">
+                                <span>Baris:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                    className="h-8 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-2 outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
+                        </div>
 
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={() => goToPage(Math.max(1, currentPage - 1))} 
+                                    disabled={currentPage === 1}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                
+                                {/* Page Numbers */}
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     let pageNum: number
                                     if (totalPages <= 5) {
@@ -625,42 +630,30 @@ export function LanguagesManager() {
                                         pageNum = currentPage - 2 + i
                                     }
                                     return (
-                                        <PaginationItem key={pageNum}>
-                                            <PaginationLink
-                                                href="#"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    goToPage(pageNum)
-                                                }}
-                                                isActive={currentPage === pageNum}
-                                                className={cn(
-                                                    "cursor-pointer",
-                                                    currentPage === pageNum &&
-                                                    "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-md"
-                                                )}
-                                            >
-                                                {pageNum}
-                                            </PaginationLink>
-                                        </PaginationItem>
+                                        <button 
+                                            key={pageNum} 
+                                            onClick={() => goToPage(pageNum)}
+                                            className={cn(
+                                                "w-8 h-8 rounded-lg text-sm font-medium transition-colors border",
+                                                currentPage === pageNum
+                                                    ? "bg-emerald-500 text-white shadow-sm border-emerald-500"
+                                                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            )}
+                                        >
+                                            {pageNum}
+                                        </button>
                                     )
                                 })}
 
-                                <PaginationItem>
-                                    <PaginationNext
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            if (currentPage < totalPages) goToPage(currentPage + 1)
-                                        }}
-                                        className={cn(
-                                            currentPage === totalPages
-                                                ? "pointer-events-none opacity-50"
-                                                : "cursor-pointer"
-                                        )}
-                                    />
-                                </PaginationItem>
-                            </PaginationContent>
-                        </Pagination>
+                                <button 
+                                    onClick={() => goToPage(Math.min(totalPages, currentPage + 1))} 
+                                    disabled={currentPage === totalPages}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

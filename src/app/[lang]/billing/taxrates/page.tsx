@@ -98,7 +98,7 @@ const EMPTY_FORM: TaxFormState = {
     rate: "", isActive: true, description: ""
 }
 
-const PAGE_SIZE = 10
+const PAGE_SIZE_DEFAULT = 10
 
 function formatDate(iso: string | null | undefined) {
     if (!iso) return "—"
@@ -256,6 +256,7 @@ function TaxRatesContent() {
     const [sortField, setSortField] = useState<SortField>("countryName")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
     const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT)
 
     const [formOpen, setFormOpen] = useState(false)
     const [editItem, setEditItem] = useState<TaxRateAPI | null>(null)
@@ -335,8 +336,8 @@ function TaxRatesContent() {
             })
     }, [rates, search, typeFilter, showInactive, sortField, sortDir])
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-    const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+    const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
 
     function handleSort(f: SortField) {
         if (sortField === f) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -519,40 +520,62 @@ function TaxRatesContent() {
                     })}
                 </div>
 
-                {/* Filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1 flex-wrap">
-                        {(["all", "vat", "gst", "income", "exempt"] as TaxType[]).map(t => (
-                            <button key={t} onClick={() => { setTypeFilter(t); setPage(1) }}
-                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${typeFilter === t ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-400"}`}>
-                                {t === "all" ? "Semua Tipe" : typeLabelMap[t]}
+                {/* Toolbar */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 mb-2">
+                    {/* Left: Search + Filter */}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:min-w-[300px] flex">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari kode, nama, negara..."
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { setSearch(searchInput); setPage(1); } }}
+                                    className="w-full pl-9 pr-4 h-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-l-md text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-700 dark:text-gray-200"
+                                />
+                            </div>
+                            <button
+                                onClick={() => { setSearch(searchInput); setPage(1); }}
+                                className="h-10 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-r-md transition-colors flex items-center gap-2 border border-emerald-500 border-l-0"
+                            >
+                                <Search className="w-4 h-4" /> <span className="hidden sm:inline">Search</span>
                             </button>
-                        ))}
+                        </div>
+
+                        {/* Type filter pills */}
+                        <div className="flex items-center gap-1 flex-wrap">
+                            {(["all", "vat", "gst", "income", "exempt"] as TaxType[]).map(t => (
+                                <button key={t} onClick={() => { setTypeFilter(t); setPage(1) }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all h-10 ${
+                                        typeFilter === t
+                                            ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
+                                            : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-emerald-400"
+                                    }`}>
+                                    {t === "all" ? "Semua" : typeLabelMap[t]}
+                                </button>
+                            ))}
+                            <button onClick={() => { setShowInactive(s => !s); setPage(1) }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 h-10 rounded-lg text-xs font-semibold border transition-all ${
+                                    showInactive
+                                        ? "bg-gray-800 text-white border-gray-700"
+                                        : "bg-white dark:bg-gray-900 text-gray-500 border-gray-200 dark:border-gray-700"
+                                }`}>
+                                <Filter className="w-3 h-3" /> {showInactive ? "Sembunyikan Nonaktif" : "Tampilkan Nonaktif"}
+                            </button>
+                        </div>
                     </div>
-                    <button onClick={() => { setShowInactive(s => !s); setPage(1) }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${showInactive ? "bg-gray-800 text-white border-gray-700" : "bg-white dark:bg-gray-900 text-gray-500 border-gray-200 dark:border-gray-700"}`}>
-                        <Filter className="w-3 h-3" /> {showInactive ? "Sembunyikan Nonaktif" : "Tampilkan Nonaktif"}
-                    </button>
-                    <div className="flex items-center w-full md:max-w-md h-10 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400 ml-auto">
-                        <Search className="ml-3 h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="Cari kode, nama, negara..."
-                            value={searchInput}
-                            onChange={e => setSearchInput(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                    setSearch(searchInput);
-                                    setPage(1);
-                                }
-                            }}
-                            className="w-full h-full px-3 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-700 dark:text-gray-200"
-                        />
-                        <button
-                            onClick={() => { setSearch(searchInput); setPage(1); }}
-                            className="h-full px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-sm transition-colors flex items-center gap-2"
-                        >
-                            <Search className="w-4 h-4" /> Cari
+
+                    {/* Right: Refresh + Create */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button onClick={fetchRates} disabled={loading}
+                            className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors shadow-sm disabled:opacity-50">
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+                        </button>
+                        <button onClick={() => { setEditItem(null); setFormOpen(true) }}
+                            className="flex items-center gap-1.5 px-4 h-10 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> Create
                         </button>
                     </div>
                 </div>
@@ -659,26 +682,54 @@ function TaxRatesContent() {
                         </table>
                     </div>
                     {/* Pagination */}
-                    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {loading ? <Skeleton className="h-3 w-32" /> : `Menampilkan ${filtered.length === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} data`}
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(p => (
-                                <button key={p} onClick={() => setPage(p)}
-                                    className={`min-w-[32px] h-8 rounded-lg text-xs font-medium border transition-colors ${p === page ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
-                                    {p}
-                                </button>
-                            ))}
-                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-2 pb-4">
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 flex-wrap justify-center sm:justify-start">
+                            <span>
+                                Menampilkan <span className="font-bold text-emerald-600">{filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, filtered.length)}</span> dari <span className="font-bold text-gray-700 dark:text-gray-200">{filtered.length}</span> data
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <span>Baris:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                                    className="h-8 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-2 outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
                         </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1">
+                                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum: number
+                                    if (totalPages <= 5) pageNum = i + 1
+                                    else if (page <= 3) pageNum = i + 1
+                                    else if (page >= totalPages - 2) pageNum = totalPages - 4 + i
+                                    else pageNum = page - 2 + i
+                                    return (
+                                        <button key={pageNum} onClick={() => setPage(pageNum)}
+                                            className={`w-8 h-8 rounded-lg text-sm font-medium border transition-colors ${
+                                                page === pageNum
+                                                    ? "bg-emerald-500 text-white shadow-sm border-emerald-500"
+                                                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            }`}>
+                                            {pageNum}
+                                        </button>
+                                    )
+                                })}
+                                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
