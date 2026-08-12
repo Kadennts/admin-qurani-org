@@ -488,8 +488,8 @@ export function getSimWalletBalances(userId: string | number) {
     }
 
     return { 
-        balance: activeBalance, 
-        activeBalance, 
-        pendingBalance 
+        balance: Math.max(0, activeBalance), 
+        activeBalance: Math.max(0, activeBalance), 
+        pendingBalance: Math.max(0, pendingBalance)
     };
 }

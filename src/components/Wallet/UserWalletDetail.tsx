@@ -361,7 +361,6 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                     <th className="px-5 py-3.5">ID</th>
                                     <th className="px-5 py-3.5">Kategori</th>
                                     <th className="px-5 py-3.5">Nominal</th>
-                                    <th className="px-5 py-3.5">Metode</th>
                                     <th className="px-5 py-3.5">Status</th>
                                     <th className="px-5 py-3.5">Tanggal</th>
                                     <th className="px-5 py-3.5 text-center">Aksi</th>
@@ -375,12 +374,26 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                         className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors cursor-pointer group"
                                     >
                                         <td className="px-5 py-4">
-                                            <div className="font-bold text-gray-900 dark:text-white text-sm">#{tx.id}</div>
-                                            <div className="text-[10px] text-gray-400 uppercase mt-0.5">{tx.reference || `TXN-${tx.id}`}</div>
+                                            {tx.referenceId ? (
+                                                <>
+                                                    <div className="font-bold text-gray-900 dark:text-white text-sm font-mono">{tx.referenceId}</div>
+                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">Internal: #{tx.id}</div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="font-bold text-gray-900 dark:text-white text-sm">#{tx.id}</div>
+                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">Transaksi Internal</div>
+                                                </>
+                                            )}
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="flex flex-col items-start gap-1">
                                                 {getTxTypeBadge(tx.type)}
+                                                {tx.paymentMethod && (
+                                                    <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                                        {tx.paymentMethod}
+                                                    </span>
+                                                )}
                                                 <span className="text-[11px] text-gray-500 truncate max-w-[200px]">{tx.description || 'Transaksi'}</span>
                                             </div>
                                         </td>
@@ -388,11 +401,6 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                             <div className={`font-black text-sm ${tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                                 {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount))}
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
-                                                {tx.paymentMethod || 'Wallet'}
-                                            </span>
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="bg-gray-50 dark:bg-gray-800/60 px-2.5 py-1 rounded border border-gray-100 dark:border-gray-700/50 inline-flex items-center">

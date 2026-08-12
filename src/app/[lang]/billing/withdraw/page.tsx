@@ -22,6 +22,7 @@ import {
     rejectSimWithdraw,
     completeSimWithdraw,
 } from "@/lib/sim-billing-store"
+import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
 import {
     Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
@@ -138,6 +139,8 @@ function WithdrawContent() {
     const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, completedCount: 0 });
 
     // User wallet modal
+    const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
+    const [selectedWalletUserName, setSelectedWalletUserName] = useState<string>("");
         
     // Modal
     const [actionModal, setActionModal] = useState<{ open: boolean; item: WithdrawItem | null; type: ModalType }>({ open: false, item: null, type: null });
@@ -217,8 +220,7 @@ function WithdrawContent() {
         }
     }, []);
 
-    useEffect(() => { fetchPending(); }, [fetchPending]);
-    useEffect(() => { if (activeTab === 'history') fetchHistory(); }, [activeTab, fetchHistory]);
+    useEffect(() => { fetchPending(); fetchHistory(); }, [fetchPending, fetchHistory]);
 
     const handleSearch = () => { setActiveSearch(search); setPage(1); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch(); };
@@ -362,7 +364,7 @@ function WithdrawContent() {
                             {/* Tabs - Right Side */}
                             <div className="flex items-center gap-0 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
                                 {[
-                                    { key: 'pending' as const, label: 'Pending Withdraw', count: withdraws.filter(w => w.status === 'pending').length },
+                                    { key: 'pending' as const, label: 'Pending', count: withdraws.filter(w => w.status === 'pending').length },
                                     { key: 'history' as const, label: 'Riwayat Withdraw' },
                                 ].map(tab => (
                                     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -392,7 +394,7 @@ function WithdrawContent() {
                                             {getWithdrawStatusBadge(w.status)}
                                         </div>
                                         <div>
-                                            <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button>
+                                            <button onClick={(e) => { e.stopPropagation(); setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button>
                                             <p className="text-xs text-gray-500 mt-0.5">{w.bankName} • {w.accountNumber}</p>
                                             <p className="text-[10px] text-gray-400 uppercase mt-0.5">{w.accountName}</p>
                                         </div>
@@ -419,7 +421,7 @@ function WithdrawContent() {
                                         <tr>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">ID</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">User</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Bank Tujuan</th>
+                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Tujuan</th>
                                             <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nominal</th>
                                             <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Request</th>
@@ -452,17 +454,9 @@ function WithdrawContent() {
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full flex-shrink-0 bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                                                {w.user?.avatar
-                                                                    ? <Image src={w.user.avatar} alt="" width={32} height={32} className="rounded-full object-cover" unoptimized />
-                                                                    : w.user?.name?.charAt(0) || 'U'
-                                                                }
-                                                            </div>
-                                                            <div>
-                                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
-                                                                {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
-                                                            </div>
+                                                        <div>
+                                                            <button onClick={(e) => { e.stopPropagation(); setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
+                                                            {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 hidden md:table-cell">
@@ -544,7 +538,7 @@ function WithdrawContent() {
                                         <tr>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">ID</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">User</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden md:table-cell">Bank Tujuan</th>
+                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden md:table-cell">Tujuan</th>
                                             <th className="text-right text-[11px] font-bold text-gray-500 uppercase px-4 py-3 pr-8">Nominal</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden lg:table-cell">Tgl Request</th>
                                             <th className="text-center text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Status</th>
@@ -571,7 +565,7 @@ function WithdrawContent() {
                                                         <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800">#{w.id}</span>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
                                                         {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
                                                     </td>
                                                     <td className="px-4 py-3 hidden md:table-cell">
@@ -620,7 +614,7 @@ function WithdrawContent() {
                                             {getWithdrawStatusBadge(w.status)}
                                         </div>
                                         <div className="text-xs text-gray-500 space-y-0.5">
-                                            <div><button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button></div>
+                                            <div><button onClick={(e) => { e.stopPropagation(); setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button></div>
                                             <div>{w.bankName ? `${w.bankName} • ${w.accountNumber}` : '—'}</div>
                                             {w.notes && <div className="text-gray-400 italic text-[11px]">"{w.notes}"</div>}
                                         </div>
@@ -757,6 +751,17 @@ function WithdrawContent() {
                 </div>
             </div>
 
+            {/* ── User Wallet Modal ── */}
+            {selectedWalletUserId && (
+                <UserWalletModal
+                    onClose={() => {
+                        setSelectedWalletUserId(null);
+                        setSelectedWalletUserName("");
+                    }}
+                    userId={selectedWalletUserId}
+                    userName={selectedWalletUserName}
+                />
+            )}
             
         </TooltipProvider>
     )

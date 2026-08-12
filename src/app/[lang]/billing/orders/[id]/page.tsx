@@ -1,6 +1,7 @@
 "use client"
 
 import React, { use, useEffect, useState } from "react"
+import { useSearchParams, useParams } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { SkeletonDetailPage } from "@/components/ui/skeletons"
@@ -29,6 +30,7 @@ import Link from "next/link"
 import dummyData from "@/data/billing-dummy.json"
 import { fetchBookingById, fetchBookingAuditTrail, fetchBookingByCode } from "@/lib/billing-bookings"
 import { getSimOrderById, type SimOrder } from "@/lib/sim-store"
+import { getSimPaymentByBookingId, type SimPayment } from "@/lib/sim-billing-store"
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function formatRupiah(n: number) {
@@ -275,10 +277,9 @@ const RAHMA_DETAIL = {
     ],
 }
 
-// ── Back URL ──────────────────────────────────────────────────────────────────
-const BACK_URL = "/billing/orders"
+// ── Back URL is now dynamic — computed inside BookingDetailContent ────────────
 
-function HeaderCard({ booking, detail, apiDetail }: { booking: any, detail: any, apiDetail: any }) {
+function HeaderCard({ booking, detail, apiDetail, backUrl, backLabel }: { booking: any, detail: any, apiDetail: any, backUrl: string, backLabel: string }) {
     const isFromApi = !!apiDetail
     const bStatus = BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] || BOOKING_STATUS.pending
     const isPaid = detail.payment.status === "paid"
@@ -292,7 +293,8 @@ function HeaderCard({ booking, detail, apiDetail }: { booking: any, detail: any,
                 {/* Top bar */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-800/50 pb-5 mb-5">
                     <div className="flex items-center gap-4">
-                        <Link href={BACK_URL}
+                        <Link href={backUrl}
+                            title={backLabel}
                             className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-800/50 text-emerald-200 hover:bg-emerald-700 hover:text-white transition-colors backdrop-blur-sm border border-emerald-700/50">
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
@@ -361,6 +363,21 @@ function HeaderCard({ booking, detail, apiDetail }: { booking: any, detail: any,
 }
 
 function BookingDetailContent({ id }: { id: number }) {
+    const searchParams = useSearchParams()
+    const routeParams = useParams()
+    const lang = (routeParams?.lang as string) || 'en'
+
+    // Compute back URL and label from ?from= query param
+    const fromPage = searchParams?.get('from') || ''
+    const backUrl = fromPage === 'payment' ? `/${lang}/billing/payments`
+        : fromPage === 'payout'  ? `/${lang}/billing/payout`
+        : fromPage === 'refund'  ? `/${lang}/billing/refund`
+        : `/${lang}/billing/orders`
+    const backLabel = fromPage === 'payment' ? 'Kembali ke Pembayaran'
+        : fromPage === 'payout'  ? 'Kembali ke Payout'
+        : fromPage === 'refund'  ? 'Kembali ke Refund'
+        : 'Kembali ke Daftar Pesanan'
+
     const [simOrder, setSimOrder] = useState<SimOrder | null | undefined>(undefined)
     const [apiDetail, setApiDetail] = useState<any | null>(null)
     const [apiAuditTrail, setApiAuditTrail] = useState<any[]>([])
@@ -373,6 +390,7 @@ function BookingDetailContent({ id }: { id: number }) {
     const [localSessionsOverride, setLocalSessionsOverride] = useState<any[] | null>(null)
     const [localAuditTrailOverride, setLocalAuditTrailOverride] = useState<any[] | null>(null)
     const [localOrderCompleted, setLocalOrderCompleted] = useState<boolean>(false)
+    const [simPaymentStatus, setSimPaymentStatus] = useState<SimPayment | null>(null)
     
     const toggleFeedback = (no: number) => setOpenFeedback(prev => ({ ...prev, [no]: !prev[no] }))
 
@@ -393,6 +411,9 @@ function BookingDetailContent({ id }: { id: number }) {
 
             const savedCompleted = localStorage.getItem(`sim_order_completed_${id}`)
             if (savedCompleted === "true") setLocalOrderCompleted(true)
+            
+            const payment = getSimPaymentByBookingId(id)
+            if (payment) setSimPaymentStatus(payment)
         } catch (e) {}
     }, [id])
 
@@ -521,9 +542,9 @@ function BookingDetailContent({ id }: { id: number }) {
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Pesanan Tidak Ditemukan</h2>
                     <p className="text-gray-500 max-w-sm mx-auto">{apiError || `ID pesanan #${id} tidak ada dalam database kami.`}</p>
                 </div>
-                <Link href={BACK_URL}
+                <Link href={backUrl}
                     className="mt-2 text-sm px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20">
-                    <ArrowLeft className="w-4 h-4" /> Kembali ke Daftar Pesanan
+                    <ArrowLeft className="w-4 h-4" /> {backLabel}
                 </Link>
             </div>
         )
@@ -590,7 +611,7 @@ function BookingDetailContent({ id }: { id: number }) {
     return (
         <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 p-4 sm:p-6 lg:p-8">
             <div className="max-w-[1200px] mx-auto">
-                <HeaderCard booking={booking} detail={detail} apiDetail={apiDetail} />
+                <HeaderCard booking={booking} detail={detail} apiDetail={apiDetail} backUrl={backUrl} backLabel={backLabel} />
 
                 {/* ── Tabs Navigation ── */}
                 <div className="flex items-center gap-8 border-b border-gray-200 dark:border-gray-800 mb-6 px-2">
@@ -928,6 +949,55 @@ function BookingDetailContent({ id }: { id: number }) {
                                     </div>
                                 </div>
                             </div>
+
+                        {/* Billing Status Panel (Reaktif dari sim-billing-store) */}
+                        {simPaymentStatus && (
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-transparent dark:from-indigo-400/5 rounded-bl-[100px] pointer-events-none" />
+                                
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+                                    <Activity className="w-4 h-4" /> Billing Status (Moderator)
+                                </h3>
+                                
+                                <div className="space-y-4 relative z-10">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">Status Pembayaran / Payout</span>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                                simPaymentStatus.status === 'paid_out' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                simPaymentStatus.status === 'refunded' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
+                                                simPaymentStatus.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                            }`}>
+                                                {simPaymentStatus.status === 'paid_out' ? 'Dana Diteruskan ke Guru' :
+                                                 simPaymentStatus.status === 'refunded' ? 'Dana Dikembalikan (Refund)' :
+                                                 simPaymentStatus.status === 'paid' ? 'Lunas (Menunggu Payout)' :
+                                                 'Pending Payment'}
+                                            </span>
+                                        </div>
+                                        {simPaymentStatus.payoutReference && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-gray-500">Referensi Payout</span>
+                                                <span className="font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">{simPaymentStatus.payoutReference}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2">
+                                        {simPaymentStatus.status === 'paid' && (
+                                            <Link href={`/${lang}/billing/payout`} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                                                Pindah ke Payout <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                                            </Link>
+                                        )}
+                                        {simPaymentStatus.status === 'pending' && (
+                                            <Link href={`/${lang}/billing/refund`} className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                                                Cek Permintaan Refund <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                                            </Link>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         </div>
 
                     </div>

@@ -11,9 +11,11 @@ import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import {
     getSimPayments,
     markSimPaymentAsPaidOut,
+    syncPaymentStatusFromOrder,
 } from "@/lib/sim-billing-store"
 import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download, Send, CheckSquare } from "lucide-react"
 import DisputesTab from "./DisputesTab"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 interface PaymentData {
     id: number | string;
     userId: number | string;
@@ -30,24 +32,9 @@ interface PaymentData {
     isPaidOut?: boolean;
 }
 
-const PAGE_SIZE = 10;
-
-// Dummy mutable data hanya dipakai sebagai fallback awal saat store belum ada.
-// Selanjutnya data diambil dari sim-billing-store (persistent localStorage).
-let localDummyData: PaymentData[] = [
-    {
-        id: 1, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi",
-        amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date().toISOString()
-    },
-    {
-        id: 2, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Ustadzah Aisyah",
-        amount: 250000, status: "pending", paymentMethod: "Bank Transfer", createdAt: new Date().toISOString()
-    },
-    {
-        id: 3, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Ustadz Budi",
-        amount: 100000, status: "paid", paymentMethod: "OVO", createdAt: new Date().toISOString()
-    }
-];
+// Data sepenuhnya dari sim-billing-store (persistent localStorage).
+// DUMMY lama dihapus — getSimPayments() sudah mengembalikan 10 entries
+// yang sesuai persis dengan 10 pesanan di halaman Orders/Pesanan.
 
 function formatCurrency(amount: number, currency: string = "IDR") {
     return new Intl.NumberFormat("id-ID", { 
@@ -178,6 +165,7 @@ function PaymentsContent() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
     const [totalItems, setTotalItems] = useState(0)
     const [isDemoMode, setIsDemoMode] = useState(false)
     
@@ -194,8 +182,6 @@ function PaymentsContent() {
     // Bulk action state
     const [selectedIds, setSelectedIds] = useState<Array<number | string>>([])
 
-    // User wallet modal state
-        
     // Modals state
     const [sendInvoiceModal, setSendInvoiceModal] = useState<PaymentData | null>(null)
     const [updateStatusModal, setUpdateStatusModal] = useState<PaymentData | null>(null)
@@ -224,6 +210,9 @@ function PaymentsContent() {
             }
             if (statusFilter) {
                 params.Status = statusFilter;
+            }
+            if (methodFilter) {
+                params.PaymentMethod = methodFilter;
             }
             
             const res = await paymentsApi.exportCSV(params);
@@ -283,7 +272,7 @@ function PaymentsContent() {
         try {
             const params: PaymentSearchParams = {
                 Page: page,
-                PageSize: PAGE_SIZE,
+                PageSize: pageSize,
             }
 
             if (activeSearch) {
@@ -294,6 +283,10 @@ function PaymentsContent() {
 
             if (statusFilter) {
                 params.Status = statusFilter;
+            }
+
+            if (methodFilter) {
+                params.PaymentMethod = methodFilter;
             }
 
             const response = await paymentsApi.search(params)
@@ -345,7 +338,7 @@ function PaymentsContent() {
         } finally {
             setLoading(false)
         }
-    }, [page, activeSearch, statusFilter, methodFilter])
+    }, [page, pageSize, activeSearch, statusFilter, methodFilter])
 
     useEffect(() => {
         fetchPayments()
@@ -363,7 +356,7 @@ function PaymentsContent() {
         }
     }
 
-    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
 
     const handleSendInvoice = async (paymentId: string | number, userEmail?: string) => {
         setIsSubmitting(true)
@@ -395,9 +388,8 @@ function PaymentsContent() {
             fetchPayments()
         } catch (err: any) {
             // Update dummy data when API fails
-            localDummyData = localDummyData.map(p => 
-                p.id === paymentId ? { ...p, status: statusUpdateValue } : p
-            )
+            const bId = payments.find(p => p.id === paymentId)?.bookingId || paymentId;
+            syncPaymentStatusFromOrder(bId, statusUpdateValue);
             showToast({ type: 'info', title: '[DEMO] Status Diperbarui', message: `Status pembayaran diubah menjadi ${statusUpdateValue} (simulasi lokal).` })
             setUpdateStatusModal(null)
             setFailureReason("")
@@ -423,50 +415,26 @@ function PaymentsContent() {
         }
     }
 
+    const handleRowClick = (bookingId: number | string | undefined) => {
+        if (!bookingId) return
+        router.push(`/${lang}/billing/orders/${bookingId}?from=payment`)
+    }
+
     return (
         <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 pb-10">
             <ToastContainer />
             {/* Header section */}
-            <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30">
-                <div className="px-4 sm:px-6 lg:px-8 py-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                                {t("billing.payments.title", "Pembayaran")}
-                            </h1>
-                        </div>
-                    </div>
-                    {/* Tabs */}
-                    <div className="flex border-b border-gray-200 dark:border-gray-800 mt-4">
-                        <button
-                            onClick={() => setActiveTab('payments')}
-                            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-                                activeTab === 'payments'
-                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                            }`}
-                        >
-                            {t("billing.payments.tabs.payments", "Daftar Pembayaran")}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('disputes')}
-                            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-                                activeTab === 'disputes'
-                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                            }`}
-                        >
-                            {t("billing.payments.tabs.disputes", "Sengketa")}
-                        </button>
-                    </div>
-                </div>
+            <div className="px-4 sm:px-6 lg:px-8 pt-5">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {t("billing.payments.title", "Pembayaran")}
+                </h1>
             </div>
 
-            {/* Payments Tab Content */}
+            {/* Payments Tab Content — Stats (payments-only) */}
             {activeTab === 'payments' && (
             <div className="px-4 sm:px-6 lg:px-8 mt-6">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
                         <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
                             <Activity className="w-6 h-6" />
@@ -485,19 +453,14 @@ function PaymentsContent() {
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.revenue)}</p>
                         </div>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg">
-                            <AlertCircle className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.pendingRefunds", "Pending Refunds")}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.pendingRefunds}</p>
-                        </div>
-                    </div>
                 </div>
+            </div>
+            )}
 
+            {/* Shared Toolbar — always visible (Tab Pills are here, must be outside any activeTab conditional) */}
+            <div className="px-4 sm:px-6 lg:px-8 mt-4">
                 {/* Filters & Search */}
-                <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                     {/* Main toolbar */}
                     <div className="flex flex-col-reverse sm:flex-row gap-3 p-4 items-center justify-between">
                         {/* Left Side: Search + Filter Button */}
@@ -541,8 +504,33 @@ function PaymentsContent() {
                             </button>
                         </div>
 
-                        {/* Right Side: Export */}
-                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+                        {/* Right Side: Tab Pills + Export */}
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
+                            {/* Tab Pills: Payments List / Disputes */}
+                            <div className="flex items-center w-full sm:w-auto rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                                <button
+                                    onClick={() => setActiveTab('payments')}
+                                    className={`flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold transition-colors ${
+                                        activeTab === 'payments'
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    {t("billing.payments.tabs.payments", "Daftar Pembayaran")}
+                                </button>
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 hidden sm:block" />
+                                <button
+                                    onClick={() => setActiveTab('disputes')}
+                                    className={`flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold transition-colors ${
+                                        activeTab === 'disputes'
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    {t("billing.payments.tabs.disputes", "Sengketa")}
+                                </button>
+                            </div>
+                            {/* Export CSV */}
                             <button
                                 onClick={handleExportCSV}
                                 disabled={isExporting}
@@ -624,7 +612,7 @@ function PaymentsContent() {
                                             { val: "GoPay", label: "GoPay" },
                                             { val: "OVO", label: "OVO" },
                                             { val: "DANA", label: "DANA" },
-                                            { val: "QRIS", label: "QRIS" },
+                                            { val: "Qurani Wallet", label: "Qurani Wallet" },
                                             { val: "Bank Transfer", label: "Bank Transfer" },
                                             { val: "Midtrans", label: "Midtrans" },
                                         ].map(opt => (
@@ -663,7 +651,11 @@ function PaymentsContent() {
                         </div>
                     </div>
                 )}
+            </div>
 
+            {/* Payments Tab — Data Table */}
+            {activeTab === 'payments' && (
+            <div className="px-4 sm:px-6 lg:px-8 pb-6">
                 {/* Data Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                     {/* MOBILE CARD VIEW (<640px) */}
@@ -683,7 +675,10 @@ function PaymentsContent() {
                             </div>
                         ) : (
                             payments.map((payment) => (
-                                <div key={payment.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm relative">
+                                <div
+                                    key={payment.id}
+                                    onClick={() => handleRowClick(payment.bookingId)}
+                                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm relative transition-colors ${payment.bookingId ? 'cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10' : ''}`}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
                                             <input 
@@ -691,6 +686,7 @@ function PaymentsContent() {
                                                 className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
                                                 checked={selectedIds.includes(payment.id)}
                                                 onChange={() => toggleSelect(payment.id)}
+                                                onClick={e => e.stopPropagation()}
                                             />
                                             <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">
                                                 #{payment.bookingId || payment.id}
@@ -703,21 +699,23 @@ function PaymentsContent() {
                                                 payment.status === 'refunded' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
                                                 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
                                             }`}>
-                                                {t(`billing.payments.status.${payment.status?.toLowerCase()}`, payment.status)}
+                                                {payment.status === 'paid' ? 'Lunas' : payment.status === 'pending' ? 'Pending' : payment.status === 'failed' ? 'Gagal' : payment.status === 'refunded' ? 'Refund' : payment.status === 'disputed' ? 'Bermasalah' : payment.status}
                                             </span>
-                                            <ActionDropdown 
-                                                payment={payment}
-                                                onSendInvoice={() => setSendInvoiceModal(payment)}
-                                                onUpdateStatus={() => {
-                                                    setStatusUpdateValue(payment.status);
-                                                    setUpdateStatusModal(payment);
-                                                }}
-                                            />
+                                            <div onClick={e => e.stopPropagation()}>
+                                                <ActionDropdown 
+                                                    payment={payment}
+                                                    onSendInvoice={() => setSendInvoiceModal(payment)}
+                                                    onUpdateStatus={() => {
+                                                        setStatusUpdateValue(payment.status);
+                                                        setUpdateStatusModal(payment);
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-gray-500">
-                                            {t("billing.payments.table.user", "User")}: <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/users/manage/${payment.userId}`); }} className="font-medium text-gray-900 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{payment.userName || '-'}</button>
+                                            {t("billing.payments.table.user", "User")}: <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }} className="font-medium text-gray-900 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{payment.userName || '-'}</button>
                                         </div>
                                         <div className="text-xs text-gray-500 mt-0.5">
                                             {t("billing.payments.table.trainer", "Trainer")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.trainerName || '-'}</span>
@@ -790,8 +788,12 @@ function PaymentsContent() {
                                     payments.map((payment) => {
                                         const tglBayar = timeAgo(payment.updatedAt || payment.createdAt);
                                         return (
-                                        <tr key={payment.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                            <td className="px-4 py-3 text-center">
+                                        <tr
+                                            key={payment.id}
+                                            onClick={() => handleRowClick(payment.bookingId)}
+                                            className={`border-b border-gray-100 dark:border-gray-800 transition-colors ${payment.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+                                        >
+                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                 <input 
                                                     type="checkbox" 
                                                     className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
@@ -806,7 +808,7 @@ function PaymentsContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/users/manage/${payment.userId}`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
+                                                <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>
@@ -821,7 +823,7 @@ function PaymentsContent() {
                                                     payment.status === 'refunded' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
                                                     'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
                                                 }`}>
-                                                    {t(`billing.payments.status.${payment.status?.toLowerCase()}`, payment.status)}
+                                                    {payment.status === 'paid' ? 'Lunas' : payment.status === 'pending' ? 'Pending' : payment.status === 'failed' ? 'Gagal' : payment.status === 'refunded' ? 'Refund' : payment.status === 'disputed' ? 'Bermasalah' : payment.status}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.paymentMethod || '-'}</td>
@@ -834,7 +836,7 @@ function PaymentsContent() {
                                                     >{t2.relative}</span>
                                                 ); })()}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                 <ActionDropdown 
                                                     payment={payment}
                                                     onSendInvoice={() => setSendInvoiceModal(payment)}
@@ -853,36 +855,21 @@ function PaymentsContent() {
                     </div>
 
                     {/* Pagination */}
-                    {totalItems > 0 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                                Menampilkan <span className="font-semibold text-gray-900 dark:text-white">{(page - 1) * PAGE_SIZE + 1}</span> - <span className="font-semibold text-gray-900 dark:text-white">{Math.min(page * PAGE_SIZE, totalItems)}</span> dari <span className="font-semibold text-gray-900 dark:text-white">{totalItems}</span> data
-                            </span>
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                    className="p-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
-                                >
-                                    <ChevronLeft className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={page >= totalPages}
-                                    className="p-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
-                                >
-                                    <ChevronRight className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <SmartPagination
+                        total={totalItems}
+                        page={page}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+                        loading={loading}
+                    />
                 </div>
             </div>
             )}
 
             {/* Disputes Tab Content */}
             {activeTab === 'disputes' && (
-                <div className="px-4 sm:px-6 lg:px-8 mt-6">
+                <div className="px-4 sm:px-6 lg:px-8 mt-4">
                     <DisputesTab />
                 </div>
             )}
@@ -1028,7 +1015,6 @@ function PaymentsContent() {
                 </div>
             )}
 
-            
         </div>
     )
 }

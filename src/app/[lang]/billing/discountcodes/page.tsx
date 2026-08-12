@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
+import { SmartPagination } from "@/components/ui/smart-pagination"
 
 // ── API Config ─────────────────────────────────────────────────────────────────
 const API_BASE = process.env.NEXT_PUBLIC_MYQURANI_API_URL || "https://api.myqurani.com"
@@ -161,7 +162,7 @@ type FilterStatus = "all" | "active" | "inactive" | "referral"
 type FilterType = "all" | "percentage" | "fixed"
 type SortField = "code" | "value" | "usageCount" | "validUntil" | "createdAt"
 
-const PAGE_SIZE = 10
+
 
 interface FormState {
     code: string; name: string; description: string
@@ -641,6 +642,7 @@ function DiscountCodesContent() {
     const [sortField, setSortField] = useState<SortField>("code")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
     const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
     const [copiedId, setCopiedId] = useState<number | null>(null)
 
     // Modals
@@ -709,8 +711,8 @@ function DiscountCodesContent() {
             })
     }, [liveCodes, search, statusFilter, typeFilter, sortField, sortDir])
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-    const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+    const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
 
     function handleSort(f: SortField) {
         if (sortField === f) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -838,6 +840,11 @@ function DiscountCodesContent() {
     return (
         <div className="bg-gray-50 dark:bg-gray-950 p-4">
             <ToastContainer />
+
+            {/* Page Header */}
+            <div className="mb-6 px-1">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Promo & Kupon</h1>
+            </div>
 
             {/* All Modals */}
             <ConfirmModal open={!!confirmDelete} title={`Hapus kode "${confirmDelete?.code}"?`}
@@ -1048,27 +1055,14 @@ function DiscountCodesContent() {
                         </table>
                     </div>
                     {/* Pagination */}
-                    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Menampilkan {filtered.length === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} dari {filtered.length} data
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                                <button key={p} onClick={() => setPage(p)}
-                                    className={`min-w-[32px] h-8 rounded-lg text-xs font-medium border transition-colors ${p === page ? "bg-emerald-500 text-white border-emerald-500" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
-                                    {p}
-                                </button>
-                            ))}
-                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+                    <SmartPagination
+                        total={filtered.length}
+                        page={page}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+                        loading={isLoading}
+                    />
                 </div>
             </div>
         </div>

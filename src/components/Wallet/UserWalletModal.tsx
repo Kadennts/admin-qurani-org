@@ -10,7 +10,7 @@ import {
 import { UserWalletDetail } from "@/components/Wallet/UserWalletDetail";
 
 interface UserWalletModalProps {
-    userId: string | null;
+    userId: string | number | null;
     userName?: string;
     onClose: () => void;
 }
@@ -30,7 +30,7 @@ export function UserWalletModal({ userId, userName, onClose }: UserWalletModalPr
                 {userId && (
                     <div className="mt-4">
                         <UserWalletDetail 
-                            userId={userId} 
+                            userId={String(userId)} 
                             hideProfileCard={false}
                             hideLimitFeature={false}
                         />

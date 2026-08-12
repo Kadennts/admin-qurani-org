@@ -112,7 +112,7 @@ function getPayoutStatusBadge(status: string | undefined) {
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3 h-3" />Selesai</span>;
     }
     if (s === "paid" || s === "pending_payout") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" />Pending Payout</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" />Pending</span>;
     }
     if (s === "failed" || s === "rejected" || s === "cancelled") {
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"><XCircle className="w-3 h-3" />Gagal</span>;
@@ -120,16 +120,9 @@ function getPayoutStatusBadge(status: string | undefined) {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{status || "—"}</span>;
 }
 
-// Dummy data hanya untuk fallback saat store kosong
-const DUMMY_PAYOUTS: PendingPayout[] = [
-    { id: 1, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi", bookingId: 501, amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date().toISOString() },
-    { id: 2, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Ustadzah Aisyah", bookingId: 502, amount: 250000, status: "paid", paymentMethod: "Bank Transfer", createdAt: new Date().toISOString() },
-    { id: 3, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Ustadz Budi", bookingId: 503, amount: 100000, status: "paid", paymentMethod: "OVO", createdAt: new Date().toISOString() },
-];
-
-const DUMMY_COMPLETED: PendingPayout[] = [
-    { id: 10, userId: 104, userName: "Yusuf", trainerId: 203, trainerName: "Ustadz Hamid", bookingId: 510, amount: 200000, status: "paid_out", paymentMethod: "QRIS", createdAt: new Date(Date.now() - 86400000).toISOString(), payoutReference: "PAY-2026-001" },
-];
+// Data sepenuhnya dari sim-billing-store (persistent localStorage).
+// DUMMY lama dihapus — gunakan getSimPayoutPending() dan getSimPayoutHistory()
+// yang sudah sinkron dengan 10 pesanan di halaman Orders/Pesanan.
 
 function PayoutContent() {
     const { t, locale } = useTranslation(['billing', 'common'])
@@ -249,8 +242,7 @@ function PayoutContent() {
         }
     }, []);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
-    useEffect(() => { if (activeTab === 'selesai') fetchCompleted(); }, [activeTab, fetchCompleted]);
+    useEffect(() => { fetchData(); fetchCompleted(); }, [fetchData, fetchCompleted]);
 
     const handleSearch = () => { setActiveSearch(searchInput); setPage(1); setSelectedIds([]); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch(); };
@@ -349,6 +341,11 @@ function PayoutContent() {
     };
     const toggleSelect = (id: number | string) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleRowClick = (bookingId: number | string | undefined) => {
+        if (!bookingId) return
+        router.push(`/${locale}/billing/orders/${bookingId}?from=payout`)
     };
 
     const tz = userTimezone;
@@ -562,8 +559,12 @@ function PayoutContent() {
                                             <p>Tidak ada antrean payout pending</p>
                                         </td></tr>
                                     ) : paged.map(p => (
-                                        <tr key={p.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
-                                            <td className="px-4 py-3 text-center">
+                                        <tr
+                                            key={p.id}
+                                            onClick={() => handleRowClick(p.bookingId)}
+                                            className={`transition-colors ${p.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                        >
+                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                 <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} className="w-4 h-4 text-emerald-600 rounded border-gray-300" />
                                             </td>
                                             <td className="px-4 py-3">
@@ -598,7 +599,7 @@ function PayoutContent() {
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <button className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
@@ -663,7 +664,11 @@ function PayoutContent() {
                                             <p>Belum ada payout yang selesai</p>
                                         </td></tr>
                                     ) : pagedCompleted.map(p => (
-                                        <tr key={p.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                                        <tr
+                                            key={p.id}
+                                            onClick={() => handleRowClick(p.bookingId)}
+                                            className={`transition-colors ${p.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                        >
                                             <td className="px-4 py-3">
                                                 <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
                                                     #{p.bookingId || p.id}
@@ -683,7 +688,7 @@ function PayoutContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-center">{getPayoutStatusBadge(p.status)}</td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                 {p.notes ? (
                                                     <button onClick={() => setViewModal({ open: true, item: p })} className="text-xs text-emerald-600 hover:underline">
                                                         Lihat Catatan
@@ -701,7 +706,11 @@ function PayoutContent() {
                         {/* Mobile Selesai */}
                         <div className="space-y-3 sm:hidden p-4">
                             {pagedCompleted.map(p => (
-                                <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 bg-white dark:bg-gray-800 shadow-sm">
+                                <div
+                                    key={p.id}
+                                    onClick={() => handleRowClick(p.bookingId)}
+                                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 bg-white dark:bg-gray-800 shadow-sm transition-colors ${p.bookingId ? 'cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10' : ''}`}
+                                >
                                     <div className="flex justify-between items-center">
                                         <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">#{p.bookingId || p.id}</span>
                                         {getPayoutStatusBadge(p.status)}

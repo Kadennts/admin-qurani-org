@@ -22,8 +22,9 @@ import {
     nextSimId, saveSimOrder, updateSimOrderPayment,
     type SimOrder,
 } from "@/lib/sim-store"
-
 import { formatTooltipDate } from "@/lib/date-utils"
+import { SmartPagination } from "@/components/ui/smart-pagination"
+import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // PipelineStatus comes from the Qurani booking API normalizer.
@@ -144,6 +145,7 @@ function FilterDropdown({ value, onChange }: { value: FilterKey; onChange: (k: F
 
 type PipelineOrder = {
     id: string | number
+    userId?: string | number
     bookingCode: string
     member: string
     username: string
@@ -198,6 +200,7 @@ function bookingToPipeline(b: typeof dummyData.bookings[0]): PipelineOrder {
     const isPendingPayment = detail ? detail.payment.status === "pending" : false
     return {
         id: b.id,
+        userId: b.userId || undefined,
         bookingCode: `#${b.id}`,
         member: b.userName,
         username: toUsername(b.userEmail, b.userName),
@@ -224,6 +227,7 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
     else if (o.paymentStatus === "paid") status = "lunas"
     return {
         id: o.id,
+        userId: o.member.id,
         bookingCode: `#${o.id}`,
         member: o.member.name,
         username: toUsername(o.member.email, o.member.name),
@@ -245,10 +249,9 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
 }
 
 // ─── Table Config ──────────────────────────────────────────────────────────────
-const PAGE_SIZE = 10
 
 const STATUS_CONFIG: Record<PipelineStatus, { label: string; dotCls: string; badgeCls: string }> = {
-    baru:         { label: "Menunggu Bayar",  dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
+    baru:         { label: "Pending",  dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
     lunas:        { label: "Lunas",           dotCls: "bg-emerald-500", badgeCls: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" },
     aktif:        { label: "Aktif",           dotCls: "bg-sky-500",     badgeCls: "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400" },
     gagal:        { label: "Batal",           dotCls: "bg-rose-500",    badgeCls: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400" },
@@ -257,7 +260,7 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; dotCls: string; bad
 }
 
 const STATUS_ACTIONS: { key: PipelineStatus; label: string; dot: string; text: string; hover: string; border: string }[] = [
-    { key: "baru",         label: "Menunggu Bayar",  dot: "bg-amber-400",   text: "text-amber-700 dark:text-amber-400",   hover: "hover:bg-amber-50 dark:hover:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800" },
+    { key: "baru",         label: "Pending",  dot: "bg-amber-400",   text: "text-amber-700 dark:text-amber-400",   hover: "hover:bg-amber-50 dark:hover:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800" },
     { key: "menunggu_guru",label: "Menunggu Guru",   dot: "bg-orange-400",  text: "text-orange-700 dark:text-orange-400", hover: "hover:bg-orange-50 dark:hover:bg-orange-900/20", border: "border-orange-200 dark:border-orange-800" },
     { key: "lunas",        label: "Lunas",           dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400",hover: "hover:bg-emerald-50 dark:hover:bg-emerald-900/20",border: "border-emerald-200 dark:border-emerald-800" },
     { key: "aktif",        label: "Aktif",           dot: "bg-sky-500",     text: "text-sky-700 dark:text-sky-400",       hover: "hover:bg-sky-50 dark:hover:bg-sky-900/20",       border: "border-sky-200 dark:border-sky-800" },
@@ -580,6 +583,11 @@ function PesananContent() {
     const [bulkOpen, setBulkOpen] = useState(false)
     const [updatingStatus, setUpdatingStatus] = useState(false)
     const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
+    
+    // User wallet modal state
+    const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
+    const [selectedWalletUserName, setSelectedWalletUserName] = useState<string>("");
 
     const refreshSim = useCallback(() => setSimOrders(getSimOrders()), [])
 
@@ -809,8 +817,8 @@ function PesananContent() {
         })
     }, [allOrders, dateFilter])
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-    const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+    const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
     const pagedIds = paged.map(o => o.id)
     const allPagedSelected = pagedIds.length > 0 && pagedIds.every(id => selectedIds.some(selected => String(selected) === String(id)))
 
@@ -844,6 +852,10 @@ function PesananContent() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
 
             <div className="max-w-[1600px] mx-auto">
+                {/* ── Page Header ── */}
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pesanan</h1>
+                </div>
 
                 {/* ── Action Toolbar ── */}
                 <div className="flex items-center gap-4 mb-6">
@@ -982,7 +994,7 @@ function PesananContent() {
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Murid</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Guru</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Paket</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Metode</th>
+                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Mode</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Tanggal</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Harga</th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Status</th>
@@ -1031,18 +1043,15 @@ function PesananContent() {
                                             </td>
                                             {/* Member */}
                                             <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    {order.memberImage ? (
-                                                        <img src={order.memberImage} alt={order.member} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100" />
-                                                    ) : (
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[colorIdx]}`}>
-                                                            {order.memberAvatar || order.member.substring(0, 2).toUpperCase()}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.member}</p>
-                                                        <p className="text-[11px] text-gray-500">{order.username}</p>
-                                                    </div>
+                                                <div>
+                                                    <p onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (order.userId) {
+                                                            setSelectedWalletUserId(order.userId);
+                                                            setSelectedWalletUserName(order.member);
+                                                        }
+                                                    }} className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : ''}`}>{order.member}</p>
+                                                    <p className="text-[11px] text-gray-500">{order.username}</p>
                                                 </div>
                                             </td>
                                             {/* Guru */}
@@ -1062,23 +1071,16 @@ function PesananContent() {
                                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{order.paket}</p>
                                                 <p className="text-[11px] text-gray-500">{order.sesiSelesai}/{order.sesi} Sesi</p>
                                             </td>
-                                            {/* Metode (mode + payment) */}
+                                            {/* Mode (online/offline) */}
                                             <td className="px-4 py-3">
-                                                <div className="flex flex-col gap-1">
-                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 w-fit ${order.mode === "online"
-                                                        ? "bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400"
-                                                        : "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400"
-                                                    }`}>
-                                                        {order.mode === "online" ? <Wifi className="w-2.5 h-2.5" /> : <MapPin className="w-2.5 h-2.5" />}
-                                                        {order.mode === "online" ? "Online" : "Offline"}
-                                                    </span>
-                                                    {order.payment && order.payment !== "-" && order.payment !== "—" && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400">
-                                                            <CreditCard className="w-2.5 h-2.5" />
-                                                            {order.payment}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold border ${
+                                                    order.mode === "offline" 
+                                                    ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800" 
+                                                    : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                                                }`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${order.mode === "offline" ? "bg-purple-500" : "bg-blue-500"}`} />
+                                                    {order.mode === "offline" ? "Tatap Muka" : "Online"}
+                                                </span>
                                             </td>
                                             {/* Tanggal */}
                                             <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
@@ -1140,27 +1142,14 @@ function PesananContent() {
                     </div>
 
                     {/* ── Pagination ── */}
-                    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Menampilkan {filtered.length === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} dari {filtered.length} pesanan
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                                <button key={n} onClick={() => setPage(n)}
-                                    className={`min-w-[32px] h-8 rounded-lg text-xs font-medium border transition-colors ${n === page ? "bg-emerald-500 text-white border-emerald-500 shadow-sm" : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
-                                    {n}
-                                </button>
-                            ))}
-                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+                    <SmartPagination
+                        total={filtered.length}
+                        page={page}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+                        loading={apiLoading}
+                    />
                 </div>
             </div>
 
@@ -1208,6 +1197,18 @@ function PesananContent() {
                         </div>
                     </div>
                 </div>
+            )}
+            
+            {/* User Wallet Modal */}
+            {selectedWalletUserId && (
+                <UserWalletModal
+                    onClose={() => {
+                        setSelectedWalletUserId(null);
+                        setSelectedWalletUserName("");
+                    }}
+                    userId={selectedWalletUserId}
+                    userName={selectedWalletUserName}
+                />
             )}
         </div>
     )

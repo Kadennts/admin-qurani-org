@@ -68,21 +68,15 @@ interface RefundItem {
     status: string;
     paymentMethod?: string;
     refundReason?: string;
+    sessionsInfo?: string;
     createdAt: string;
     updatedAt?: string;
     notes?: string;
 }
 
-// Dummy data
-const DUMMY_REFUNDS: RefundItem[] = [
-    { id: 1, userId: 101, userName: "Ahmad Fauzi", trainerName: "Ustadz Budi", bookingId: 501, amount: 150000, refundAmount: 150000, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Jadwal tidak sesuai", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 2, userId: 102, userName: "Siti Aminah", trainerName: "Ustadzah Aisyah", bookingId: 502, amount: 250000, refundAmount: 250000, status: "pending_refund", paymentMethod: "Bank Transfer", refundReason: "Guru tidak tersedia", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: 3, userId: 103, userName: "Rizky Pratama", trainerName: "Ustadz Hamid", bookingId: 503, amount: 100000, refundAmount: 100000, status: "pending_refund", paymentMethod: "OVO", refundReason: "Kesalahan pembayaran", createdAt: new Date(Date.now() - 10800000).toISOString() },
-];
-const DUMMY_PROCESSED: RefundItem[] = [
-    { id: 10, userId: 104, userName: "Fatimah", trainerName: "Ustadz Zaki", bookingId: 510, amount: 200000, refundAmount: 200000, status: "refunded", paymentMethod: "QRIS", createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: 11, userId: 105, userName: "Yusuf", trainerName: "Ustadzah Hana", bookingId: 511, amount: 75000, refundAmount: 0, status: "rejected", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 172800000).toISOString() },
-];
+// Data sepenuhnya dari sim-billing-store (persistent localStorage).
+// DUMMY lama dihapus — gunakan getSimRefundPending() dan getSimRefundProcessed()
+// yang sudah sinkron dengan 10 pesanan di halaman Orders/Pesanan.
 
 function getStatusBadge(status: string) {
     const s = status?.toLowerCase() || '';
@@ -207,6 +201,11 @@ function RefundContent() {
     const openAction = (item: RefundItem, type: 'approve' | 'reject') => {
         setActionModal({ open: true, item, type });
         setNotes("");
+    };
+
+    const handleRowClick = (bookingId: number | string | undefined) => {
+        if (!bookingId) return
+        router.push(`/${locale}/billing/orders/${bookingId}?from=refund`)
     };
 
     const handleProcessRefund = async () => {
@@ -355,7 +354,11 @@ function RefundContent() {
                                 ) : paged.length === 0 ? (
                                     <div className="text-center py-8 text-gray-400"><RotateCcw className="w-10 h-10 mx-auto mb-3 text-gray-300" /><p>Tidak ada refund pending</p></div>
                                 ) : paged.map(r => (
-                                    <div key={r.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm">
+                                    <div
+                                        key={r.id}
+                                        onClick={() => handleRowClick(r.bookingId)}
+                                        className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm transition-colors ${r.bookingId ? 'cursor-pointer hover:border-rose-300 dark:hover:border-rose-700 hover:bg-rose-50/30 dark:hover:bg-rose-900/10' : ''}`}
+                                    >
                                         <div className="flex justify-between">
                                             <span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md">#{r.bookingId || r.id}</span>
                                             {getStatusBadge(r.status)}
@@ -363,13 +366,14 @@ function RefundContent() {
                                         <div className="text-xs text-gray-500 space-y-1">
                                             <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-rose-600 dark:hover:text-rose-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
                                             <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
+                                            {r.sessionsInfo && <div>Sesi: <span className="font-medium text-rose-600 dark:text-rose-400">{r.sessionsInfo}</span></div>}
                                             {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
                                         </div>
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
                                             <span className="font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</span>
                                             <div className="flex gap-2">
-                                                <button onClick={() => openAction(r, 'approve')} className="text-xs font-semibold text-emerald-600 border border-emerald-300 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors">Setuju</button>
-                                                <button onClick={() => openAction(r, 'reject')} className="text-xs font-semibold text-red-600 border border-red-300 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">Tolak</button>
+                                                <button onClick={(e) => { e.stopPropagation(); openAction(r, 'approve'); }} className="text-xs font-semibold text-emerald-600 border border-emerald-300 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors">Setuju</button>
+                                                <button onClick={(e) => { e.stopPropagation(); openAction(r, 'reject'); }} className="text-xs font-semibold text-red-600 border border-red-300 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">Tolak</button>
                                             </div>
                                         </div>
                                     </div>
@@ -384,6 +388,7 @@ function RefundContent() {
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Kode Pesanan</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">User</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Guru</th>
+                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden xl:table-cell">Sesi</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Alasan</th>
                                             <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nilai Refund</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Request</th>
@@ -403,7 +408,11 @@ function RefundContent() {
                                                 <p>Tidak ada permintaan refund pending</p>
                                             </td></tr>
                                         ) : paged.map(r => (
-                                            <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                                            <tr
+                                                key={r.id}
+                                                onClick={() => handleRowClick(r.bookingId)}
+                                                className={`transition-colors ${r.bookingId ? 'cursor-pointer hover:bg-rose-50/40 dark:hover:bg-rose-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                            >
                                                 <td className="px-4 py-3">
                                                     <span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-800">
                                                         #{r.bookingId || r.id}
@@ -414,6 +423,9 @@ function RefundContent() {
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell">
                                                     <div className="font-medium text-gray-900 dark:text-white text-sm">{r.trainerName || `ID: ${r.trainerId}`}</div>
+                                                </td>
+                                                <td className="px-4 py-3 hidden xl:table-cell">
+                                                    <div className="text-[11px] font-semibold text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20 px-2 py-0.5 rounded border border-rose-100 dark:border-rose-800 max-w-fit">{r.sessionsInfo || '—'}</div>
                                                 </td>
                                                 <td className="px-4 py-3 hidden lg:table-cell">
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 italic max-w-[200px] truncate">
@@ -435,7 +447,7 @@ function RefundContent() {
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </td>
-                                                <td className="px-4 py-3 text-center">
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
                                                             onClick={() => openAction(r, 'approve')}
@@ -478,6 +490,7 @@ function RefundContent() {
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Kode Pesanan</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">User</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden md:table-cell">Guru</th>
+                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden xl:table-cell">Sesi</th>
                                             <th className="text-right text-[11px] font-bold text-gray-500 uppercase px-4 py-3 pr-8">Nilai Refund</th>
                                             <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden lg:table-cell">Tgl Proses</th>
                                             <th className="text-center text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Status</th>
@@ -490,16 +503,23 @@ function RefundContent() {
                                         ) : pagedProcessed.length === 0 ? (
                                             <tr><td colSpan={7} className="text-center py-12 text-gray-400"><Receipt className="w-10 h-10 mx-auto mb-3 text-gray-300" /><p>Belum ada refund yang diproses</p></td></tr>
                                         ) : pagedProcessed.map(r => (
-                                            <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                                            <tr
+                                                key={r.id}
+                                                onClick={() => handleRowClick(r.bookingId)}
+                                                className={`transition-colors ${r.bookingId ? 'cursor-pointer hover:bg-rose-50/40 dark:hover:bg-rose-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                            >
                                                 <td className="px-4 py-3"><span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-800">#{r.bookingId || r.id}</span></td>
                                                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                                                     <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="hover:text-rose-600 dark:hover:text-rose-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hidden md:table-cell">{r.trainerName || '—'}</td>
+                                                <td className="px-4 py-3 hidden xl:table-cell">
+                                                    <div className="text-[11px] font-semibold text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20 px-2 py-0.5 rounded border border-rose-100 dark:border-rose-800 max-w-fit">{r.sessionsInfo || '—'}</div>
+                                                </td>
                                                 <td className="px-4 py-3 text-right pr-8 font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</td>
                                                 <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 hidden lg:table-cell">{formatDate(r.updatedAt || r.createdAt, 'relative', tz, locale)}</td>
                                                 <td className="px-4 py-3 text-center">{getStatusBadge(r.status)}</td>
-                                                <td className="px-4 py-3 text-center">
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                     {(r.notes || r.refundReason) ? (
                                                         <button onClick={() => setViewModal({ open: true, item: r })} className="text-xs text-rose-600 hover:underline">
                                                             Lihat Catatan

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -54,6 +54,7 @@ import {
     confirmSimTopup,
     rejectSimTopup
 } from "@/lib/sim-wallet-store"
+import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,8 @@ function getStatusBadge(status: string | undefined) {
 function WalletPageContent() {
     const { t } = useI18n();
     const router = useRouter();
+    const params = useParams();
+    const lang = params?.lang || "en";
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [topups, setTopups] = useState<PendingTopup[]>([]);
@@ -192,6 +195,8 @@ function WalletPageContent() {
     const [activeSearch, setActiveSearch] = useState("");
 
     // User wallet modal state
+    const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
+    const [selectedWalletUserName, setSelectedWalletUserName] = useState<string>("");
         
     // Modal states
     const [actionModal, setActionModal] = useState<{
@@ -554,7 +559,7 @@ function WalletPageContent() {
                                                 </DropdownMenu>
                                             </div>
                                             <div>
-                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
+                                                <Link href={`/${lang}/billing/${item.userId}/wallet`} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</Link>
                                                 <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-[11px] font-medium text-gray-700 dark:text-gray-300">
                                                     <CreditCard className="w-3 h-3" />
                                                     {item.paymentMethod || 'Transfer/Payment Gateway'}
@@ -630,7 +635,7 @@ function WalletPageContent() {
                                                         ); })()}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
+                                                        <Link href={`/${lang}/billing/${item.userId}/wallet`} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</Link>
                                                         {userUsername && <div className="text-[11px] text-gray-400 mt-0.5">{userUsername}</div>}
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -720,7 +725,7 @@ function WalletPageContent() {
                                             <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">#{item.id}</span>
                                             {getStatusBadge(item.status)}
                                         </div>
-                                        <button onClick={(e) => { e.stopPropagation(); }} className="text-sm font-semibold text-gray-800 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
+                                        <Link href={`/${lang}/billing/${item.userId}/wallet`} className="text-sm font-semibold text-gray-800 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</Link>
                                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
                                             <CreditCard className="w-3 h-3" />{item.paymentMethod || '—'}
                                         </div>
@@ -796,7 +801,7 @@ function WalletPageContent() {
                                                         ) : '—'}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <button onClick={(e) => { e.stopPropagation(); }} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</button>
+                                                        <Link href={`/${lang}/billing/${item.userId}/wallet`} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left">{item.user?.name || `User ID: ${item.userId}`}</Link>
                                                         {userUsername && <div className="text-[11px] text-gray-400 mt-0.5">{userUsername}</div>}
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -908,7 +913,17 @@ function WalletPageContent() {
                     </div>
                 )}
 
-                
+                {/* ── User Wallet Modal ── */}
+                {selectedWalletUserId && (
+                    <UserWalletModal
+                        onClose={() => {
+                            setSelectedWalletUserId(null);
+                            setSelectedWalletUserName("");
+                        }}
+                        userId={selectedWalletUserId}
+                        userName={selectedWalletUserName}
+                    />
+                )}
 
                 {/* ── Rejection Reason Modal ── */}
                 {rejectionModal.isOpen && (

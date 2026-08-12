@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SmartPagination } from "@/components/ui/smart-pagination";
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("id-ID", {
@@ -91,6 +92,7 @@ function HistoryPageContent() {
     const [txLoading, setTxLoading] = useState(true);
     const [txError, setTxError] = useState<string | null>(null);
     const [txPage, setTxPage] = useState(1);
+    const [txPageSize, setTxPageSize] = useState(10);
     const [txTotalPages, setTxTotalPages] = useState(1);
     const [isDemoMode, setIsDemoMode] = useState(false);
     
@@ -126,7 +128,7 @@ function HistoryPageContent() {
     // Store all transactions for user lookup
     const [allTransactions, setAllTransactions] = useState<any[]>([]);
     
-    const TX_PAGE_SIZE = 10;
+    // Removed TX_PAGE_SIZE constant as it's now state
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const locale = 'id-ID';
 
@@ -136,7 +138,7 @@ function HistoryPageContent() {
         setTxLoading(true);
         setTxError(null);
         try {
-            const res = await walletApi.getTransactions({ page, pageSize: TX_PAGE_SIZE });
+            const res = await walletApi.getTransactions({ page, pageSize: txPageSize });
             const data = res?.data || res;
             let items = Array.isArray(data) ? data : (data?.items || data?.data || []);
             
@@ -191,16 +193,15 @@ function HistoryPageContent() {
                 items = items.filter((item: any) => new Date(item.createdAt) <= endDate);
             }
 
-            const totalItems = data?.totalCount || items.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / TX_PAGE_SIZE));
+            const total = items.length;
+            setTotalCount(total);
+            setTxTotalPages(Math.ceil(total / txPageSize));
             
-            const displayItems = (isDemoMode || search || Object.values(filters).some(v => v)) 
-                ? items.slice((page - 1) * TX_PAGE_SIZE, page * TX_PAGE_SIZE) 
-                : items;
+            // Apply pagination on frontend
+            const startIndex = (page - 1) * txPageSize;
+            const displayItems = items.slice(startIndex, startIndex + txPageSize);
 
             setTransactions(displayItems);
-            setTotalCount(totalItems);
-            setTxTotalPages(totalPages);
         } catch (err: any) {
             console.error("Error fetching transactions:", err);
         } finally {
@@ -484,7 +485,7 @@ function HistoryPageContent() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${item.userId}/wallet`); }}
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${item.userId || item.id}/wallet`); }}
                                                 className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left"
                                             >
                                                 {item.user?.name || `User ID: ${item.userId}`}
@@ -566,34 +567,17 @@ function HistoryPageContent() {
                     </div>
 
                     {/* Pagination Footer */}
-                    {!txLoading && totalCount > 0 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800 gap-3">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                Menampilkan {Math.min((txPage - 1) * TX_PAGE_SIZE + 1, totalCount)}–{Math.min(txPage * TX_PAGE_SIZE, totalCount)} dari {totalCount} data
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() => setTxPage(p => Math.max(1, p - 1))}
-                                    disabled={txPage === 1}
-                                    className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </button>
-                                <span className="text-xs font-bold px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                    {txPage} / {txTotalPages}
-                                </span>
-                                <button
-                                    onClick={() => setTxPage(p => Math.min(txTotalPages, p + 1))}
-                                    disabled={txPage === txTotalPages}
-                                    className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <SmartPagination
+                        total={totalCount}
+                        page={txPage}
+                        pageSize={txPageSize}
+                        onPageChange={setTxPage}
+                        onPageSizeChange={(s: number) => { setTxPageSize(s); setTxPage(1); }}
+                        loading={txLoading}
+                    />
                 </div>
             </div>
+            
         </div>
     );
 }

@@ -7,6 +7,10 @@
 import { getSimTransactions } from "@/lib/sim-wallet-store"
 
 // ── Storage Keys ──────────────────────────────────────────────────────────────
+// STORE_VERSION: Naikkan angka ini setiap kali dummy data berubah agar
+// localStorage lama otomatis di-reset ke data terbaru.
+const STORE_VERSION        = "v4-payment-method-fix"  // ← ubah ini saat dummy data diperbarui
+const STORE_VERSION_KEY    = "qurani_sim_billing_version"
 const PAYOUT_PENDING_KEY   = "qurani_sim_payout_pending"
 const PAYOUT_HISTORY_KEY   = "qurani_sim_payout_history"
 const REFUND_PENDING_KEY   = "qurani_sim_refund_pending"
@@ -48,6 +52,7 @@ export interface SimRefund {
     status: string
     paymentMethod?: string
     refundReason?: string
+    sessionsInfo?: string
     createdAt: string
     updatedAt?: string
     notes?: string
@@ -87,36 +92,48 @@ export interface SimPayment {
 
 // ── Dummy Data ─────────────────────────────────────────────────────────────────
 
+// ── DUMMY DATA (sesuai 10 orders di halaman Orders/Pesanan) ─────────────────
+// Sumber kebenaran: billing-dummy.json bookings #3098, #3099, #3010, #3002, #3003, #3004, #3005, #3006, #3007, #3008
+// Order lunas (#3010, #3002, #3003, #3007) → masuk PAYOUT_PENDING
+// Order yang sudah dipayout (#3004, #3006) → masuk PAYOUT_HISTORY
+// Order bermasalah/refund → masuk REFUND_PENDING / REFUND_PROCESSED
+
 const DUMMY_PAYOUT_PENDING: SimPayout[] = [
-    { id: "178572300220100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: "178572300220200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, status: "paid", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: "178572300220300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, status: "paid", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "178572300220400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, status: "paid", paymentMethod: "DANA", createdAt: new Date(Date.now() - 172800000).toISOString() },
-    { id: "178572300220500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, status: "paid", paymentMethod: "OVO", createdAt: new Date(Date.now() - 259200000).toISOString() }
+    // Pesanan #3002 — Siti Aminah / Indi Fitriani (status: Lunas, belum dipayout)
+    { id: "178572300220100000", userId: 103, userName: "Siti Aminah", trainerName: "Indi Fitriani", bookingId: 3002, amount: 90000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString() },
+    // Pesanan #3003 — Budi Santoso / Ustadz Iwan (status: Lunas, belum dipayout)
+    { id: "178572300220200000", userId: 104, userName: "Budi Santoso", trainerName: "Ustadz Iwan", bookingId: 3003, amount: 705000, status: "paid", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    // Pesanan #3007 — Halimah Tussa'diyah / Hasyim asy'ari (status: Lunas, belum dipayout)
+    { id: "178572300220300000", userId: 107, userName: "Halimah Tussa'diyah", trainerName: "Hasyim asy'ari, Lc", bookingId: 3007, amount: 90000, status: "paid", paymentMethod: "Bank Transfer", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    // Pesanan #3010 — Zulfa Hanum / Hasyim asy'ari (status: Selesai, belum dipayout)
+    { id: "178572300220400000", userId: 110, userName: "Zulfa Hanum", trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "paid", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 604800000).toISOString() },
 ];
 
 const DUMMY_PAYOUT_HISTORY: SimPayout[] = [
-    { id: "178572300230100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, status: "paid_out", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
-    { id: "178572300230200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString(), payoutReference: "PAY-2026-002" },
-    { id: "178572300230300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, status: "paid_out", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 518400000).toISOString(), payoutReference: "PAY-2026-003" },
-    { id: "178572300230400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString(), payoutReference: "PAY-2026-004" },
-    { id: "178572300230500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, status: "paid_out", paymentMethod: "OVO", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-005" }
+    // Pesanan #3004 — Dewi Rahayu / Hasyim asy'ari (sudah dipayout ke guru)
+    { id: "178572300230100000", userId: 105, userName: "Dewi Rahayu", trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
+    // Pesanan #3006 — Farid Al-Amin / Zain (sudah dipayout ke guru)
+    { id: "178572300230200000", userId: 106, userName: "Farid Al-Amin", trainerName: "Zain", bookingId: 3006, amount: 387500, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 777600000).toISOString(), payoutReference: "PAY-2026-002", notes: "Transfer berhasil" },
 ];
 
 const DUMMY_REFUND_PENDING: SimRefund[] = [
-    { id: "178572300240100000", userId: 101, userName: "Siti Rahmawati", trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, refundAmount: 300000, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Jadwal tidak sesuai", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: "178572300240200000", userId: 102, userName: "Ahmad Fauzan", trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, refundAmount: 150000, status: "pending_refund", paymentMethod: "Bank Transfer", refundReason: "Guru tidak tersedia", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: "178572300240300000", userId: 103, userName: "Siti Aminah", trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, refundAmount: 250000, status: "pending_refund", paymentMethod: "OVO", refundReason: "Kesalahan pembayaran", createdAt: new Date(Date.now() - 10800000).toISOString() },
-    { id: "178572300240400000", userId: 104, userName: "Ahmad Fauzi", trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, refundAmount: 200000, status: "pending_refund", paymentMethod: "DANA", refundReason: "Materi tidak sesuai", createdAt: new Date(Date.now() - 172800000).toISOString() },
-    { id: "178572300240500000", userId: 105, userName: "Budi Santoso", trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, refundAmount: 175000, status: "pending_refund", paymentMethod: "Bank BCA", refundReason: "Jadwal bentrok", createdAt: new Date(Date.now() - 259200000).toISOString() }
+    // Pesanan #3098 — Fauzia Nurrohma / Indi Fitriani (Menunggu Bayar → refund request)
+    { id: "178572300240100000", userId: 101, userName: "Fauzia Nurrohma", trainerName: "Indi Fitriani", bookingId: 3098, amount: 89800, refundAmount: 89800, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Jadwal tidak sesuai", sessionsInfo: "0 dari 1 Pertemuan", createdAt: new Date(Date.now() - 345600000).toISOString() },
+    // Pesanan #3099 — Rahma Aulia / Indi Fitriani (Aktif → refund request)
+    { id: "178572300240200000", userId: 102, userName: "Rahma Aulia", trainerName: "Indi Fitriani", bookingId: 3099, amount: 420000, refundAmount: 420000, status: "pending_refund", paymentMethod: "Qurani Wallet", refundReason: "Guru tidak tersedia", sessionsInfo: "0 dari 5 Pertemuan", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    // Pesanan #3002 — Siti Aminah / Indi Fitriani (Lunas → refund karena kesalahan bayar)
+    { id: "178572300240300000", userId: 103, userName: "Siti Aminah", trainerName: "Indi Fitriani", bookingId: 3002, amount: 90000, refundAmount: 90000, status: "pending_refund", paymentMethod: "Qurani Wallet", refundReason: "Kesalahan pembayaran", sessionsInfo: "0 dari 1 Pertemuan", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    // Pesanan #3003 — Budi Santoso / Ustadz Iwan (Lunas → refund sebagian)
+    { id: "178572300240400000", userId: 104, userName: "Budi Santoso", trainerName: "Ustadz Iwan", bookingId: 3003, amount: 705000, refundAmount: 352500, status: "pending_refund", paymentMethod: "GoPay", refundReason: "Materi tidak sesuai harapan", sessionsInfo: "5 dari 10 Pertemuan", createdAt: new Date(Date.now() - 604800000).toISOString() },
+    // Pesanan #3004 — Dewi Rahayu / Hasyim asy'ari (Lunas → refund jadwal bentrok)
+    { id: "178572300240500000", userId: 105, userName: "Dewi Rahayu", trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000, refundAmount: 90000, status: "pending_refund", paymentMethod: "Bank Transfer", refundReason: "Jadwal bentrok", sessionsInfo: "0 dari 1 Pertemuan", createdAt: new Date(Date.now() - 691200000).toISOString() },
 ];
 
 const DUMMY_REFUND_PROCESSED: SimRefund[] = [
-    { id: "178572300250100000", userId: 101, userName: "Siti Rahmawati", trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, refundAmount: 400000, status: "refunded", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 345600000).toISOString(), notes: "Refund disetujui" },
-    { id: "178572300250200000", userId: 102, userName: "Ahmad Fauzan", trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, refundAmount: 250000, status: "refunded", paymentMethod: "Bank Transfer", createdAt: new Date(Date.now() - 432000000).toISOString(), notes: "Refund disetujui" },
-    { id: "178572300250300000", userId: 103, userName: "Siti Aminah", trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, refundAmount: 0, status: "rejected", paymentMethod: "OVO", createdAt: new Date(Date.now() - 518400000).toISOString(), notes: "Melebihi batas waktu" },
-    { id: "178572300250400000", userId: 104, userName: "Ahmad Fauzi", trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, refundAmount: 350000, status: "refunded", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString(), notes: "Refund disetujui" },
-    { id: "178572300250500000", userId: 105, userName: "Budi Santoso", trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, refundAmount: 0, status: "rejected", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 691200000).toISOString(), notes: "Bukti tidak valid" }
+    // Pesanan #3005 — Nur Hidayah / Indi Fitriani (Batal → refund disetujui)
+    { id: "178572300250100000", userId: 106, userName: "Nur Hidayah", trainerName: "Indi Fitriani", bookingId: 3005, amount: 595000, refundAmount: 595000, status: "refunded", paymentMethod: "GoPay", sessionsInfo: "0 dari 5 Pertemuan", createdAt: new Date(Date.now() - 777600000).toISOString(), updatedAt: new Date(Date.now() - 691200000).toISOString(), notes: "Refund disetujui — order dibatalkan" },
+    // Pesanan #3008 — Muhammad Yusuf / Indi Fitriani (Aktif → refund ditolak)
+    { id: "178572300250200000", userId: 108, userName: "Muhammad Yusuf", trainerName: "Indi Fitriani", bookingId: 3008, amount: 705000, refundAmount: 352500, status: "rejected", paymentMethod: "GoPay", sessionsInfo: "5 dari 10 Pertemuan", createdAt: new Date(Date.now() - 864000000).toISOString(), updatedAt: new Date(Date.now() - 777600000).toISOString(), notes: "Ditolak — sesi sudah berjalan lebih dari 50%" },
 ];
 
 const DUMMY_WITHDRAW_PENDING: SimWithdraw[] = [
@@ -136,17 +153,22 @@ const DUMMY_WITHDRAW_HISTORY: SimWithdraw[] = [
 ];
 
 const DUMMY_PAYMENTS: SimPayment[] = [
-    { id: "178572300280100000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-001", amount: 300000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: "178572300280200000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-002", amount: 150000, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: "178572300280300000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-003", amount: 250000, status: "pending", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "178572300280400000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-004", amount: 200000, status: "pending", paymentMethod: "DANA", createdAt: new Date(Date.now() - 172800000).toISOString() },
-    { id: "178572300280500000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-005", amount: 175000, status: "pending", paymentMethod: "OVO", createdAt: new Date(Date.now() - 259200000).toISOString() },
-    
-    { id: "178572300280600000", userId: 101, userName: "Siti Rahmawati", trainerId: 201, trainerName: "Budi Haryanto", bookingId: "B-006", amount: 400000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString() },
-    { id: "178572300280700000", userId: 102, userName: "Ahmad Fauzan", trainerId: 202, trainerName: "Aisyah Putri", bookingId: "B-007", amount: 250000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString() },
-    { id: "178572300280800000", userId: 103, userName: "Siti Aminah", trainerId: 203, trainerName: "Hamid Khalil", bookingId: "B-008", amount: 180000, status: "paid", paymentMethod: "Bank BCA", createdAt: new Date(Date.now() - 518400000).toISOString() },
-    { id: "178572300280900000", userId: 104, userName: "Ahmad Fauzi", trainerId: 204, trainerName: "Hana Rosyida", bookingId: "B-009", amount: 350000, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 604800000).toISOString() },
-    { id: "178572300281000000", userId: 105, userName: "Budi Santoso", trainerId: 205, trainerName: "Zaki Maulana", bookingId: "B-010", amount: 220000, status: "paid", paymentMethod: "OVO", createdAt: new Date(Date.now() - 691200000).toISOString() }
+    // 10 payment entries — sesuai persis 10 orders di halaman Orders
+    // Status payment mencerminkan status pesanan:
+    //   pending  = Menunggu Bayar (#3098 Fauzia, #3099 Rahma, #3008 M.Yusuf)
+    //   paid     = Lunas tapi belum dipayout (#3002 Siti, #3003 Budi, #3007 Halimah, #3010 Zulfa)
+    //   paid_out = Sudah dipayout ke guru (#3004 Dewi, #3006 Farid)
+    //   refunded = Refund disetujui (#3005 Nur Hidayah)
+    { id: "178572300280100000", userId: 101, userName: "Fauzia Nurrohma", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3098, amount: 89800, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 259200000).toISOString() },
+    { id: "178572300280200000", userId: 102, userName: "Rahma Aulia", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3099, amount: 420000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString() },
+    { id: "178572300280300000", userId: 110, userName: "Zulfa Hanum", trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "paid", paymentMethod: "Bank Transfer", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    { id: "178572300280400000", userId: 103, userName: "Siti Aminah", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3002, amount: 90000, status: "paid", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    { id: "178572300280500000", userId: 104, userName: "Budi Santoso", trainerId: 303, trainerName: "Ustadz Iwan", bookingId: 3003, amount: 705000, status: "paid", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 604800000).toISOString() },
+    { id: "178572300280600000", userId: 105, userName: "Dewi Rahayu", trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000, status: "paid_out", paymentMethod: "Bank Transfer", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-001" },
+    { id: "178572300280700000", userId: 106, userName: "Nur Hidayah", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3005, amount: 595000, status: "refunded", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 777600000).toISOString() },
+    { id: "178572300280800000", userId: 107, userName: "Farid Al-Amin", trainerId: 304, trainerName: "Zain", bookingId: 3006, amount: 387500, status: "paid_out", paymentMethod: "DANA", createdAt: new Date(Date.now() - 864000000).toISOString(), payoutReference: "PAY-2026-002" },
+    { id: "178572300280900000", userId: 108, userName: "Halimah Tussa'diyah", trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3007, amount: 90000, status: "paid", paymentMethod: "OVO", createdAt: new Date(Date.now() - 950400000).toISOString() },
+    { id: "178572300281000000", userId: 109, userName: "Muhammad Yusuf", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3008, amount: 705000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 1036800000).toISOString() },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -186,6 +208,13 @@ function nextId(): string {
 
 export function initSimBillingStore(forceReset = false): void {
     if (typeof window === "undefined") return
+
+    // Auto-reset jika versi store berubah (dummy data diperbarui)
+    const savedVersion = localStorage.getItem(STORE_VERSION_KEY)
+    if (savedVersion !== STORE_VERSION) {
+        forceReset = true
+        localStorage.setItem(STORE_VERSION_KEY, STORE_VERSION)
+    }
     
     if (forceReset) {
         localStorage.removeItem(PAYOUT_PENDING_KEY)
@@ -266,6 +295,9 @@ export function confirmSimPayout(id: number | string, reference: string, notes?:
 
     safeSet(PAYOUT_PENDING_KEY, pending)
     safeSet(PAYOUT_HISTORY_KEY, history)
+
+    // Sinkronisasi: update status payment di PAYMENT_LIST agar halaman Payment ikut berubah
+    syncPaymentStatusFromOrder(item.bookingId || item.id, "paid_out")
 }
 
 // ── REFUND ────────────────────────────────────────────────────────────────────
@@ -320,6 +352,9 @@ export function approveSimRefund(id: number | string, notes?: string): void {
 
     safeSet(REFUND_PENDING_KEY, pending)
     safeSet(REFUND_PROCESSED_KEY, processed)
+
+    // Sinkronisasi: update status payment di PAYMENT_LIST agar halaman Payment ikut berubah
+    syncPaymentStatusFromOrder(item.bookingId || item.id, "refunded")
 }
 
 /**
@@ -449,6 +484,47 @@ export function completeSimWithdraw(
 export function getSimPayments(): SimPayment[] {
     initSimBillingStore()
     return safeGet<SimPayment>(PAYMENT_LIST_KEY, DUMMY_PAYMENTS)
+}
+
+/**
+ * Cari payment berdasarkan bookingId.
+ */
+export function getSimPaymentByBookingId(bookingId: number | string): SimPayment | undefined {
+    return getSimPayments().find(p => p.bookingId == bookingId)
+}
+
+/**
+ * Sinkronisasi status payment ketika status order berubah dari halaman lain.
+ * Dipanggil saat: approve refund, confirm payout, dll.
+ */
+export function syncPaymentStatusFromOrder(
+    bookingId: number | string,
+    newStatus: string,
+): void {
+    const payments = getSimPayments()
+    const idx = payments.findIndex(p => p.bookingId == bookingId)
+    if (idx === -1) return
+    payments[idx] = {
+        ...payments[idx],
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+    }
+    safeSet(PAYMENT_LIST_KEY, payments)
+}
+
+/**
+ * Tambah payment baru (misalnya dari sim order yang baru dibayar).
+ */
+export function addSimPayment(payment: SimPayment): void {
+    const payments = getSimPayments()
+    const existing = payments.findIndex(p => p.bookingId == payment.bookingId)
+    if (existing !== -1) {
+        // Update jika sudah ada
+        payments[existing] = { ...payments[existing], ...payment, updatedAt: new Date().toISOString() }
+    } else {
+        payments.unshift(payment)
+    }
+    safeSet(PAYMENT_LIST_KEY, payments)
 }
 
 /**

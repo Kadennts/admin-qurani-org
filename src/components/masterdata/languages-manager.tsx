@@ -403,6 +403,9 @@ export function LanguagesManager() {
         <>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 {/* Header and Toolbar */}
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Languages</h1>
+                </div>
                 <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <div className="relative flex-1 sm:min-w-[300px] flex">
