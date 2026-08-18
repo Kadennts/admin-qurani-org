@@ -9,7 +9,7 @@ import {
     ChevronsUpDown, CheckCircle2, XCircle, Copy,
     Trash2, Plus, Pencil, Zap, Loader2,
     Download, FlaskConical,
-    X, Play, PauseCircle, MoreVertical, ExternalLink,
+    X, Play, PauseCircle, MoreVertical, ExternalLink, Filter,
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
@@ -160,6 +160,22 @@ function mapApiToCode(d: ApiDiscountCode): DiscountCode {
 
 type FilterStatus = "all" | "active" | "inactive" | "referral"
 type FilterType = "all" | "percentage" | "fixed"
+
+export interface FilterState {
+    types: string[]
+    statuses: string[]
+    campaignId: string
+    validFrom: string
+    validUntil: string
+}
+
+export const EMPTY_FILTER: FilterState = {
+    types: [],
+    statuses: [],
+    campaignId: "",
+    validFrom: "",
+    validUntil: "",
+}
 type SortField = "code" | "value" | "usageCount" | "validUntil" | "createdAt"
 
 
@@ -625,6 +641,82 @@ function AbTestModal({ open, onClose, onSave, saving }: {
     )
 }
 
+// ── Filter Modal ───────────────────────────────────────────────────────────────
+function FilterModal({ open, initial, onClose, onApply }: {
+    open: boolean; initial: FilterState
+    onClose: () => void; onApply: (f: FilterState) => void
+}) {
+    const [draft, setDraft] = useState<FilterState>(initial)
+
+    useEffect(() => { if (open) setDraft(initial) }, [open, initial])
+
+    if (!open) return null
+
+    const toggleArr = (arr: string[], val: string) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]
+    const Chip = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+        <button onClick={onClick} className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${active ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+            {label}
+        </button>
+    )
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-gray-500" />
+                        <h3 className="text-base font-bold text-gray-900 dark:text-white">Filter Data</h3>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-light">×</button>
+                </div>
+                <div className="px-6 py-4 space-y-5">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Status Promo</label>
+                        <div className="flex flex-wrap gap-2">
+                            <Chip label="Semua" active={draft.statuses.length === 0} onClick={() => setDraft(p => ({ ...p, statuses: [] }))} />
+                            {[{ id: "active", label: "Aktif" }, { id: "inactive", label: "Nonaktif" }, { id: "referral", label: "Referral" }, { id: "expired", label: "Kedaluwarsa" }].map(s => (
+                                <Chip key={s.id} label={s.label} active={draft.statuses.includes(s.id)} onClick={() => setDraft(p => ({ ...p, statuses: toggleArr(p.statuses, s.id) }))} />
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Tipe Diskon</label>
+                        <div className="flex flex-wrap gap-2">
+                            <Chip label="Semua" active={draft.types.length === 0} onClick={() => setDraft(p => ({ ...p, types: [] }))} />
+                            <Chip label="Persen (%)" active={draft.types.includes("percentage")} onClick={() => setDraft(p => ({ ...p, types: toggleArr(p.types, "percentage") }))} />
+                            <Chip label="Nominal (Rp)" active={draft.types.includes("fixed")} onClick={() => setDraft(p => ({ ...p, types: toggleArr(p.types, "fixed") }))} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Campaign ID</label>
+                        <input type="text" value={draft.campaignId} onChange={e => setDraft(p => ({ ...p, campaignId: e.target.value }))} placeholder="Masukkan ID Campaign..."
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Berlaku Dari</label>
+                            <input type="date" value={draft.validFrom} onChange={e => setDraft(p => ({ ...p, validFrom: e.target.value }))}
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Berlaku Sampai</label>
+                            <input type="date" value={draft.validUntil} onChange={e => setDraft(p => ({ ...p, validUntil: e.target.value }))}
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex gap-2 justify-end px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+                    <button onClick={() => setDraft(EMPTY_FILTER)} className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors mr-auto">
+                        Reset
+                    </button>
+                    <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Batal</button>
+                    <button onClick={() => onApply(draft)} className="px-5 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors">Terapkan Filter</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN CONTENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -637,8 +729,7 @@ function DiscountCodesContent() {
 
     const [search, setSearch] = useState("")
     const [searchInput, setSearchInput] = useState("")
-    const [statusFilter, setStatusFilter] = useState<FilterStatus>("all")
-    const [typeFilter, setTypeFilter] = useState<FilterType>("all")
+    const [filterState, setFilterState] = useState<FilterState>(EMPTY_FILTER)
     const [sortField, setSortField] = useState<SortField>("code")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
     const [page, setPage] = useState(1)
@@ -652,6 +743,7 @@ function DiscountCodesContent() {
     const [confirmDelete, setConfirmDelete] = useState<DiscountCode | null>(null)
     const [exportOpen, setExportOpen] = useState(false)
     const [abTestOpen, setAbTestOpen] = useState(false)
+    const [filterOpen, setFilterOpen] = useState(false)
 
     // Close action menu on click outside
     useEffect(() => {
@@ -697,9 +789,32 @@ function DiscountCodesContent() {
         return liveCodes
             .filter(c => {
                 const matchSearch = !q || c.code.toLowerCase().includes(q) || (c.name || "").toLowerCase().includes(q) || (c.description || "").toLowerCase().includes(q) || (c.trainerName?.toLowerCase().includes(q) ?? false)
-                const matchStatus = statusFilter === "all" || (statusFilter === "active" && c.isActive) || (statusFilter === "inactive" && !c.isActive) || (statusFilter === "referral" && c.isReferral)
-                const matchType = typeFilter === "all" || c.type === typeFilter
-                return matchSearch && matchStatus && matchType
+                
+                let matchStatus = true
+                if (filterState.statuses.length > 0) {
+                    const st = getCodeStatus(c).label.toLowerCase()
+                    const isRef = c.isReferral
+                    let matched = false
+                    if (filterState.statuses.includes("active") && c.isActive && st !== "kedaluwarsa") matched = true
+                    if (filterState.statuses.includes("inactive") && !c.isActive) matched = true
+                    if (filterState.statuses.includes("referral") && isRef) matched = true
+                    if (filterState.statuses.includes("expired") && st === "kedaluwarsa") matched = true
+                    matchStatus = matched
+                }
+
+                const matchType = filterState.types.length === 0 || filterState.types.includes(c.type)
+                
+                const matchCampaign = !filterState.campaignId || (c.campaignId?.toLowerCase().includes(filterState.campaignId.toLowerCase()))
+                
+                let matchDate = true
+                if (filterState.validFrom && c.validFrom) {
+                    if (new Date(c.validFrom) < new Date(filterState.validFrom + "T00:00:00Z")) matchDate = false
+                }
+                if (filterState.validUntil && c.validUntil) {
+                    if (new Date(c.validUntil) > new Date(filterState.validUntil + "T23:59:59Z")) matchDate = false
+                }
+
+                return matchSearch && matchStatus && matchType && matchCampaign && matchDate
             })
             .sort((a, b) => {
                 let av: number | string = a.code, bv: number | string = b.code
@@ -709,7 +824,7 @@ function DiscountCodesContent() {
                 if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av)
                 return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number)
             })
-    }, [liveCodes, search, statusFilter, typeFilter, sortField, sortDir])
+    }, [liveCodes, search, filterState, sortField, sortDir])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
     const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
@@ -852,6 +967,7 @@ function DiscountCodesContent() {
                 onConfirm={() => confirmDelete && handleDelete(confirmDelete)} onCancel={() => setConfirmDelete(null)} />
             <CodeFormModal open={formOpen} editItem={editItem} onSave={handleSaveForm} onClose={() => { setFormOpen(false); setEditItem(null) }} saving={mutating} />
             <BulkModal open={bulkOpen} onClose={() => setBulkOpen(false)} onGenerate={handleBulkGenerate} saving={mutating} />
+            <FilterModal open={filterOpen} initial={filterState} onClose={() => setFilterOpen(false)} onApply={f => { setFilterState(f); setFilterOpen(false); setPage(1) }} />
             <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
             <AbTestModal open={abTestOpen} onClose={() => setAbTestOpen(false)} onSave={handleAbTest} saving={mutating} />
 
@@ -902,6 +1018,18 @@ function DiscountCodesContent() {
                             <Search className="w-4 h-4" />
                         </button>
                     </div>
+
+                    {/* Filter Button */}
+                    <button
+                        onClick={() => setFilterOpen(true)}
+                        className={`flex items-center justify-center gap-1.5 h-10 px-4 text-sm font-semibold rounded-lg transition-colors border shadow-sm ${
+                            (filterState.statuses.length > 0 || filterState.types.length > 0 || filterState.campaignId || filterState.validFrom || filterState.validUntil)
+                            ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20"
+                            : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
+                        }`}
+                    >
+                        <Filter className="w-4 h-4" /> Filter
+                    </button>
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 ml-auto flex-wrap">
                         <button onClick={() => setExportOpen(true)} title="Export CSV"
@@ -920,29 +1048,6 @@ function DiscountCodesContent() {
                             className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors shadow-sm whitespace-nowrap">
                             <Plus className="w-4 h-4" /> Buat Promo
                         </button>
-                    </div>
-                </div>
-
-                {/* Filter Tabs */}
-                <div className="flex items-center gap-4 border-b border-gray-100 dark:border-gray-800">
-                    {([
-                        { key: "all", label: "Semua", count: stats.total },
-                        { key: "active", label: "Aktif", count: stats.active },
-                        { key: "inactive", label: "Nonaktif", count: liveCodes.filter(c => !c.isActive).length },
-                        { key: "referral", label: "Referral", count: liveCodes.filter(c => c.isReferral).length },
-                    ] as { key: FilterStatus; label: string; count: number }[]).map(tab => (
-                        <button key={tab.key} onClick={() => { setStatusFilter(tab.key); setPage(1) }}
-                            className={`flex items-center gap-1.5 pb-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${statusFilter === tab.key ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"}`}>
-                            {tab.label}<span className={`text-xs font-bold ${statusFilter === tab.key ? "text-emerald-500" : "text-gray-400"}`}>{tab.count}</span>
-                        </button>
-                    ))}
-                    <div className="ml-auto flex items-center gap-1 pb-1">
-                        {(["all", "percentage", "fixed"] as FilterType[]).map(t => (
-                            <button key={t} onClick={() => setTypeFilter(t)}
-                                className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-colors ${typeFilter === t ? "bg-emerald-500 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
-                                {t === "all" ? "Semua Tipe" : t === "percentage" ? "Persen" : "Nominal"}
-                            </button>
-                        ))}
                     </div>
                 </div>
 

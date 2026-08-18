@@ -593,27 +593,26 @@ export function CountriesManager() {
             </div>
             <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:min-w-[300px] flex">
-                        <div className="relative flex-1">
+                    <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                        <div className="relative flex-1 bg-white dark:bg-gray-900">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <Input
                                 placeholder={t("masterdata.countries.search_placeholder", "Search by name, ISO code...")}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyDown={handleSearchKeyDown}
-                                className="pl-9 pr-4 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
+                                className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white h-10"
                             />
                         </div>
                         <Button
                             onClick={handleSearch}
-                            className="rounded-l-none bg-emerald-500 hover:bg-emerald-600 text-white transition-colors h-10 px-4 gap-2 border border-emerald-500 border-l-0"
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors rounded-none h-10 border-0"
                         >
                             {isSearching ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                                <Search className="w-4 h-4" />
+                                "Cari"
                             )}
-                            <span className="hidden sm:inline">Search</span>
                         </Button>
                     </div>
                     <Button
@@ -622,13 +621,13 @@ export function CountriesManager() {
                         className={cn(
                             "flex items-center gap-2 shrink-0 h-10 bg-white dark:bg-gray-900",
                             selectedRegion !== "All"
-                                ? "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20"
-                                : "border-gray-200 dark:border-gray-700"
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                         )}
                     >
                         <Filter className="w-4 h-4" />
                         <span className="hidden sm:inline">
-                            {selectedRegion !== "All" ? selectedRegion : t("common.filter", "Filter")}
+                            {t("common.filter", "Filter")}
                         </span>
                     </Button>
                 </div>

@@ -149,6 +149,13 @@ function HistoryPageContent() {
                 setIsDemoMode(false);
             }
 
+            // Halaman Transaksi hanya menampilkan data yang sudah terproses
+            // (selesai/berhasil atau ditolak). Data pending disaring agar tidak tampil.
+            items = items.filter((item: any) => {
+                const s = (item.status || "").toLowerCase();
+                return !["pending", "waiting"].includes(s);
+            });
+
             // Store all transactions for user detail lookup
             setAllTransactions(items);
 
@@ -322,7 +329,11 @@ function HistoryPageContent() {
 
                             <button 
                                 onClick={() => setIsFilterOpen(true)}
-                                className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                                    (activeFilters.kategori !== "all" || activeFilters.nominalMin !== "" || activeFilters.nominalMax !== "" || activeFilters.dateStart !== "" || activeFilters.dateEnd !== "" || activeFilters.metode !== "" || activeFilters.status !== "all")
+                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                                        : "bg-white text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                }`}
                             >
                                 <Filter className="w-4 h-4" /> Filter
                             </button>
@@ -374,7 +385,6 @@ function HistoryPageContent() {
                                                 <SelectContent>
                                                     <SelectGroup>
                                                         <SelectItem value="all">Semua Status</SelectItem>
-                                                        <SelectItem value="Pending">Pending</SelectItem>
                                                         <SelectItem value="Berhasil">Berhasil</SelectItem>
                                                         <SelectItem value="Tolak">Ditolak</SelectItem>
                                                     </SelectGroup>

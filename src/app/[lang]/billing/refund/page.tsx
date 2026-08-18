@@ -193,7 +193,7 @@ function RefundContent() {
     }, []);
 
     useEffect(() => { fetchPending(); }, [fetchPending]);
-    useEffect(() => { if (activeTab === 'processed') fetchProcessed(); }, [activeTab, fetchProcessed]);
+    useEffect(() => { fetchProcessed(); }, [fetchProcessed]);
 
     const handleSearch = () => { setActiveSearch(search); setPage(1); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch(); };

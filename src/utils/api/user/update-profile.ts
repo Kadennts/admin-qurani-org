@@ -1,17 +1,17 @@
 "use server";
 
-import { userApi } from "@/lib/api";
+import { userApi, masterdataApi } from "@/lib/api";
 
 export const updateUserProfile = async (
   userId: string,
-  countryId: number, 
-  stateId: number, 
-  cityId: number, 
-  countryName: string, 
-  statesName: string, 
-  cityName: string, 
+  countryId: number,
+  stateId: number,
+  cityId: number,
+  countryName: string,
+  statesName: string,
+  cityName: string,
   timezone: string,
-  fullName?: string, 
+  fullName?: string,
   nickname?: string,
   username?: string,
   gender?: number | null,
@@ -36,19 +36,18 @@ export const updateUserProfile = async (
       return { success: false, message: "No active session found. Please login again." };
     }
 
-    // Strip data URL prefix if present (API expects raw base64 only, not "data:image/...;base64,...")
-    // If it's a normal URL (not starting with data:), we don't send it as imageBase64
+    // Strip data URL prefix if present (API expects raw base64 only)
     let imageBase64Value: string | null = null;
-    if (profilePhotoUrl && profilePhotoUrl.startsWith('data:')) {
-      const parts = profilePhotoUrl.split(',');
+    if (profilePhotoUrl && profilePhotoUrl.startsWith("data:")) {
+      const parts = profilePhotoUrl.split(",");
       imageBase64Value = parts.length > 1 ? parts[1] : null;
     }
 
     const finalPayload: Record<string, any> = {
-      name: fullName || null, 
-      nickname: nickname || null, 
-      bio: bio || null, 
-      address: phoneNumber || null, 
+      name: fullName || null,
+      nickname: nickname || null,
+      bio: bio || null,
+      address: phoneNumber || null,
       cityId: cityId || null,
       city: cityName || null,
       stateId: stateId || null,
@@ -69,15 +68,22 @@ export const updateUserProfile = async (
       finalPayload.dateOfBirth = date_of_birth;
     }
 
-    // API expects timezone as integer, so we only send it if it's a number
-    if (timezone && !isNaN(Number(timezone))) {
-      finalPayload.timezone = Number(timezone);
+    // Resolve timezone string (e.g. "Asia/Jakarta") to integer ID via Qurani API
+    if (timezone) {
+      try {
+        const tzResponse = await masterdataApi.timezones.getByCode(timezone, token);
+        if (tzResponse.success && tzResponse.data?.id) {
+          finalPayload.timezone = Number(tzResponse.data.id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch timezone ID:", err);
+      }
     }
 
     const response = await userApi.updateMe(finalPayload, token);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: "Profile updated successfully",
       data: response?.data || response
     };

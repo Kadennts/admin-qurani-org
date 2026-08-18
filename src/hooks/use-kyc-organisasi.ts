@@ -105,7 +105,7 @@ export type TabKey = "semua" | "menunggu" | "aktif" | "nonaktif" | "ditolak"
 
 export type FilterState = {
     type: string
-    categoryId: string
+    categoryIds: string[]
     isActive: string
     dateFrom: string
     dateTo: string
@@ -113,7 +113,7 @@ export type FilterState = {
 
 export const EMPTY_FILTER: FilterState = {
     type: "",
-    categoryId: "",
+    categoryIds: [],
     isActive: "",
     dateFrom: "",
     dateTo: "",
@@ -330,7 +330,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
             }
 
             if (filter.type) params.set("Type", filter.type)
-            if (filter.categoryId) params.set("CategoryId", filter.categoryId)
+            if (filter.categoryIds.length === 1) params.set("CategoryId", filter.categoryIds[0])
             if (filter.dateFrom) params.set("DateFrom", filter.dateFrom)
             if (filter.dateTo) params.set("DateTo", filter.dateTo)
 
@@ -367,13 +367,14 @@ export function useKycOrganisasi(): KycOrganisasiState {
             // If we detect mixed statuses in a filtered tab, fallback by fetching
             // all rows for current non-status filters and filter locally.
             const needStrictFallback =
-                activeTab !== "semua" &&
+                filter.categoryIds.length > 1 ||
+                (activeTab !== "semua" &&
                 items.length > 0 &&
-                tabFilteredItems.length !== items.length
+                tabFilteredItems.length !== items.length)
 
             if (needStrictFallback) {
                 // Build a cache key to avoid re-fetching all rows on page/perPage change
-                const cacheKey = `${activeTab}|${search}|${filter.type}|${filter.categoryId}|${filter.isActive}|${filter.dateFrom}|${filter.dateTo}`
+                const cacheKey = `${activeTab}|${search}|${filter.type}|${filter.categoryIds.join(",")}|${filter.isActive}|${filter.dateFrom}|${filter.dateTo}`
 
                 let strictFiltered: ApiOrg[]
 
@@ -395,7 +396,8 @@ export function useKycOrganisasi(): KycOrganisasiState {
                         p.set("PageSize", String(pageSizeFallback))
                         if (search.trim()) p.set("Name", search.trim())
                         if (filter.type) p.set("Type", filter.type)
-                        if (filter.categoryId) p.set("CategoryId", filter.categoryId)
+                        // Do not append CategoryId to fallback fetch if there are multiple, to let client filter
+                        if (filter.categoryIds.length === 1) p.set("CategoryId", filter.categoryIds[0])
                         // Do not append IsActive to fallback fetch to prevent 400 Bad Request
                         if (filter.dateFrom) p.set("DateFrom", filter.dateFrom)
                         if (filter.dateTo) p.set("DateTo", filter.dateTo)
@@ -415,12 +417,23 @@ export function useKycOrganisasi(): KycOrganisasiState {
                         fallbackPage += 1
                     }
 
-                    strictFiltered = allRows.filter((org) => statusToTabKey(org) === activeTab)
+                    strictFiltered = allRows.filter((org) => {
+                        if (activeTab !== "semua" && statusToTabKey(org) !== activeTab) return false;
+                        if (filter.categoryIds.length > 1) {
+                            const matchCategory = org.category || org.categoryName || String(org.categoryId || "");
+                            if (!filter.categoryIds.includes(matchCategory)) return false;
+                        }
+                        return true;
+                    })
 
                     const searchLower = search.trim().toLowerCase();
                     const filteredDummy = getDummyOrgs().filter(d => {
                         if (searchLower && !d.name.toLowerCase().includes(searchLower)) return false;
-                        if (statusToTabKey(d as any) !== activeTab) return false;
+                        if (activeTab !== "semua" && statusToTabKey(d as any) !== activeTab) return false;
+                        if (filter.categoryIds.length > 1) {
+                            const matchCategory = (d as any).category || (d as any).categoryName || String((d as any).categoryId || "");
+                            if (!filter.categoryIds.includes(matchCategory)) return false;
+                        }
                         return true;
                     });
                     strictFiltered = [...filteredDummy as any, ...strictFiltered];

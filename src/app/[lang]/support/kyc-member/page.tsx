@@ -664,7 +664,10 @@ function KycMemberContent() {
     const [perPage, setPerPage] = useState(10)
     const [selectedMember, setSelectedMember] = useState<KycSubmission | null>(null)
     const [showFilter, setShowFilter] = useState(false)
-    const [filterDocType, setFilterDocType] = useState<string>("all")
+    const [filterDocTypes, setFilterDocTypes] = useState<string[]>([])
+    const [filterStatuses, setFilterStatuses] = useState<number[]>([])
+    const [tempFilterDocTypes, setTempFilterDocTypes] = useState<string[]>([])
+    const [tempFilterStatuses, setTempFilterStatuses] = useState<number[]>([])
     const [toasts, setToasts] = useState<ToastItem[]>([])
 
     // Toast helpers
@@ -746,10 +749,15 @@ function KycMemberContent() {
                 (x.email?.toLowerCase().includes(q))
             )
         }
-        if (filterDocType !== "all") data = data.filter(x => x.documentType === filterDocType)
+        if (filterStatuses.length > 0) {
+            data = data.filter(x => filterStatuses.includes(x.status))
+        }
+        if (filterDocTypes.length > 0) {
+            data = data.filter(x => x.documentType ? filterDocTypes.includes(x.documentType) : false)
+        }
         return data
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [items, activeTab, search, filterDocType])
+    }, [items, activeTab, search, filterDocTypes, filterStatuses])
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage))
     const paginatedData = filteredData.slice((page - 1) * perPage, page * perPage)
@@ -877,6 +885,30 @@ function KycMemberContent() {
                                 <X className="w-4 h-4 text-gray-400" />
                             </button>
                         </div>
+                        {/* Status Filter */}
+                        <div className="mb-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <AlertCircle className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Status</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => setTempFilterStatuses([])}
+                                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${tempFilterStatuses.length === 0 ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                    Semua Status
+                                </button>
+                                {[0, 1, 2, 3].map(s => {
+                                    const stInfo = statusConfig[s as 0 | 1 | 2 | 3]
+                                    return (
+                                        <button key={s} onClick={() => setTempFilterStatuses(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+                                            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all flex items-center gap-1.5 ${tempFilterStatuses.includes(s) ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                            <stInfo.icon className="w-3 h-3" />
+                                            {stInfo.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
                         {/* Doc Type Filter */}
                         <div className="mb-4">
                             <div className="flex items-center gap-2 mb-2">
@@ -884,24 +916,32 @@ function KycMemberContent() {
                                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t("kyc_member.filter_doc_type")}</span>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button onClick={() => setFilterDocType("all")}
-                                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${filterDocType === "all" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                <button onClick={() => setTempFilterDocTypes([])}
+                                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${tempFilterDocTypes.length === 0 ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
                                     {t("kyc_member.filter_doc_all")}
                                 </button>
                                 {DOC_TYPES.map(d => (
-                                    <button key={d} onClick={() => setFilterDocType(d)}
-                                        className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${filterDocType === d ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
+                                    <button key={d} onClick={() => setTempFilterDocTypes(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                                        className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${tempFilterDocTypes.includes(d) ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-emerald-300 bg-white dark:bg-gray-800"}`}>
                                         {getDocLabel(d)}
                                     </button>
                                 ))}
                             </div>
                         </div>
                         <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                            <button onClick={() => { setFilterDocType("all"); setShowFilter(false) }}
+                            <button onClick={() => { 
+                                setTempFilterDocTypes([]); 
+                                setTempFilterStatuses([]);
+                            }}
                                 className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                                 <RotateCcw className="w-3.5 h-3.5" />{t("kyc_member.filter_reset")}
                             </button>
-                            <button onClick={() => setShowFilter(false)}
+                            <button onClick={() => {
+                                setFilterDocTypes(tempFilterDocTypes);
+                                setFilterStatuses(tempFilterStatuses);
+                                setShowFilter(false);
+                                setPage(1);
+                            }}
                                 className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors">
                                 {t("kyc_member.filter_apply")}
                             </button>
@@ -947,13 +987,14 @@ function KycMemberContent() {
                                 </button>
                             </div>
                         </div>
-                        <button onClick={() => setShowFilter(true)}
-                            className={`relative flex items-center justify-center w-full sm:w-auto gap-1.5 h-9 px-3 text-xs font-medium rounded-lg transition-colors border order-1 sm:order-2 ${filterDocType !== "all" ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20" : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"}`}>
+                        <button onClick={() => {
+                            setTempFilterDocTypes(filterDocTypes);
+                            setTempFilterStatuses(filterStatuses);
+                            setShowFilter(true);
+                        }}
+                            className={`relative flex items-center justify-center w-full sm:w-auto gap-1.5 h-9 px-3 text-xs font-medium rounded-lg transition-colors border order-1 sm:order-2 ${(filterDocTypes.length > 0 || filterStatuses.length > 0) ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20" : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"}`}>
                             <Filter className="w-3.5 h-3.5" />
                             <span>{t("kyc_member.filter")}</span>
-                            {filterDocType !== "all" && (
-                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">1</span>
-                            )}
                         </button>
                     </div>
                 </div>

@@ -579,7 +579,7 @@ function FilterModal({
 }) {
     const [draft, setDraft] = useState<FilterState>(initial)
 
-    const setVal = (key: keyof FilterState, val: string) => {
+    const setVal = (key: keyof FilterState, val: any) => {
         setDraft(prev => ({ ...prev, [key]: val }))
     }
 
@@ -644,13 +644,18 @@ function FilterModal({
                             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Kategori Organisasi</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <ChipBtn label="Semua" active={!draft.categoryId} onClick={() => setVal("categoryId", "")} />
+                            <ChipBtn label="Semua" active={draft.categoryIds.length === 0} onClick={() => setVal("categoryIds", [])} />
                             {KATEGORI_OPTIONS.map(k => (
                                 <ChipBtn
                                     key={k.id}
                                     label={k.label}
-                                    active={draft.categoryId === k.id}
-                                    onClick={() => setVal("categoryId", k.id)}
+                                    active={draft.categoryIds.includes(k.id)}
+                                    onClick={() => {
+                                        const newCategories = draft.categoryIds.includes(k.id) 
+                                            ? draft.categoryIds.filter(id => id !== k.id) 
+                                            : [...draft.categoryIds, k.id]
+                                        setVal("categoryIds", newCategories)
+                                    }}
                                 />
                             ))}
                         </div>
@@ -710,7 +715,7 @@ function KycOrganisasiContent() {
 
     const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
 
-    const activeFiltersCount = (appliedFilter.type ? 1 : 0) + (appliedFilter.isActive ? 1 : 0) + (appliedFilter.categoryId ? 1 : 0) + (appliedFilter.dateFrom ? 1 : 0) + (appliedFilter.dateTo ? 1 : 0)
+    const activeFiltersCount = (appliedFilter.type ? 1 : 0) + (appliedFilter.isActive ? 1 : 0) + (appliedFilter.categoryIds.length > 0 ? 1 : 0) + (appliedFilter.dateFrom ? 1 : 0) + (appliedFilter.dateTo ? 1 : 0)
 
 
 
@@ -788,11 +793,6 @@ function KycOrganisasiContent() {
                                 }`}
                         >
                             <Filter className="w-4 h-4" /> Filter
-                            {activeFiltersCount > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-emerald-500 text-white rounded-full">
-                                    {activeFiltersCount}
-                                </span>
-                            )}
                         </button>
                     </div>
                 </div>

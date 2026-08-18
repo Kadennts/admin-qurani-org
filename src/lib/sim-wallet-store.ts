@@ -2,91 +2,15 @@ import DUMMY_DATA from "@/data/dummy-wallet.json"
 
 const PENDING_TOPUPS_KEY = "qurani_sim_pending_topups"
 const TOPUP_HISTORY_KEY = "qurani_sim_topup_history"
-const TRANSACTIONS_KEY = "qurani_sim_transactions_v2"
+const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
 
 const DUMMY_TRANSACTIONS = [
-    // --- 5 PENDING TRANSACTIONS ---
+    // ─── RIWAYAT TOPUP (dari Wallet/Riwayat Topup) ───────────────────────────
+    // Sumber: DUMMY_TOPUP_HISTORY — hanya yang sudah selesai/ditolak
     {
-        id: "1785723001901",
-        userId: 101,
-        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
-        type: 1,
-        typeName: "TopUp",
-        description: "Top up via VA Mandiri",
-        amount: 300000,
-        balanceBefore: 0,
-        balanceAfter: 0,
-        status: "pending",
-        paymentMethod: "VA Mandiri",
-        referenceId: "TXN-P-001",
-        createdAt: new Date(Date.now() - 3600000).toISOString()
-    },
-    {
-        id: "1785723001902",
-        userId: 102,
-        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
-        type: 2,
-        typeName: "Withdraw",
-        description: "Penarikan ke Bank BCA",
-        amount: -150000,
-        balanceBefore: 450000,
-        balanceAfter: 450000,
-        status: "pending",
-        paymentMethod: "Bank BCA",
-        referenceId: "TXN-P-002",
-        createdAt: new Date(Date.now() - 7200000).toISOString()
-    },
-    {
-        id: "1785723001903",
-        userId: 103,
-        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
-        type: 4,
-        typeName: "Payment",
-        description: "Pembayaran kelas",
-        amount: -250000,
-        balanceBefore: 500000,
-        balanceAfter: 500000,
-        status: "waiting",
-        paymentMethod: "Qurani Wallet",
-        referenceId: "TXN-P-003",
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-    },
-    {
-        id: "1785723001904",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
-        type: 5,
-        typeName: "Refund",
-        description: "Refund kelas dibatalkan",
-        amount: 200000,
-        balanceBefore: 100000,
-        balanceAfter: 100000,
-        status: "pending",
-        paymentMethod: "GoPay",
-        referenceId: "TXN-P-004",
-        createdAt: new Date(Date.now() - 172800000).toISOString()
-    },
-    {
-        id: "1785723001905",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
-        type: 1,
-        typeName: "TopUp",
-        description: "Top up via Bank BNI",
-        amount: 500000,
-        balanceBefore: 50000,
-        balanceAfter: 50000,
-        status: "pending",
-        paymentMethod: "Bank BNI",
-        referenceId: "TXN-P-005",
-        createdAt: new Date(Date.now() - 259200000).toISOString()
-    },
-    
-    // --- 5 HISTORY TRANSACTIONS ---
-    {
-        id: "1785723001906",
+        id: "1785723002101",
         userId: 101,
         user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         type: 1,
@@ -97,9 +21,182 @@ const DUMMY_TRANSACTIONS = [
         balanceAfter: 300000,
         status: "completed",
         paymentMethod: "VA Mandiri",
-        referenceId: "TXN-H-101",
+        referenceId: "EXT-TOP-001",
         createdAt: new Date(Date.now() - 345600000).toISOString()
     },
+    {
+        id: "1785723002102",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via BCA Virtual Account",
+        amount: 200000,
+        balanceBefore: 0,
+        balanceAfter: 200000,
+        status: "completed",
+        paymentMethod: "BCA Virtual Account",
+        referenceId: "EXT-TOP-002",
+        createdAt: new Date(Date.now() - 432000000).toISOString()
+    },
+    {
+        id: "1785723002103",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via Bank Transfer",
+        amount: 250000,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        status: "rejected",
+        paymentMethod: "Bank Transfer",
+        referenceId: "TOPUP-REJ-001",
+        createdAt: new Date(Date.now() - 518400000).toISOString()
+    },
+    {
+        id: "1785723002104",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via GoPay",
+        amount: 150000,
+        balanceBefore: 0,
+        balanceAfter: 150000,
+        status: "completed",
+        paymentMethod: "GoPay",
+        referenceId: "EXT-TOP-004",
+        createdAt: new Date(Date.now() - 604800000).toISOString()
+    },
+    {
+        id: "1785723002105",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        type: 1,
+        typeName: "TopUp",
+        description: "Top up via Bank BNI",
+        amount: 500000,
+        balanceBefore: 0,
+        balanceAfter: 500000,
+        status: "completed",
+        paymentMethod: "Bank BNI",
+        referenceId: "EXT-TOP-005",
+        createdAt: new Date(Date.now() - 691200000).toISOString()
+    },
+
+    // ─── RIWAYAT REFUND (dari Refund/Sudah Diproses) ─────────────────────────
+    // Sumber: DUMMY_REFUND_PROCESSED di sim-billing-store.ts
+    {
+        id: "178572300250100000",
+        userId: 106,
+        user: { name: "Nur Hidayah", email: "nur.hidayah@example.com", username: "nur_hidayah" },
+        type: 5,
+        typeName: "Refund",
+        description: "Refund disetujui — pesanan #3005 (0 dari 5 Pertemuan)",
+        amount: 595000,
+        balanceBefore: 0,
+        balanceAfter: 595000,
+        status: "completed",
+        paymentMethod: "GoPay",
+        referenceId: "REFUND-3005",
+        createdAt: new Date(Date.now() - 691200000).toISOString()
+    },
+    {
+        id: "178572300250200000",
+        userId: 108,
+        user: { name: "Muhammad Yusuf", email: "m.yusuf@example.com", username: "m_yusuf" },
+        type: 5,
+        typeName: "Refund",
+        description: "Refund ditolak — pesanan #3008 (5 dari 10 Pertemuan)",
+        amount: 352500,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        status: "rejected",
+        paymentMethod: "GoPay",
+        referenceId: "REFUND-3008",
+        createdAt: new Date(Date.now() - 777600000).toISOString()
+    },
+
+    // ─── RIWAYAT WITHDRAW (dari Withdraw/Riwayat Withdraw) ───────────────────
+    // Sumber: DUMMY_WITHDRAW_HISTORY di sim-billing-store.ts
+    {
+        id: "178572300270100000",
+        userId: 101,
+        user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke Bank BCA — 1234567890",
+        amount: -1000000,
+        balanceBefore: 1000000,
+        balanceAfter: 0,
+        status: "completed",
+        paymentMethod: "Bank BCA",
+        referenceId: "WD-REF-001",
+        createdAt: new Date(Date.now() - 345600000).toISOString()
+    },
+    {
+        id: "178572300270200000",
+        userId: 102,
+        user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke Mandiri — 0987654321",
+        amount: -300000,
+        balanceBefore: 300000,
+        balanceAfter: 300000,
+        status: "rejected",
+        paymentMethod: "Bank Mandiri",
+        referenceId: "WD-REJ-002",
+        createdAt: new Date(Date.now() - 432000000).toISOString()
+    },
+    {
+        id: "178572300270300000",
+        userId: 103,
+        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke Bank BNI — 1122334455",
+        amount: -500000,
+        balanceBefore: 500000,
+        balanceAfter: 0,
+        status: "completed",
+        paymentMethod: "Bank BNI",
+        referenceId: "WD-REF-003",
+        createdAt: new Date(Date.now() - 518400000).toISOString()
+    },
+    {
+        id: "178572300270400000",
+        userId: 104,
+        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke Bank BRI — 6677889900",
+        amount: -250000,
+        balanceBefore: 250000,
+        balanceAfter: 0,
+        status: "completed",
+        paymentMethod: "Bank BRI",
+        referenceId: "WD-REF-004",
+        createdAt: new Date(Date.now() - 604800000).toISOString()
+    },
+    {
+        id: "178572300270500000",
+        userId: 105,
+        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        type: 2,
+        typeName: "Withdraw",
+        description: "Penarikan ke GoPay — 081234567890",
+        amount: -400000,
+        balanceBefore: 400000,
+        balanceAfter: 400000,
+        status: "rejected",
+        paymentMethod: "GoPay",
+        referenceId: "WD-REJ-005",
+        createdAt: new Date(Date.now() - 691200000).toISOString()
+    },
+
+    // ─── TRANSAKSI PAYMENT (data historis payment yang sudah selesai) ─────────
     {
         id: "1785723001907",
         userId: 102,
@@ -114,36 +211,6 @@ const DUMMY_TRANSACTIONS = [
         paymentMethod: "Qurani Wallet",
         referenceId: "TXN-H-102",
         createdAt: new Date(Date.now() - 432000000).toISOString()
-    },
-    {
-        id: "1785723001908",
-        userId: 103,
-        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
-        type: 2,
-        typeName: "Withdraw",
-        description: "Penarikan ke Bank BNI",
-        amount: -250000,
-        balanceBefore: 750000,
-        balanceAfter: 500000,
-        status: "completed",
-        paymentMethod: "Bank BNI",
-        referenceId: "TXN-H-103",
-        createdAt: new Date(Date.now() - 518400000).toISOString()
-    },
-    {
-        id: "1785723001909",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
-        type: 5,
-        typeName: "Refund",
-        description: "Refund ke Bank Transfer",
-        amount: 200000,
-        balanceBefore: 100000,
-        balanceAfter: 300000,
-        status: "completed",
-        paymentMethod: "Bank Transfer",
-        referenceId: "TXN-H-104",
-        createdAt: new Date(Date.now() - 604800000).toISOString()
     },
     {
         id: "1785723001910",

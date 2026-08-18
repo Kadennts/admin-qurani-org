@@ -11,7 +11,6 @@ import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { searchUsers, SearchUser } from "@/utils/api/users/search"
-import { createClient } from "@/utils/supabase/client"
 import { updateUserProfile } from "@/utils/api/user/update-profile"
 import signOut from "@/utils/Auth/logout"
 import { useI18n, I18nProvider } from "@/components/providers/i18n-provider"
@@ -535,21 +534,10 @@ function ProfilePageContent() {
     if (!userId) return false
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('user_monitoring_records')
-        .insert({
-          id: generateId(),
-          user_id: userId,
-          user_monitoring_id: recipientId
-        })
-
-      if (error) {
-        console.error('Error saving notification recipient:', error)
-        return false
-      }
-
-      return true
+      // Supabase is completely removed as requested.
+      // TODO: Replace with Qurani API for user monitoring when available.
+      toast.info("Fitur notifikasi penerima (recipient) sedang dimigrasi ke API baru.")
+      return false
     } catch (error) {
       console.error('Error saving notification recipient:', error)
       return false
@@ -572,7 +560,7 @@ function ProfilePageContent() {
         setSearchQuery("")
         setSearchResults([])
       } else {
-        toast.error(t('profile.notification_recipients.messages.add_failed', 'Failed to add notification recipient. Please try again.'))
+        // toast.error(t('profile.notification_recipients.messages.add_failed', 'Failed to add notification recipient. Please try again.'))
       }
     } catch (error) {
       console.error('Error adding user:', error)
@@ -584,19 +572,10 @@ function ProfilePageContent() {
     if (!userId) return false
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('user_monitoring_records')
-        .delete()
-        .eq('user_id', userId)
-        .eq('user_monitoring_id', recipientId)
-
-      if (error) {
-        console.error('Error deleting notification recipient:', error)
-        return false
-      }
-
-      return true
+      // Supabase is completely removed as requested.
+      // TODO: Replace with Qurani API for user monitoring when available.
+      toast.info("Fitur notifikasi penerima (recipient) sedang dimigrasi ke API baru.")
+      return false
     } catch (error) {
       console.error('Error deleting notification recipient:', error)
       return false

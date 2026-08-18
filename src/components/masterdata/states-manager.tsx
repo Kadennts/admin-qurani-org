@@ -538,47 +538,53 @@ export function StatesManager() {
             </div>
 
             {/* Search and Filter Bar */}
-            <div className="flex gap-2 sm:gap-3 items-center mb-6">
-                {/* Search Input */}
-                <div className="relative flex-1 flex">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <Input
-                            placeholder="Search by name, state code..."
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleSearchKeyDown}
-                            className="pl-9 pr-4 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
-                        />
+            <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                        <div className="relative flex-1 bg-white dark:bg-gray-900">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Input
+                                placeholder="Search by name, state code..."
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={handleSearchKeyDown}
+                                className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white h-10"
+                            />
+                        </div>
+                        <Button
+                            onClick={handleSearch}
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors rounded-none h-10 border-0"
+                        >
+                            {isSearching ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                "Cari"
+                            )}
+                        </Button>
                     </div>
+
+                    {/* Filter Button */}
                     <Button
-                        onClick={handleSearch}
-                        variant="ghost"
-                        className="rounded-l-none border border-gray-200 dark:border-gray-700 border-l-0 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-colors h-10 px-4 gap-2"
-                    >
-                        {isSearching ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Search className="w-4 h-4" />
+                        variant="outline"
+                        onClick={handleOpenFilterModal}
+                        className={cn(
+                            "flex items-center gap-2 shrink-0 h-10 bg-white dark:bg-gray-900 relative",
+                            activeFilterCount > 0
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                         )}
-                        Search
+                    >
+                        <Filter className="w-4 h-4" />
+                        <span className="hidden sm:inline">
+                            {t("common.filter", "Filter")}
+                        </span>
+                        {activeFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center">
+                                {activeFilterCount}
+                            </span>
+                        )}
                     </Button>
                 </div>
-
-                {/* Filter Button */}
-                <Button
-                    variant="outline"
-                    onClick={handleOpenFilterModal}
-                    className="relative shrink-0"
-                >
-                    <Filter className="w-4 h-4 mr-2" />
-                    {t("common.filter", "Filter")}
-                    {activeFilterCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center">
-                            {activeFilterCount}
-                        </span>
-                    )}
-                </Button>
             </div>
 
             {/* Loading State */}

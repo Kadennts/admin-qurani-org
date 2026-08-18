@@ -3,7 +3,7 @@
 import { UserProfile } from "@/types/database.types";
 import { normalizeUsername } from "@/utils/validation/username";
 import { cookies } from "next/headers";
-import { userApi } from "@/lib/api";
+import { userApi, masterdataApi } from "@/lib/api";
 
 export const updateUsername = async (
   userId: string,
@@ -21,13 +21,23 @@ export const updateUsername = async (
     const cookieStore = await cookies();
     const token = cookieStore.get("myqurani_access_token")?.value;
 
-    const updateData = {
+    const updateData: any = {
       username: formattedUsername,
       countryId: Number(country.id),
       stateId: Number(states.id),
       cityId: Number(city.id),
-      timezone: city.timezone,
     };
+
+    if (city.timezone) {
+      try {
+        const tzResponse = await masterdataApi.timezones.getByCode(city.timezone, token);
+        if (tzResponse.success && tzResponse.data?.id) {
+          updateData.timezone = Number(tzResponse.data.id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch timezone ID:", err);
+      }
+    }
 
     const response = await userApi.updateMe(updateData, token);
 
@@ -84,8 +94,15 @@ export const updateUserProfile = async (userId: string, data: UserProfile) => {
       updateData.dateOfBirth = data.dob;
     }
 
-    if (data.timezone && !isNaN(Number(data.timezone))) {
-      updateData.timezone = Number(data.timezone);
+    if (data.timezone) {
+      try {
+        const tzResponse = await masterdataApi.timezones.getByCode(data.timezone, token);
+        if (tzResponse.success && tzResponse.data?.id) {
+          updateData.timezone = Number(tzResponse.data.id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch timezone ID:", err);
+      }
     }
     const response = await userApi.updateMe(updateData, token);
 

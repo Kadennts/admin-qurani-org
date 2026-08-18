@@ -9,7 +9,7 @@ import { getSimTransactions } from "@/lib/sim-wallet-store"
 // ── Storage Keys ──────────────────────────────────────────────────────────────
 // STORE_VERSION: Naikkan angka ini setiap kali dummy data berubah agar
 // localStorage lama otomatis di-reset ke data terbaru.
-const STORE_VERSION        = "v4-payment-method-fix"  // ← ubah ini saat dummy data diperbarui
+const STORE_VERSION        = "v5-transaction-sync"  // ← ubah ini saat dummy data diperbarui
 const STORE_VERSION_KEY    = "qurani_sim_billing_version"
 const PAYOUT_PENDING_KEY   = "qurani_sim_payout_pending"
 const PAYOUT_HISTORY_KEY   = "qurani_sim_payout_history"
@@ -19,7 +19,7 @@ const WITHDRAW_PENDING_KEY = "qurani_sim_withdraw_pending"
 const WITHDRAW_HISTORY_KEY = "qurani_sim_withdraw_history"
 const PAYMENT_LIST_KEY     = "qurani_sim_payment_list"
 // Shared dengan sim-wallet-store.ts
-const TRANSACTIONS_KEY     = "qurani_sim_transactions_v2"
+const TRANSACTIONS_KEY     = "qurani_sim_transactions_v3"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

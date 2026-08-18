@@ -172,12 +172,18 @@ export default function SupportTicketsPage() {
     console.log('[Tickets] Fetching from API...', { currentPage, statusFilters, priorityFilters, searchQuery });
     setIsLoading(true)
     try {
+      // Check if we need client-side filtering (multi-select)
+      const isMultiStatus = statusFilters.length > 1;
+      const isMultiPriority = priorityFilters.length > 1;
+      const hasDepartmentFilter = departmentFilters.length > 0;
+      
+      const needsClientFilter = isMultiStatus || isMultiPriority || hasDepartmentFilter;
+
       const singleStatus = statusFilters.length === 1 ? statusFilters[0] : undefined
       const singlePriority = priorityFilters.length === 1 ? priorityFilters[0] : undefined
 
-      const limit = itemsPerPage
-      const offset = (currentPage - 1) * limit
-      const page = currentPage
+      const limit = needsClientFilter ? 500 : itemsPerPage;
+      const page = needsClientFilter ? 1 : currentPage;
 
       // Try client-side API first (uses localStorage tokens like My-Qurani example)
       try {
@@ -196,8 +202,8 @@ export default function SupportTicketsPage() {
           const params = {
             page,
             pageSize: limit,
-            status: singleStatus ? statusMap[singleStatus] : undefined,
-            priority: singlePriority ? priorityMap[singlePriority] : undefined,
+            status: (!needsClientFilter && singleStatus) ? statusMap[singleStatus] : undefined,
+            priority: (!needsClientFilter && singlePriority) ? priorityMap[singlePriority] : undefined,
           };
 
           // Department mapping (ID → Name) - API returns string IDs
@@ -254,6 +260,27 @@ export default function SupportTicketsPage() {
           }
 
           if (signal?.aborted) return;
+
+          // Client-side filtering if needed
+          if (needsClientFilter) {
+            if (statusFilters.length > 0) {
+              tickets = tickets.filter((t: any) => statusFilters.includes(t.statusName || 'Open'));
+            }
+            if (priorityFilters.length > 0) {
+              tickets = tickets.filter((t: any) => priorityFilters.includes(t.priorityName || 'Medium'));
+            }
+            if (departmentFilters.length > 0) {
+              tickets = tickets.filter((t: any) => {
+                const deptName = departmentMap[String(t.department)] || 'GENERAL';
+                return departmentFilters.includes(deptName) || departmentFilters.includes(deptName.charAt(0).toUpperCase() + deptName.slice(1).toLowerCase());
+              });
+            }
+            total = tickets.length;
+            
+            // Manual pagination
+            const offset = (currentPage - 1) * itemsPerPage;
+            tickets = tickets.slice(offset, offset + itemsPerPage);
+          }
 
           // API Qurani only (no Supabase merge/fallback)
           const finalTickets = tickets.length > 0 ? convertTickets(tickets) : [];
@@ -770,8 +797,10 @@ export default function SupportTicketsPage() {
               variant="outline"
               size="sm"
               className={cn(
-                "h-9 w-full sm:w-auto border-dashed whitespace-nowrap text-xs",
-                (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) && "border-emerald-500 bg-emerald-50 text-emerald-700"
+                "h-9 w-full sm:w-auto whitespace-nowrap text-xs",
+                (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) 
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20" 
+                  : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
               )}
               onClick={() => {
                 setTempStatusFilters([...statusFilters])
