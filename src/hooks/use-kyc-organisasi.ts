@@ -218,7 +218,7 @@ export function useKycOrganisasi(): KycOrganisasiState {
     const [totalCount, setTotalCount] = useState(0)
     const [page, setPageRaw] = useState(1)
     const [perPage, setPerPageRaw] = useState(10)
-    const [activeTab, setActiveTabRaw] = useState<TabKey>("aktif")
+    const [activeTab, setActiveTabRaw] = useState<TabKey>("semua")
     const [search, setSearchRaw] = useState("")
     const [filter, setFilterRaw] = useState<FilterState>(EMPTY_FILTER)
     const [sortOrder, setSortOrderRaw] = useState<SortOrder>("name_asc")

@@ -882,23 +882,99 @@ export default function Users() {
                                 </button>
                             </div>
 
-                            <Button
-                                variant="outline"
+                            <button
                                 onClick={openFilterModal}
-                                size="sm"
-                                className="h-8 text-xs border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                className={`relative flex items-center gap-1.5 h-10 px-3 text-xs font-medium rounded-lg border transition-colors flex-shrink-0 ${
+                                    roleFilter !== 'all' || statusFilter !== 'all' || fromDate || endDate
+                                        ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600'
+                                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-emerald-400'
+                                }`}
                             >
-                                <Filter className="w-3.5 h-3.5 sm:mr-1" />
-                                <span className="hidden sm:block">
-                                    {t('filters', 'Filter')}
-                                </span>
-                            </Button>
+                                <Filter className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">{t('filters', 'Filter')}</span>
+                                {(roleFilter !== 'all' || statusFilter !== 'all' || fromDate || endDate) && (
+                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-white text-emerald-600 text-[9px] font-bold flex-shrink-0">
+                                        {[roleFilter !== 'all' ? 1 : 0, statusFilter !== 'all' ? 1 : 0, (fromDate || endDate) ? 1 : 0].reduce((a, b) => a + b, 0)}
+                                    </span>
+                                )}
+                            </button>
                         </div>
 
                     </div>
 
-                    {/* Users Table */}
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    {/* Mobile Card View */}
+                    <div className="block md:hidden space-y-2">
+                        {isLoading ? (
+                            Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 animate-pulse">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+                                        <div className="flex-1 space-y-1.5">
+                                            <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+                                            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                                        </div>
+                                        <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                                    </div>
+                                </div>
+                            ))
+                        ) : paginatedUsers.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                {searchQuery.trim() ? `Data "${searchQuery}" tidak ditemukan` : 'Tidak ada pengguna ditemukan'}
+                            </div>
+                        ) : (
+                            paginatedUsers.map((user) => {
+                                const roleConfig: Record<string, { className: string; label: string }> = {
+                                    admin: { className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400', label: 'Admin' },
+                                    support: { className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', label: 'Support' },
+                                    billing: { className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', label: 'Billing' },
+                                    member: { className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', label: 'Member' },
+                                }
+                                const rConfig = roleConfig[user.role || 'member'] || roleConfig.member
+                                return (
+                                    <div key={getUserId(user)} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
+                                        <div className="flex items-start gap-3">
+                                            <Link href={'/profile/' + getUserId(user)}>
+                                                <Avatar className="w-10 h-10 flex-shrink-0">
+                                                    <AvatarImage src={getAvatarSrc(user) || undefined} alt={user.name || user.username || ''} />
+                                                    <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                                        {user.name ? user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'U'}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                            </Link>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <button onClick={() => handleOpenDetail(getUserId(user))} className="text-sm font-semibold text-gray-900 dark:text-white truncate hover:text-emerald-600 transition-colors text-left">
+                                                        {user.name || user.username}
+                                                    </button>
+                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${(user.isBlocked) ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                                                        {user.isBlocked ? 'Diblokir' : 'Aktif'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{user.username}</p>
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email || '-'}</p>
+                                                <div className="flex items-center justify-between mt-2">
+                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${rConfig.className}`}>
+                                                        {rConfig.label}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button onClick={() => handleOpenDetail(getUserId(user))} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button onClick={() => handleManageRole(user)} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+                                                            <Shield className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-emerald-600 hover:bg-emerald-600">
@@ -926,7 +1002,6 @@ export default function Users() {
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    // Loading skeleton
                                     Array.from({ length: 3 }).map((_, index) => (
                                         <TableRow key={index}>
                                             <TableCell className="py-4">
@@ -935,21 +1010,11 @@ export default function Users() {
                                                     <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="w-40 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                                            </TableCell>
+                                            <TableCell className="py-4"><div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></TableCell>
+                                            <TableCell className="py-4"><div className="w-40 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></TableCell>
+                                            <TableCell className="py-4"><div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></TableCell>
+                                            <TableCell className="py-4"><div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" /></TableCell>
+                                            <TableCell className="py-4"><div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" /></TableCell>
                                             <TableCell className="py-4">
                                                 <div className="flex space-x-2">
                                                     <div className="w-12 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -984,80 +1049,36 @@ export default function Users() {
                                                     {user.username}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="py-2 px-3 text-sm text-gray-900 dark:text-white">
-                                                {user.name}
-                                            </TableCell>
-                                            <TableCell className="py-2 px-3 text-sm text-gray-600 dark:text-gray-400">
-                                                {user.email || '-'}
-                                            </TableCell>
+                                            <TableCell className="py-2 px-3 text-sm text-gray-900 dark:text-white">{user.name}</TableCell>
+                                            <TableCell className="py-2 px-3 text-sm text-gray-600 dark:text-gray-400">{user.email || '-'}</TableCell>
                                             <TableCell className="py-2 px-3 text-sm text-gray-600 dark:text-gray-400">
                                                 {(user.created || user.createdAt) ? formatDate(user.created || user.createdAt || '') : '-'}
                                             </TableCell>
                                             <TableCell className="py-2 px-3">
                                                 {(() => {
-                                                    // If no role data from API, show placeholder
-                                                    if (!user.role) {
-                                                        return <span className="text-gray-400 text-sm">-</span>
-                                                    }
-
+                                                    if (!user.role) return <span className="text-gray-400 text-sm">-</span>
                                                     const role = user.role
                                                     const roleConfig = {
-                                                        admin: {
-                                                            className: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-800',
-                                                            label: t('roles.admin', 'Admin')
-                                                        },
-                                                        support: {
-                                                            className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
-                                                            label: t('roles.support', 'Support')
-                                                        },
-                                                        billing: {
-                                                            className: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
-                                                            label: t('roles.billing', 'Billing')
-                                                        },
-                                                        member: {
-                                                            className: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-                                                            label: t('roles.member', 'Member')
-                                                        }
+                                                        admin: { className: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-800', label: t('roles.admin', 'Admin') },
+                                                        support: { className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800', label: t('roles.support', 'Support') },
+                                                        billing: { className: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800', label: t('roles.billing', 'Billing') },
+                                                        member: { className: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700', label: t('roles.member', 'Member') }
                                                     }
                                                     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.member
-                                                    return (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={`px-2 py-0.5 text-xs font-medium border ${config.className} rounded-md shadow-sm`}
-                                                        >
-                                                            {config.label}
-                                                        </Badge>
-                                                    )
+                                                    return <Badge variant="outline" className={`px-2 py-0.5 text-xs font-medium border ${config.className} rounded-md shadow-sm`}>{config.label}</Badge>
                                                 })()}
                                             </TableCell>
                                             <TableCell className="py-2 px-3">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={`px-2 py-0.5 text-xs font-medium border rounded-md shadow-sm ${(user.isBlocked || false)
-                                                        ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800'
-                                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                                                        }`}
-                                                >
+                                                <Badge variant="outline" className={`px-2 py-0.5 text-xs font-medium border rounded-md shadow-sm ${(user.isBlocked || false) ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'}`}>
                                                     {(user.isBlocked || false) ? t('status.blocked', 'Tidak') : t('status.active', 'Ya')}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="py-2 px-3">
                                                 <div className="flex items-center space-x-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleOpenDetail(getUserId(user))}
-                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                    >
+                                                    <Button variant="ghost" size="sm" onClick={() => handleOpenDetail(getUserId(user))} className="h-8 w-8 p-0 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                                                         <Eye className="w-4 h-4" />
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleManageRole(user)}
-                                                        title="Kelola Role"
-                                                        className="h-8 w-8 p-0 text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                                                    >
+                                                    <Button variant="ghost" size="sm" onClick={() => handleManageRole(user)} title="Kelola Role" className="h-8 w-8 p-0 text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                                                         <Shield className="w-4 h-4" />
                                                     </Button>
                                                 </div>

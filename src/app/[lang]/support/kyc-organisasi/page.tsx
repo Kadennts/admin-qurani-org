@@ -818,8 +818,84 @@ function KycOrganisasiContent() {
                     ))}
                 </div>
 
-                {/* ── Table Card ── */}
-                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
+                {/* ── Mobile Card View ── */}
+                <div className="block md:hidden space-y-3 mb-4">
+                    {loading ? (
+                        <div className="text-center py-10 text-gray-400 text-sm bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+                            Memuat data organisasi...
+                        </div>
+                    ) : filteredData.length === 0 ? (
+                        <div className="text-center py-10 text-gray-400 text-sm bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+                            Tidak ada data organisasi ditemukan
+                        </div>
+                    ) : filteredData.map(org => {
+                        let orgStatus = "nonaktif";
+                        const statusStr = org.status ? org.status.toLowerCase() : "";
+                        if (statusStr === "pending") orgStatus = "menunggu";
+                        else if (statusStr === "active" || statusStr === "aktif" || statusStr === "approved") orgStatus = "aktif";
+                        else if (statusStr === "inactive" || statusStr === "nonaktif") orgStatus = "nonaktif";
+                        else if (statusStr === "rejected" || statusStr === "ditolak") orgStatus = "ditolak";
+                        else if (org.isVerified === 0) orgStatus = "menunggu";
+                        else if (org.isVerified === 2) orgStatus = "ditolak";
+                        else if (org.isActive) orgStatus = "aktif";
+
+                        const status = STATUS_CONFIG[orgStatus]
+                        const StatusIcon = status.icon
+                        const tglPengajuan = new Date(org.createdAt || Date.now()).toLocaleDateString("id-ID", {
+                            day: "numeric", month: "short", year: "numeric"
+                        })
+                        return (
+                            <div 
+                                key={org.id} 
+                                onClick={() => router.push(`/support/kyc-organisasi/${org.id}`)}
+                                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm cursor-pointer hover:border-emerald-400 transition-colors"
+                            >
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-emerald-700 text-xs font-bold">
+                                                {String(org.name || "O").charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-1">{org.name}</p>
+                                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 mt-1 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                                {org.type || "Organisasi"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <AksiDropdown org={org} onToggle={toggleActive} onDetail={(id) => router.push(`/support/kyc-organisasi/${id}`)} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Kategori</p>
+                                        <p className="font-medium text-gray-900 dark:text-gray-300 truncate">{org.categoryName || org.category || "Umum"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">User</p>
+                                        <p className="font-medium text-gray-900 dark:text-gray-300 truncate">{org.ownerName || (org as any).user || org.ownerUsername || "-"}</p>
+                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">@{org.ownerUsername || (org as any).userUsername || "-"}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                        {tglPengajuan}
+                                    </div>
+                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full ${status.cls}`}>
+                                        <StatusIcon className="w-3 h-3" />
+                                        {status.label}
+                                    </span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {/* ── Desktop Table View ── */}
+                <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>

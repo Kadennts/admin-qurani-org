@@ -169,7 +169,7 @@ export interface FilterState {
     validUntil: string
 }
 
-export const EMPTY_FILTER: FilterState = {
+const EMPTY_FILTER: FilterState = {
     types: [],
     statuses: [],
     campaignId: "",

@@ -34,6 +34,9 @@ import {
   History,
   RotateCcw,
   ArrowDownToLine,
+  Headset,
+  BookMarked,
+  Award,
 } from "lucide-react"
 import { RxDashboard, } from "react-icons/rx"
 import { MdAnnouncement } from "react-icons/md"
@@ -273,6 +276,11 @@ const getSidebarData = (
           title: t("navigation.packages", "Courses"),
           url: "/teachers/courses",
           icon: Package,
+        },
+        {
+          title: t("navigation.trainer_certificates", "Sertifikat"),
+          url: "/teachers/certificates",
+          icon: Award,
         },
       ],
     },

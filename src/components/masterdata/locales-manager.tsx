@@ -201,28 +201,32 @@ export function LocalesManager() {
                 </Button>
             </div>
 
-            <div className="flex gap-3 mb-6">
-                <div className="relative flex-1 flex">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                        <Input
-                            placeholder="Search locales..."
-                            value={searchInput}
-                            onChange={(e) => setSearchInput(e.target.value)}
-                            onKeyDown={handleSearchKeyDown}
-                            className="pl-9 rounded-r-none bg-white dark:bg-gray-900 border-gray-200"
-                        />
-                    </div>
-                    <Button 
-                        onClick={handleSearchClick}
-                        className="rounded-l-none bg-emerald-600 hover:bg-emerald-700 text-white"
-                    >
-                        Search
-                    </Button>
-                </div>
-            </div>
-
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+                <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    {/* Kiri: Search */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                            <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search locales..."
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    onKeyDown={handleSearchKeyDown}
+                                    className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                />
+                            </div>
+                            <button
+                                onClick={handleSearchClick}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex-shrink-0"
+                            >
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <Table>
                     <TableHeader className="bg-emerald-600 dark:bg-emerald-700">
                         <TableRow className="hover:bg-transparent dark:hover:bg-transparent">

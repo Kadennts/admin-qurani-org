@@ -13,7 +13,7 @@ import {
     markSimPaymentAsPaidOut,
     syncPaymentStatusFromOrder,
 } from "@/lib/sim-billing-store"
-import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download, Send, CheckSquare } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, DollarSign, Activity, MoreHorizontal, AlertCircle, SlidersHorizontal, Download, Send, CheckSquare, Filter } from "lucide-react"
 import DisputesTab from "./DisputesTab"
 import { SmartPagination } from "@/components/ui/smart-pagination"
 interface PaymentData {
@@ -192,14 +192,44 @@ function PaymentsContent() {
     const [failureReason, setFailureReason] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    // Stats
+    // Stats from API
     const [stats, setStats] = useState({
         revenue: 0,
+        totalPayments: 0,
         pendingRefunds: 0
     });
+    const [statsLoading, setStatsLoading] = useState(true);
 
     // Export State
     const [isExporting, setIsExporting] = useState(false);
+
+    // Fetch stats from API on mount
+    useEffect(() => {
+        let cancelled = false;
+        const fetchStats = async () => {
+            setStatsLoading(true);
+            try {
+                const [statsRes, revenueRes] = await Promise.allSettled([
+                    paymentsApi.getStats(),
+                    paymentsApi.getRevenueAnalytics(),
+                ]);
+                if (cancelled) return;
+                const statsData = statsRes.status === 'fulfilled' ? statsRes.value : null;
+                const revenueData = revenueRes.status === 'fulfilled' ? revenueRes.value : null;
+                setStats(prev => ({
+                    ...prev,
+                    totalPayments: statsData?.totalPayments ?? statsData?.total ?? statsData?.count ?? prev.totalPayments,
+                    revenue: revenueData?.totalRevenue ?? revenueData?.revenue ?? revenueData?.total ?? prev.revenue,
+                }));
+            } catch {
+                // fallback: data will be updated from fetchPayments
+            } finally {
+                if (!cancelled) setStatsLoading(false);
+            }
+        };
+        fetchStats();
+        return () => { cancelled = true; };
+    }, []);
 
     const handleExportCSV = async () => {
         setIsExporting(true);
@@ -297,11 +327,15 @@ function PaymentsContent() {
             setTotalItems(response.totalCount || response.totalItems || dataArr.length || 0)
             setIsDemoMode(false)
             
-            // Try fetching stats if possible, otherwise calculate dummy stats from current items
-            setStats({
-                revenue: dataArr.filter((p: any) => p.status === 'paid').reduce((a: number, b: any) => a + b.amount, 0) || 5000000,
-                pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2
-            })
+            // Only update revenue from payment data as fallback when stats API hasn't loaded real data
+            if (statsLoading) {
+                setStats(prev => ({
+                    ...prev,
+                    revenue: prev.revenue || dataArr.filter((p: any) => p.status === 'paid').reduce((a: number, b: any) => a + b.amount, 0) || 5000000,
+                    totalPayments: prev.totalPayments || response.totalCount || dataArr.length || 0,
+                    pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2
+                }));
+            }
 
         } catch (err: any) {
             console.warn("API Fetch Error:", err.message)
@@ -331,10 +365,12 @@ function PaymentsContent() {
 
             setPayments(dummy)
             setTotalItems(dummy.length)
-            setStats({
-                revenue: dummy.filter(p => p.status === 'paid').reduce((a, b) => a + b.amount, 0),
+            setStats(prev => ({
+                ...prev,
+                revenue: prev.revenue || dummy.filter(p => p.status === 'paid').reduce((a, b) => a + b.amount, 0),
+                totalPayments: prev.totalPayments || dummy.length,
                 pendingRefunds: dummy.filter(p => p.status === 'pending_refund').length
-            })
+            }))
         } finally {
             setLoading(false)
         }
@@ -434,115 +470,129 @@ function PaymentsContent() {
             {activeTab === 'payments' && (
             <div className="px-4 sm:px-6 lg:px-8 mt-6">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                            <Activity className="w-6 h-6" />
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+                    {/* Card: Total Pembayaran */}
+                    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3 sm:gap-4">
+                        <div className="p-2.5 sm:p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex-shrink-0">
+                            <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.payments", "Pembayaran")}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{totalItems}</p>
+                        <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">{t("billing.payments.summary.payments", "Pembayaran")}</p>
+                            {statsLoading ? (
+                                <div className="h-7 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-0.5" />
+                            ) : (
+                                <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                                    {(stats.totalPayments || totalItems).toLocaleString('id-ID')}
+                                </p>
+                            )}
                         </div>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                            <DollarSign className="w-6 h-6" />
+                    {/* Card: Revenue */}
+                    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3 sm:gap-4">
+                        <div className="p-2.5 sm:p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg flex-shrink-0">
+                            <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("billing.payments.summary.revenue", "Revenue")}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.revenue)}</p>
+                        <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">{t("billing.payments.summary.revenue", "Revenue")}</p>
+                            {statsLoading ? (
+                                <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-0.5" />
+                            ) : (
+                                <p className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white">
+                                    {formatCurrency(stats.revenue)}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
             )}
 
-            {/* Shared Toolbar — always visible (Tab Pills are here, must be outside any activeTab conditional) */}
+            {/* Shared Toolbar */}
             <div className="px-4 sm:px-6 lg:px-8 mt-4">
-                {/* Filters & Search */}
                 <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                    {/* Main toolbar */}
-                    <div className="flex flex-col-reverse sm:flex-row gap-3 p-4 items-center justify-between">
-                        {/* Left Side: Search + Filter Button */}
-                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                            <div className="flex flex-1 sm:w-[420px] shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-shadow">
-                                <div className="relative flex-1 bg-white dark:bg-gray-900">
+                    <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        {/* Kiri: Search & Filter */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1 flex-1">
+                            {/* Search */}
+                            <div className="flex flex-1 sm:flex-none sm:w-64 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow">
+                                <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                     <input
                                         type="text"
-                                        placeholder="Cari kode pemesanan, metode..."
+                                        placeholder="Cari kode pesanan, metode..."
                                         value={searchInput}
                                         onChange={(e) => setSearchInput(e.target.value)}
                                         onKeyDown={handleKeyPress}
-                                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                        className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
                                     />
                                 </div>
                                 <button
                                     onClick={handleSearch}
-                                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors flex-shrink-0"
                                 >
-                                    <Search className="w-4 h-4" />
                                     {t("billing.payments.searchButton", "Cari")}
                                 </button>
                             </div>
-                            {/* Filter Modal Button */}
+
+                            {/* Filter */}
                             <button
                                 onClick={() => setShowFilterPanel(true)}
-                                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border flex-shrink-0 ${
                                     statusFilter || methodFilter
-                                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400'
-                                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                                        : "bg-white text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                                 }`}
                             >
-                                <SlidersHorizontal className="w-4 h-4" />
-                                Filter
+                                <Filter className="w-4 h-4" /> 
+                                <span className="hidden sm:inline">Filter</span>
                                 {(statusFilter || methodFilter) && (
-                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex-shrink-0">
+                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold">
                                         {[statusFilter, methodFilter].filter(Boolean).length}
                                     </span>
                                 )}
                             </button>
                         </div>
 
-                        {/* Right Side: Tab Pills + Export */}
-                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
-                            {/* Tab Pills: Payments List / Disputes */}
-                            <div className="flex items-center w-full sm:w-auto rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                        {/* Kanan: CSV & Tabs */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
+                            {/* Export CSV */}
+                            <button
+                                onClick={handleExportCSV}
+                                disabled={isExporting}
+                                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 border flex-shrink-0 ${
+                                    isExporting
+                                    ? "bg-gray-100 text-gray-400 cursor-wait dark:bg-gray-800 dark:text-gray-600 border-gray-200 dark:border-gray-700"
+                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800"
+                                }`}
+                            >
+                                <Download className="w-4 h-4" />
+                                <span className="hidden md:inline">{isExporting ? "Ekspor..." : "CSV"}</span>
+                            </button>
+
+                            {/* Tab Pills */}
+                            <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
                                 <button
                                     onClick={() => setActiveTab('payments')}
-                                    className={`flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold transition-colors ${
+                                    className={`px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
                                         activeTab === 'payments'
                                             ? 'bg-emerald-500 text-white'
                                             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                     }`}
                                 >
-                                    {t("billing.payments.tabs.payments", "Daftar Pembayaran")}
+                                    Payments List
                                 </button>
-                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 hidden sm:block" />
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
                                 <button
                                     onClick={() => setActiveTab('disputes')}
-                                    className={`flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold transition-colors ${
+                                    className={`px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
                                         activeTab === 'disputes'
                                             ? 'bg-emerald-500 text-white'
                                             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                     }`}
                                 >
-                                    {t("billing.payments.tabs.disputes", "Sengketa")}
+                                    Disputes
                                 </button>
                             </div>
-                            {/* Export CSV */}
-                            <button
-                                onClick={handleExportCSV}
-                                disabled={isExporting}
-                                className={`w-full sm:w-auto px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${
-                                    isExporting 
-                                    ? "bg-gray-100 text-gray-400 cursor-wait dark:bg-gray-800 dark:text-gray-600" 
-                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800"
-                                }`}
-                            >
-                                <Download className="w-4 h-4" />
-                                {isExporting ? "Mengekspor..." : "Export CSV"}
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -658,80 +708,140 @@ function PaymentsContent() {
             <div className="px-4 sm:px-6 lg:px-8 pb-6">
                 {/* Data Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                    {/* MOBILE CARD VIEW (<640px) */}
-                    <div className="space-y-3 sm:hidden p-4">
+                    {/* MOBILE CARD VIEW (<640px) — like SupportTicketsPage */}
+                    <div className="space-y-3 sm:hidden p-3">
                         {loading ? (
                             <div className="space-y-3">
-                                {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
-                                        <div className="flex justify-between items-start"><Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" /></div>
-                                        <div className="grid grid-cols-2 gap-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /></div>
+                                {[...Array(4)].map((_, i) => (
+                                    <div key={i} className="border-l-4 border-l-gray-200 dark:border-l-gray-700 border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-2">
+                                                <Skeleton className="h-4 w-12 rounded" />
+                                                <Skeleton className="h-5 w-16 rounded-full" />
+                                            </div>
+                                            <Skeleton className="h-7 w-7 rounded" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Skeleton className="h-3.5 w-3/4 rounded" />
+                                            <Skeleton className="h-3 w-1/2 rounded" />
+                                        </div>
+                                        <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-800">
+                                            <Skeleton className="h-4 w-24 rounded" />
+                                            <Skeleton className="h-4 w-16 rounded" />
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         ) : payments.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                                {t("billing.payments.empty", "Tidak ada pembayaran yang ditemukan.")}
+                            <div className="text-center py-10 text-gray-500 dark:text-gray-400">
+                                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
+                                <p className="text-sm">{t("billing.payments.empty", "Tidak ada pembayaran yang ditemukan.")}</p>
                             </div>
                         ) : (
-                            payments.map((payment) => (
-                                <div
-                                    key={payment.id}
-                                    onClick={() => handleRowClick(payment.bookingId)}
-                                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm relative transition-colors ${payment.bookingId ? 'cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10' : ''}`}>
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2">
-                                            <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
-                                                checked={selectedIds.includes(payment.id)}
-                                                onChange={() => toggleSelect(payment.id)}
-                                                onClick={e => e.stopPropagation()}
-                                            />
-                                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">
-                                                #{payment.bookingId || payment.id}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
-                                                payment.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                                payment.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                payment.status === 'refunded' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                                'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                                            }`}>
-                                                {payment.status === 'paid' ? 'Lunas' : payment.status === 'pending' ? 'Pending' : payment.status === 'failed' ? 'Gagal' : payment.status === 'refunded' ? 'Refund' : payment.status === 'disputed' ? 'Bermasalah' : payment.status}
-                                            </span>
-                                            <div onClick={e => e.stopPropagation()}>
-                                                <ActionDropdown 
-                                                    payment={payment}
-                                                    onSendInvoice={() => setSendInvoiceModal(payment)}
-                                                    onUpdateStatus={() => {
-                                                        setStatusUpdateValue(payment.status);
-                                                        setUpdateStatusModal(payment);
-                                                    }}
-                                                />
+                            payments.map((payment) => {
+                                const statusBorderColor =
+                                    payment.status === 'paid' ? 'border-l-emerald-500' :
+                                    payment.status === 'pending' ? 'border-l-amber-400' :
+                                    payment.status === 'refunded' ? 'border-l-blue-500' :
+                                    payment.status === 'disputed' ? 'border-l-purple-500' :
+                                    'border-l-rose-500';
+                                return (
+                                    <div
+                                        key={payment.id}
+                                        className={`border-l-4 ${statusBorderColor} border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm transition-all active:scale-[0.99] ${payment.bookingId ? 'cursor-pointer hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700' : ''}`}
+                                    >
+                                        <div className="p-4 space-y-3">
+                                            {/* Row 1: Kode + Status + Action */}
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <div onClick={e => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-emerald-600 rounded border-gray-300 dark:border-gray-600 focus:ring-emerald-500"
+                                                            checked={selectedIds.includes(payment.id)}
+                                                            onChange={() => toggleSelect(payment.id)}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRowClick(payment.bookingId)}
+                                                        className="font-mono text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+                                                    >
+                                                        #{payment.bookingId || payment.id}
+                                                    </button>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
+                                                        payment.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                        payment.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                        payment.status === 'refunded' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                        payment.status === 'disputed' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                                        'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                                                    }`}>
+                                                        {payment.status === 'paid' ? 'Lunas' : payment.status === 'pending' ? 'Pending' : payment.status === 'failed' ? 'Gagal' : payment.status === 'refunded' ? 'Refund' : payment.status === 'disputed' ? 'Bermasalah' : payment.status}
+                                                    </span>
+                                                </div>
+                                                <div onClick={e => e.stopPropagation()}>
+                                                    <ActionDropdown
+                                                        payment={payment}
+                                                        onSendInvoice={() => setSendInvoiceModal(payment)}
+                                                        onUpdateStatus={() => {
+                                                            setStatusUpdateValue(payment.status);
+                                                            setUpdateStatusModal(payment);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Row 2: User & Trainer info */}
+                                            <div onClick={() => handleRowClick(payment.bookingId)} className="space-y-1">
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">User</span>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }}
+                                                        className="text-sm font-semibold text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left leading-tight"
+                                                    >
+                                                        {payment.userName || '-'}
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">Trainer</span>
+                                                    <span className="text-sm text-gray-700 dark:text-gray-300 leading-tight">{payment.trainerName || '-'}</span>
+                                                </div>
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">Metode</span>
+                                                    <span className="text-sm text-gray-700 dark:text-gray-300 leading-tight">{payment.paymentMethod || '-'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Row 3: Amount + Date */}
+                                            <div className="flex justify-between items-center pt-2.5 border-t border-gray-100 dark:border-gray-700">
+                                                <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCurrency(payment.amount)}
+                                                </span>
+                                                <span
+                                                    className="text-[11px] text-gray-400 dark:text-gray-500 border-b border-dashed border-gray-300 dark:border-gray-600 cursor-default"
+                                                    title={formatTooltipDate(payment.updatedAt || payment.createdAt)}
+                                                >
+                                                    {timeAgo(payment.updatedAt || payment.createdAt).relative}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="text-xs text-gray-500">
-                                            {t("billing.payments.table.user", "User")}: <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }} className="font-medium text-gray-900 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{payment.userName || '-'}</button>
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-0.5">
-                                            {t("billing.payments.table.trainer", "Trainer")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.trainerName || '-'}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-0.5">
-                                            {t("billing.payments.table.paymentMethod", "Metode")}: <span className="font-medium text-gray-900 dark:text-gray-300">{payment.paymentMethod || '-'}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                                        <div className="font-medium text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(payment.amount)}</div>
-                                        <div className="text-xs text-gray-500" title={formatTooltipDate(payment.updatedAt || payment.createdAt)}>
-                                            {timeAgo(payment.updatedAt || payment.createdAt).relative}
-                                        </div>
-                                    </div>
+                                );
+                            })
+                        )}
+
+                        {/* Mobile Bulk Action Bar */}
+                        {selectedIds.length > 0 && (
+                            <div className="fixed bottom-4 left-4 right-4 z-40 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-2xl shadow-2xl p-3 flex items-center justify-between">
+                                <span className="text-sm font-semibold">{selectedIds.length} dipilih</span>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setSelectedIds([])}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-colors"
+                                    >
+                                        Batal
+                                    </button>
                                 </div>
-                            ))
+                            </div>
                         )}
                     </div>
 

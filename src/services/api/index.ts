@@ -85,7 +85,7 @@ export type {
     LeaderboardEntryDto,
     TeacherDashboardDto,
     RecapCityDto,
-    CertificateDto,
+    SetoranCertificateDto,
 } from './setoran';
 
 // Re-export types from types file
@@ -116,3 +116,31 @@ export type {
     UpdateProfileRequest,
 } from './users';
 
+// Re-export Certificate services
+export {
+    searchCertificates,
+    getCertificateById,
+    getCertificateByNumber,
+    getCertificateForBooking,
+    getCertificatesByTrainer,
+    bulkIssueCertificates,
+    revokeCertificate,
+    reinstateCertificate,
+    getCertificateTemplates,
+    getCertificateStatistics,
+    getExpiringCertificates,
+    updateCertificateVisibility,
+} from './certificates';
+
+// Re-export types from certificates
+export type {
+    CertificateDto,
+    CertificateSearchParams,
+    CertificatePagedResponse,
+    BulkIssueCertificatesRequest,
+    RevokeCertificateRequest,
+    ReinstateCertificateRequest,
+    CertificateTemplateDto,
+    CertificateStatisticsDto,
+    ExpiringCertificateDto,
+} from './certificates';

@@ -119,7 +119,7 @@ export interface RecapCityDto {
     avgScore: number;
 }
 
-export interface CertificateDto {
+export interface SetoranCertificateDto {
     id: number;
     type: string;
     title: string;
@@ -595,10 +595,10 @@ export async function fetchRecapByCity(filters?: {
  */
 export async function fetchCertificates(): Promise<{
     success: boolean;
-    data?: CertificateDto[];
+    data?: SetoranCertificateDto[];
     error?: string;
 }> {
-    const result = await apiRequest<ApiResponse<CertificateDto[]>>('/api/v1/qurani/certificates');
+    const result = await apiRequest<ApiResponse<SetoranCertificateDto[]>>('/api/v1/qurani/certificates');
 
     return {
         success: result.success,

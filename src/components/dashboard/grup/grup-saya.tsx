@@ -1178,18 +1178,17 @@ export function GrupSaya() {
               </div>
             </div>
             
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => handleOpenFilterModal()}
-              className={`h-9 w-full sm:w-auto border-dashed whitespace-nowrap text-xs ${selectedCategoryFilter !== "all" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : ""}`}
+              className={`relative h-9 px-3 w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap ${
+                selectedCategoryFilter !== "all" || selectedStatusGrup !== "active" || locationFilter.country_id !== "0"
+                  ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
+                  : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-emerald-400"
+              }`}
             >
-              <Filter className="h-3.5 w-3.5 mr-2" />
+              <Filter className="h-3.5 w-3.5" />
               {t('filters', 'Filter')}
-              {selectedCategoryFilter !== "all" && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>
-              )}
-            </Button>
+            </button>
           </div>
         </div>
 
