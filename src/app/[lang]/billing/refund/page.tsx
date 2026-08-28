@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -9,7 +9,7 @@ import { useTranslation } from "@/hooks/use-translation"
 import {
     Search, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock,
     RotateCcw, AlertCircle, RefreshCw, MoreVertical,
-    Check, X, Banknote, Receipt
+    Check, X, Banknote, Receipt, Filter, Calendar, DollarSign, ChevronDown
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import { SmartPagination } from "@/components/ui/smart-pagination"
@@ -74,9 +74,14 @@ interface RefundItem {
     notes?: string;
 }
 
-// Data sepenuhnya dari sim-billing-store (persistent localStorage).
-// DUMMY lama dihapus — gunakan getSimRefundPending() dan getSimRefundProcessed()
-// yang sudah sinkron dengan 10 pesanan di halaman Orders/Pesanan.
+// Filter state type
+interface FilterState {
+    status: string; // '' | 'pending' | 'approved' | 'rejected'
+    dateFrom: string;
+    dateTo: string;
+    amountMin: string;
+    amountMax: string;
+}
 
 function getStatusBadge(status: string) {
     const s = status?.toLowerCase() || '';
@@ -106,25 +111,22 @@ function RefundContent() {
     const [tz, setTz] = useState("UTC");
     useEffect(() => { setTz(resolveTimezone()); }, [resolveTimezone]);
 
-    const [activeTab, setActiveTab] = useState<'pending' | 'processed'>('pending');
     const [loading, setLoading] = useState(true);
     const [isDemoMode, setIsDemoMode] = useState(false);
-    const [pendingRefunds, setPendingRefunds] = useState<RefundItem[]>([]);
-    const [processedRefunds, setProcessedRefunds] = useState<RefundItem[]>([]);
-    const [processedLoading, setProcessedLoading] = useState(false);
+    const [allRefunds, setAllRefunds] = useState<RefundItem[]>([]);
 
     const [search, setSearch] = useState("");
     const [activeSearch, setActiveSearch] = useState("");
     const [page, setPage] = useState(1);
-    const [processedPage, setProcessedPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [processedPageSize, setProcessedPageSize] = useState(10);
 
-    const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, processedCount: 0 });
+    // Filter state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [filter, setFilter] = useState<FilterState>({ status: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
+    const [activeFilter, setActiveFilter] = useState<FilterState>({ status: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
+    const filterRef = useRef<HTMLDivElement>(null);
 
-    // User wallet modal
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-    const [selectedUserName, setSelectedUserName] = useState<string>("");
+    const [stats, setStats] = useState({ pendingCount: 0, totalValue: 0, approvedCount: 0, rejectedCount: 0 });
 
     // Modal
     const [actionModal, setActionModal] = useState<{ open: boolean; item: RefundItem | null; type: 'approve' | 'reject' }>({ open: false, item: null, type: 'approve' });
@@ -132,71 +134,155 @@ function RefundContent() {
     const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Close filter modal on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && filterOpen) {
+                setFilterOpen(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [filterOpen]);
+
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 if (viewModal.open) setViewModal({ open: false, item: null });
                 if (actionModal.open) setActionModal({ open: false, item: null, type: 'approve' });
+                if (filterOpen) setFilterOpen(false);
             }
         };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
-    }, [viewModal.open, actionModal.open]);
+    }, [viewModal.open, actionModal.open, filterOpen]);
 
-    // ── Fetch pending refunds ─────────────────────────────────────────────────
-    const fetchPending = useCallback(async () => {
+    // ── Fetch all refunds (pending + processed combined) ───────────────────────
+    const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
-            // paymentsApi.getPendingRefunds → GET /api/v1/Payments/pending-refunds
-            const res = await paymentsApi.getPendingRefunds({ page: 1, pageSize: 100 } as any);
-            let items: RefundItem[] = Array.isArray(res) ? res : (res?.data || res?.items || []);
-            if (!Array.isArray(items)) items = [];
+            const [pendingRes, processedRes] = await Promise.allSettled([
+                paymentsApi.getPendingRefunds({ page: 1, pageSize: 100 } as any),
+                paymentsApi.search({ Status: 'refunded', Page: 1, PageSize: 100 } as any),
+            ]);
 
-            if (items.length === 0) {
-                items = getSimRefundPending();
-                setIsDemoMode(true);
-            } else setIsDemoMode(false);
+            let pendingItems: RefundItem[] = [];
+            let processedItems: RefundItem[] = [];
 
-            if (activeSearch) {
-                const q = activeSearch.toLowerCase();
-                items = items.filter(r => r.userName?.toLowerCase().includes(q) || r.trainerName?.toLowerCase().includes(q) || String(r.id).includes(q) || r.refundReason?.toLowerCase().includes(q));
+            if (pendingRes.status === 'fulfilled') {
+                const res = pendingRes.value;
+                pendingItems = Array.isArray(res) ? res : (res?.data || res?.items || []);
+            }
+            if (processedRes.status === 'fulfilled') {
+                const res = processedRes.value;
+                processedItems = Array.isArray(res) ? res : (res?.data || res?.items || []);
             }
 
-            setPendingRefunds(items);
-            setStats(prev => ({ ...prev, pendingCount: items.length, pendingTotal: items.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0) }));
+            let combined: RefundItem[] = [...pendingItems, ...processedItems];
+
+            if (combined.length === 0) {
+                const simPending = getSimRefundPending();
+                const simProcessed = getSimRefundProcessed();
+                combined = [...simPending, ...simProcessed];
+                setIsDemoMode(true);
+            } else {
+                setIsDemoMode(false);
+            }
+
+            setAllRefunds(combined);
+            setStats({
+                pendingCount: combined.filter(r => {
+                    const s = (r.status || '').toLowerCase();
+                    return s === 'pending' || s === 'waiting' || s === 'pending_refund';
+                }).length,
+                totalValue: combined.reduce((a, b) => a + (b.refundAmount ?? b.amount), 0),
+                approvedCount: combined.filter(r => {
+                    const s = (r.status || '').toLowerCase();
+                    return s === 'refunded' || s === 'approved';
+                }).length,
+                rejectedCount: combined.filter(r => {
+                    const s = (r.status || '').toLowerCase();
+                    return s === 'rejected' || s === 'failed';
+                }).length,
+            });
         } catch {
-            const fallback = getSimRefundPending();
-            setPendingRefunds(fallback);
+            const simPending = getSimRefundPending();
+            const simProcessed = getSimRefundProcessed();
+            const combined = [...simPending, ...simProcessed];
+            setAllRefunds(combined);
             setIsDemoMode(true);
-            setStats(prev => ({ ...prev, pendingCount: fallback.length, pendingTotal: fallback.reduce((a: number, b: any) => a + b.amount, 0) }));
+            setStats({
+                pendingCount: combined.filter(r => ['pending', 'waiting', 'pending_refund'].includes((r.status || '').toLowerCase())).length,
+                totalValue: combined.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0),
+                approvedCount: combined.filter(r => ['refunded', 'approved'].includes((r.status || '').toLowerCase())).length,
+                rejectedCount: combined.filter(r => ['rejected', 'failed'].includes((r.status || '').toLowerCase())).length,
+            });
         } finally {
             setLoading(false);
         }
-    }, [activeSearch]);
-
-    const fetchProcessed = useCallback(async () => {
-        setProcessedLoading(true);
-        try {
-            const res = await paymentsApi.search({ Status: 'refunded', Page: 1, PageSize: 100 } as any);
-            let items: RefundItem[] = Array.isArray(res) ? res : (res?.items || res?.data || []);
-            if (!Array.isArray(items)) items = [];
-            if (items.length === 0) items = getSimRefundProcessed();
-            setProcessedRefunds(items);
-            setStats(prev => ({ ...prev, processedCount: items.length }));
-        } catch {
-            const fallback = getSimRefundProcessed();
-            setProcessedRefunds(fallback);
-            setStats(prev => ({ ...prev, processedCount: fallback.length }));
-        } finally {
-            setProcessedLoading(false);
-        }
     }, []);
 
-    useEffect(() => { fetchPending(); }, [fetchPending]);
-    useEffect(() => { fetchProcessed(); }, [fetchProcessed]);
+    useEffect(() => { fetchAll(); }, [fetchAll]);
+
+    // Apply filters + search client-side
+    const filteredRefunds = allRefunds.filter(r => {
+        // Search
+        if (activeSearch) {
+            const q = activeSearch.toLowerCase();
+            if (!(r.userName?.toLowerCase().includes(q) || r.trainerName?.toLowerCase().includes(q) || String(r.id).includes(q) || r.refundReason?.toLowerCase().includes(q))) return false;
+        }
+        // Status filter
+        if (activeFilter.status) {
+            const s = (r.status || '').toLowerCase();
+            if (activeFilter.status === 'pending' && !['pending', 'waiting', 'pending_refund'].includes(s)) return false;
+            if (activeFilter.status === 'approved' && !['approved', 'refunded'].includes(s)) return false;
+            if (activeFilter.status === 'rejected' && !['rejected', 'failed'].includes(s)) return false;
+        }
+        // Date from
+        if (activeFilter.dateFrom) {
+            const d = new Date(r.createdAt);
+            const from = new Date(activeFilter.dateFrom);
+            if (d < from) return false;
+        }
+        // Date to
+        if (activeFilter.dateTo) {
+            const d = new Date(r.createdAt);
+            const to = new Date(activeFilter.dateTo);
+            to.setHours(23, 59, 59);
+            if (d > to) return false;
+        }
+        // Amount min
+        if (activeFilter.amountMin) {
+            const val = r.refundAmount ?? r.amount;
+            if (val < Number(activeFilter.amountMin)) return false;
+        }
+        // Amount max
+        if (activeFilter.amountMax) {
+            const val = r.refundAmount ?? r.amount;
+            if (val > Number(activeFilter.amountMax)) return false;
+        }
+        return true;
+    });
+
+    const paged = filteredRefunds.slice((page - 1) * pageSize, page * pageSize);
 
     const handleSearch = () => { setActiveSearch(search); setPage(1); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch(); };
+
+    const hasActiveFilter = activeFilter.status || activeFilter.dateFrom || activeFilter.dateTo || activeFilter.amountMin || activeFilter.amountMax;
+
+    const applyFilter = () => {
+        setActiveFilter({ ...filter });
+        setPage(1);
+        setFilterOpen(false);
+    };
+    const resetFilter = () => {
+        const empty = { status: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' };
+        setFilter(empty);
+        setActiveFilter(empty);
+        setPage(1);
+        setFilterOpen(false);
+    };
 
     const openAction = (item: RefundItem, type: 'approve' | 'reject') => {
         setActionModal({ open: true, item, type });
@@ -216,7 +302,6 @@ function RefundContent() {
         }
         setIsSubmitting(true);
         try {
-            // paymentsApi.processRefund → POST /api/v1/Payments/{id}/process-refund
             await paymentsApi.processRefund(actionModal.item.id, {
                 approved: actionModal.type === 'approve' ? 1 : 0,
                 notes: notes.trim() || undefined,
@@ -230,26 +315,24 @@ function RefundContent() {
                     : 'Refund berhasil ditolak.',
             });
             setActionModal({ open: false, item: null, type: 'approve' });
-            fetchPending();
+            fetchAll();
         } catch {
-            // Demo fallback: simpan ke sim-billing-store (persistent)
             if (actionModal.type === 'approve') {
                 approveSimRefund(actionModal.item!.id, notes.trim() || undefined);
             } else {
                 rejectSimRefund(actionModal.item!.id, notes.trim() || 'Ditolak oleh Admin');
             }
 
-            // Refresh dari store
-            const newPending = getSimRefundPending();
-            const newProcessed = getSimRefundProcessed();
-            setPendingRefunds(newPending);
-            setProcessedRefunds(newProcessed);
-            setStats(prev => ({
-                ...prev,
-                pendingCount: newPending.length,
-                pendingTotal: newPending.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0),
-                processedCount: newProcessed.length,
-            }));
+            const simPending = getSimRefundPending();
+            const simProcessed = getSimRefundProcessed();
+            const combined = [...simPending, ...simProcessed];
+            setAllRefunds(combined);
+            setStats({
+                pendingCount: combined.filter(r => ['pending', 'waiting', 'pending_refund'].includes((r.status || '').toLowerCase())).length,
+                totalValue: combined.reduce((a: number, b: any) => a + (b.refundAmount ?? b.amount), 0),
+                approvedCount: combined.filter(r => ['refunded', 'approved'].includes((r.status || '').toLowerCase())).length,
+                rejectedCount: combined.filter(r => ['rejected', 'failed'].includes((r.status || '').toLowerCase())).length,
+            });
 
             showToast({
                 type: 'info',
@@ -262,11 +345,6 @@ function RefundContent() {
         }
     };
 
-    const paged = pendingRefunds.slice((page - 1) * pageSize, page * pageSize);
-    const totalPages = Math.max(1, Math.ceil(pendingRefunds.length / pageSize));
-    const pagedProcessed = processedRefunds.slice((processedPage - 1) * processedPageSize, processedPage * processedPageSize);
-    const totalProcessedPages = Math.max(1, Math.ceil(processedRefunds.length / processedPageSize));
-
     return (
         <TooltipProvider>
             <div className="bg-gray-50 dark:bg-gray-950 p-4 min-h-screen">
@@ -277,24 +355,25 @@ function RefundContent() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <RotateCcw className="w-6 h-6 text-rose-500" />
+                                <RotateCcw className="w-6 h-6 text-emerald-500" />
                                 Refund
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={fetchPending} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
+                            <button onClick={fetchAll} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
                                 <RefreshCw className="w-4 h-4 text-gray-500" />
                                 Refresh
                             </button>
                         </div>
                     </div>
 
-                    {/* ── Stats Cards ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* ── Stats Cards (4 cards) ── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
                             { label: "Pending Refund", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", clr: "text-amber-600 dark:text-amber-400" },
-                            { label: "Total Nilai Pending", value: formatRupiah(stats.pendingTotal), icon: Banknote, bg: "bg-rose-100 dark:bg-rose-900/30", clr: "text-rose-600 dark:text-rose-400", isStr: true },
-                            { label: "Sudah Diproses", value: stats.processedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400" },
+                            { label: "Refund Total Nilai", value: formatRupiah(stats.totalValue), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400", isStr: true },
+                            { label: "Disetujui", value: stats.approvedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400" },
+                            { label: "Ditolak", value: stats.rejectedCount, icon: XCircle, bg: "bg-red-100 dark:bg-red-900/30", clr: "text-red-600 dark:text-red-400" },
                         ].map(c => {
                             const Icon = c.icon;
                             return (
@@ -312,128 +391,218 @@ function RefundContent() {
                     {/* ── Table Card ── */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 
-                        {/* Tab Header */}
-                        <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
-                            {/* Toolbar (Search) - Left Side */}
-                            <div className="py-2 w-full sm:w-auto flex flex-wrap items-center gap-2">
-                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-rose-500 transition-shadow w-full sm:w-auto">
+                        {/* Toolbar: Search + Filter */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center border-b border-gray-100 dark:border-gray-700 px-4 py-3 gap-3">
+                            {/* Search - Left side, bigger */}
+                            <div className="flex items-center gap-2 flex-1">
+                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow flex-1 max-w-md">
                                     <div className="relative bg-white dark:bg-gray-900 flex-1">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                                        <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleKeyDown}
-                                            placeholder="Cari nama, alasan..."
-                                            className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none dark:text-white" />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                            onKeyDown={handleKeyDown}
+                                            placeholder="Cari nama, alasan refund..."
+                                            className="w-full pl-10 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none dark:text-white"
+                                        />
                                     </div>
-                                    <button onClick={handleSearch} className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold transition-colors">Cari</button>
+                                    <button onClick={handleSearch} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors whitespace-nowrap">Cari</button>
                                 </div>
-                            </div>
 
-                            {/* Tabs - Right Side */}
-                            <div className="flex items-center gap-0 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
-                                {[
-                                    { key: 'pending' as const, label: 'Pending Refund', count: pendingRefunds.length },
-                                    { key: 'processed' as const, label: 'Sudah Diproses' },
-                                ].map(tab => (
-                                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${activeTab === tab.key ? 'border-rose-500 text-rose-600 dark:text-rose-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
-                                        {tab.label}
-                                        {tab.count !== undefined && tab.count > 0 && (
-                                            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">{tab.count}</span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ══ TAB: PENDING REFUND ══ */}
-                        {activeTab === 'pending' && (
-                        <>
-                            {/* Mobile */}
-                            <div className="space-y-3 sm:hidden p-4">
-                                {loading ? (
-                                    <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="border rounded-lg p-4 space-y-2 animate-pulse"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-full" /></div>)}</div>
-                                ) : paged.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-400"><RotateCcw className="w-10 h-10 mx-auto mb-3 text-gray-300" /><p>Tidak ada refund pending</p></div>
-                                ) : paged.map(r => (
-                                    <div
-                                        key={r.id}
-                                        onClick={() => handleRowClick(r.bookingId)}
-                                        className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm transition-colors ${r.bookingId ? 'cursor-pointer hover:border-rose-300 dark:hover:border-rose-700 hover:bg-rose-50/30 dark:hover:bg-rose-900/10' : ''}`}
+                                {/* Filter Button */}
+                                <div className="relative" ref={filterRef}>
+                                    <button
+                                        onClick={() => setFilterOpen(prev => !prev)}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
+                                            ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                            : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                        }`}
                                     >
-                                        <div className="flex justify-between">
-                                            <span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md">#{r.bookingId || r.id}</span>
-                                            {getStatusBadge(r.status)}
-                                        </div>
-                                        <div className="text-xs text-gray-500 space-y-1">
-                                            <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-rose-600 dark:hover:text-rose-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
-                                            <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
-                                            {r.sessionsInfo && <div>Sesi: <span className="font-medium text-rose-600 dark:text-rose-400">{r.sessionsInfo}</span></div>}
-                                            {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
-                                        </div>
-                                        <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                                            <span className="font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</span>
-                                            <div className="flex gap-2">
-                                                <button onClick={(e) => { e.stopPropagation(); openAction(r, 'approve'); }} className="text-xs font-semibold text-emerald-600 border border-emerald-300 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors">Setuju</button>
-                                                <button onClick={(e) => { e.stopPropagation(); openAction(r, 'reject'); }} className="text-xs font-semibold text-red-600 border border-red-300 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">Tolak</button>
+                                        <Filter className="w-4 h-4" />
+                                        Filter
+                                    </button>
+
+                                    {/* Filter Modal */}
+                                    {filterOpen && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Filter className="w-5 h-5 text-emerald-500" /> Filter Data Refund</h3>
+                                                    <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
+                                                </div>
+                                                <div className="p-6 space-y-4">
+                                            {/* Status */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Status</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {['', 'pending', 'approved', 'rejected'].map(s => (
+                                                        <button
+                                                            key={s}
+                                                            onClick={() => setFilter(f => ({ ...f, status: s }))}
+                                                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${filter.status === s
+                                                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                                                : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                                                            }`}
+                                                        >
+                                                            {s === '' ? 'Semua' : s === 'pending' ? 'Pending' : s === 'approved' ? 'Disetujui' : 'Ditolak'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Date Range */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><Calendar className="w-3 h-3" />Rentang Tanggal</label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-400 mb-1">Dari</p>
+                                                        <input type="date" value={filter.dateFrom} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value }))}
+                                                            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-400 mb-1">Sampai</p>
+                                                        <input type="date" value={filter.dateTo} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value }))}
+                                                            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Amount Range */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><DollarSign className="w-3 h-3" />Nilai Refund (Rp)</label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-400 mb-1">Lebih dari</p>
+                                                        <input type="number" placeholder="0" value={filter.amountMin} onChange={e => setFilter(f => ({ ...f, amountMin: e.target.value }))}
+                                                            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-400 mb-1">Kurang dari</p>
+                                                        <input type="number" placeholder="∞" value={filter.amountMax} onChange={e => setFilter(f => ({ ...f, amountMax: e.target.value }))}
+                                                            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                                <button onClick={resetFilter} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Reset</button>
+                                                <button onClick={applyFilter} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors">Terapkan</button>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            )}
+                        </div>
                             </div>
+                        </div>
 
-                            {/* Desktop Table */}
-                            <div className="hidden sm:block overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
-                                        <tr>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Kode Pesanan</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">User</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Guru</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden xl:table-cell">Sesi</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Alasan</th>
-                                            <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nilai Refund</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Request</th>
-                                            <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                        {loading ? (
-                                            <tr><td colSpan={7}>
-                                                <div className="space-y-3 py-4 px-6">
-                                                    {[...Array(3)].map((_, i) => <div key={i} className="flex items-center gap-4 animate-pulse"><Skeleton className="h-3 flex-1" /><Skeleton className="h-3 flex-1" /><Skeleton className="h-3 flex-1" /></div>)}
-                                                </div>
-                                            </td></tr>
-                                        ) : paged.length === 0 ? (
-                                            <tr><td colSpan={7} className="text-center py-12 text-gray-400">
-                                                <RotateCcw className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                                <p>Tidak ada permintaan refund pending</p>
-                                            </td></tr>
-                                        ) : paged.map(r => (
+                        {/* Mobile Cards */}
+                        <div className="space-y-3 sm:hidden p-4">
+                            {loading ? (
+                                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="border rounded-lg p-4 space-y-2 animate-pulse"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-full" /></div>)}</div>
+                            ) : paged.length === 0 ? (
+                                <div className="text-center py-8 text-gray-400"><RotateCcw className="w-10 h-10 mx-auto mb-3 text-gray-300" /><p>Tidak ada data refund</p></div>
+                            ) : paged.map(r => (
+                                <div
+                                    key={r.id}
+                                    onClick={() => handleRowClick(r.bookingId)}
+                                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm transition-colors ${r.bookingId ? 'cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10' : ''}`}
+                                >
+                                    <div className="flex justify-between">
+                                        <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">#{r.bookingId || r.id}</span>
+                                        {getStatusBadge(r.status)}
+                                    </div>
+                                    <div className="text-xs text-gray-500 space-y-1">
+                                        <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
+                                        <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
+                                        {r.sessionsInfo && <div>Sesi: <span className="font-medium text-emerald-600 dark:text-emerald-400">{r.sessionsInfo}</span></div>}
+                                        {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                                        <span className="font-bold text-red-600 dark:text-red-400">{formatRupiah(r.refundAmount ?? r.amount)}</span>
+                                        <div onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"><MoreVertical className="w-4 h-4" /></button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-52">
+                                                    <DropdownMenuLabel>Aksi Refund</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    {(r.status?.toLowerCase() === 'pending' || r.status?.toLowerCase() === 'waiting') && (
+                                                        <>
+                                                            <DropdownMenuItem onClick={() => openAction(r, 'approve')}><Check className="w-4 h-4 mr-2 text-emerald-600" /><span className="text-emerald-600 font-medium">Setuju</span></DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => openAction(r, 'reject')}><X className="w-4 h-4 mr-2 text-red-600" /><span className="text-red-600 font-medium">Tolak</span></DropdownMenuItem>
+                                                        </>
+                                                    )}
+                                                    {(r.status?.toLowerCase() === 'approved' || r.status?.toLowerCase() === 'refunded') && (
+                                                        <DropdownMenuItem onClick={() => setViewModal({ open: true, item: r })}><CheckCircle2 className="w-4 h-4 mr-2 text-teal-600" /><span>Lihat Catatan</span></DropdownMenuItem>
+                                                    )}
+                                                    {(r.status?.toLowerCase() === 'rejected' || r.status?.toLowerCase() === 'failed') && (
+                                                        <DropdownMenuItem onClick={() => setViewModal({ open: true, item: r })}><XCircle className="w-4 h-4 mr-2 text-red-600" /><span>Lihat Alasan Ditolak</span></DropdownMenuItem>
+                                                    )}
+                                                    {!['pending', 'waiting', 'pending_refund', 'approved', 'refunded', 'rejected', 'failed'].includes(r.status?.toLowerCase() || '') && <DropdownMenuItem disabled><span className="text-gray-400 text-xs">Tidak ada aksi</span></DropdownMenuItem>}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop Table */}
+                        <div className="hidden sm:block overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
+                                    <tr>
+                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Kode Pesanan</th>
+                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">User</th>
+                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Guru</th>
+                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden xl:table-cell">Sesi</th>
+                                        <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
+                                        <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nilai Refund</th>
+                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Request</th>
+                                        <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                    {loading ? (
+                                        <tr><td colSpan={8}>
+                                            <div className="space-y-3 py-4 px-6">
+                                                {[...Array(3)].map((_, i) => <div key={i} className="flex items-center gap-4 animate-pulse"><Skeleton className="h-3 flex-1" /><Skeleton className="h-3 flex-1" /><Skeleton className="h-3 flex-1" /></div>)}
+                                            </div>
+                                        </td></tr>
+                                    ) : paged.length === 0 ? (
+                                        <tr><td colSpan={8} className="text-center py-12 text-gray-400">
+                                            <RotateCcw className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                                            <p>Tidak ada data refund</p>
+                                        </td></tr>
+                                    ) : paged.map(r => {
+                                        return (
                                             <tr
                                                 key={r.id}
                                                 onClick={() => handleRowClick(r.bookingId)}
-                                                className={`transition-colors ${r.bookingId ? 'cursor-pointer hover:bg-rose-50/40 dark:hover:bg-rose-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                                className={`transition-colors ${r.bookingId ? 'cursor-pointer hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
                                             >
                                                 <td className="px-4 py-3">
-                                                    <span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-800">
+                                                    <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
                                                         #{r.bookingId || r.id}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-rose-600 dark:hover:text-rose-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell">
                                                     <div className="font-medium text-gray-900 dark:text-white text-sm">{r.trainerName || `ID: ${r.trainerId}`}</div>
                                                 </td>
                                                 <td className="px-4 py-3 hidden xl:table-cell">
-                                                    <div className="text-[11px] font-semibold text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20 px-2 py-0.5 rounded border border-rose-100 dark:border-rose-800 max-w-fit">{r.sessionsInfo || '—'}</div>
+                                                    <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800 max-w-fit">{r.sessionsInfo || '—'}</div>
                                                 </td>
-                                                <td className="px-4 py-3 hidden lg:table-cell">
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 italic max-w-[200px] truncate">
-                                                        {r.refundReason || '—'}
-                                                    </p>
+                                                <td className="px-4 py-3 text-center">
+                                                    {getStatusBadge(r.status)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right pr-8">
-                                                    <span className="font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</span>
+                                                    <span className="font-bold text-red-600 dark:text-red-400">{formatRupiah(r.refundAmount ?? r.amount)}</span>
                                                 </td>
                                                 <td className="px-4 py-3 hidden lg:table-cell">
                                                     <Tooltip>
@@ -444,105 +613,51 @@ function RefundContent() {
                                                         </TooltipTrigger>
                                                         <TooltipContent side="top">
                                                             <p className="text-xs">{formatDate(r.createdAt, 'long', tz, locale)}</p>
+                                                            {r.refundReason && <p className="text-xs text-gray-400 italic mt-1">Alasan: {r.refundReason}</p>}
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </td>
                                                 <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => openAction(r, 'approve')}
-                                                            className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                                                        >
-                                                            <Check className="w-3.5 h-3.5" /> Setuju
-                                                        </button>
-                                                        <button
-                                                            onClick={() => openAction(r, 'reject')}
-                                                            className="flex items-center gap-1 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" /> Tolak
-                                                        </button>
-                                                    </div>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                                                <MoreVertical className="w-4 h-4" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-52">
+                                                            <DropdownMenuLabel>Aksi Refund</DropdownMenuLabel>
+                                                            <DropdownMenuSeparator />
+                                                            {(r.status?.toLowerCase() === 'pending' || r.status?.toLowerCase() === 'waiting' || r.status?.toLowerCase() === 'pending_refund') && (
+                                                                <>
+                                                                    <DropdownMenuItem onClick={() => openAction(r, 'approve')}><Check className="w-4 h-4 mr-2 text-emerald-600" /><span className="text-emerald-600 font-medium">Setuju</span></DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => openAction(r, 'reject')}><X className="w-4 h-4 mr-2 text-red-600" /><span className="text-red-600 font-medium">Tolak</span></DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                            {(r.status?.toLowerCase() === 'approved' || r.status?.toLowerCase() === 'refunded') && (
+                                                                <DropdownMenuItem onClick={() => setViewModal({ open: true, item: r })}><CheckCircle2 className="w-4 h-4 mr-2 text-teal-600" /><span>Lihat Catatan</span></DropdownMenuItem>
+                                                            )}
+                                                            {(r.status?.toLowerCase() === 'rejected' || r.status?.toLowerCase() === 'failed') && (
+                                                                <DropdownMenuItem onClick={() => setViewModal({ open: true, item: r })}><XCircle className="w-4 h-4 mr-2 text-red-600" /><span>Lihat Alasan Ditolak</span></DropdownMenuItem>
+                                                            )}
+                                                            {!['pending', 'waiting', 'pending_refund', 'approved', 'refunded', 'rejected', 'failed'].includes(r.status?.toLowerCase() || '') && <DropdownMenuItem disabled><span className="text-gray-400 text-xs">Tidak ada aksi</span></DropdownMenuItem>}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </td>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
 
-                            <SmartPagination
-                                total={pendingRefunds.length}
-                                page={page}
-                                pageSize={pageSize}
-                                onPageChange={setPage}
-                                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-                                loading={loading}
-                            />
-                        </>
-                        )}
-
-                        {/* ══ TAB: SUDAH DIPROSES ══ */}
-                        {activeTab === 'processed' && (
-                        <>
-                            <div className="hidden sm:block overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
-                                        <tr>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Kode Pesanan</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3">User</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden md:table-cell">Guru</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden xl:table-cell">Sesi</th>
-                                            <th className="text-right text-[11px] font-bold text-gray-500 uppercase px-4 py-3 pr-8">Nilai Refund</th>
-                                            <th className="text-left text-[11px] font-bold text-gray-500 uppercase px-4 py-3 hidden lg:table-cell">Tgl Proses</th>
-                                            <th className="text-center text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Status</th>
-                                            <th className="text-center text-[11px] font-bold text-gray-500 uppercase px-4 py-3">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                        {processedLoading ? (
-                                            <tr><td colSpan={7}><div className="py-8 px-6 flex items-center justify-center gap-2 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin" /> Memuat...</div></td></tr>
-                                        ) : pagedProcessed.length === 0 ? (
-                                            <tr><td colSpan={7} className="text-center py-12 text-gray-400"><Receipt className="w-10 h-10 mx-auto mb-3 text-gray-300" /><p>Belum ada refund yang diproses</p></td></tr>
-                                        ) : pagedProcessed.map(r => (
-                                            <tr
-                                                key={r.id}
-                                                onClick={() => handleRowClick(r.bookingId)}
-                                                className={`transition-colors ${r.bookingId ? 'cursor-pointer hover:bg-rose-50/40 dark:hover:bg-rose-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
-                                            >
-                                                <td className="px-4 py-3"><span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-800">#{r.bookingId || r.id}</span></td>
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="hover:text-rose-600 dark:hover:text-rose-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hidden md:table-cell">{r.trainerName || '—'}</td>
-                                                <td className="px-4 py-3 hidden xl:table-cell">
-                                                    <div className="text-[11px] font-semibold text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20 px-2 py-0.5 rounded border border-rose-100 dark:border-rose-800 max-w-fit">{r.sessionsInfo || '—'}</div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right pr-8 font-bold text-rose-600 dark:text-rose-400">{formatRupiah(r.refundAmount ?? r.amount)}</td>
-                                                <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 hidden lg:table-cell">{formatDate(r.updatedAt || r.createdAt, 'relative', tz, locale)}</td>
-                                                <td className="px-4 py-3 text-center">{getStatusBadge(r.status)}</td>
-                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                    {(r.notes || r.refundReason) ? (
-                                                        <button onClick={() => setViewModal({ open: true, item: r })} className="text-xs text-rose-600 hover:underline">
-                                                            Lihat Catatan
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400">—</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <SmartPagination
-                                total={processedRefunds.length}
-                                page={processedPage}
-                                pageSize={processedPageSize}
-                                onPageChange={setProcessedPage}
-                                onPageSizeChange={(s) => { setProcessedPageSize(s); setProcessedPage(1); }}
-                                loading={processedLoading}
-                            />
-                        </>
-                        )}
+                        <SmartPagination
+                            total={filteredRefunds.length}
+                            page={page}
+                            pageSize={pageSize}
+                            onPageChange={setPage}
+                            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                            loading={loading}
+                        />
                     </div>
 
                     {/* ── View Modal ── */}
@@ -554,6 +669,12 @@ function RefundContent() {
                                     <button onClick={() => setViewModal({ open: false, item: null })} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="p-6 space-y-4">
+                                    {viewModal.item.refundReason && (
+                                        <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-800/50">
+                                            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">Alasan Refund:</p>
+                                            <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{viewModal.item.refundReason}</p>
+                                        </div>
+                                    )}
                                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                                         <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan/Alasan Admin:</p>
                                         <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
@@ -587,7 +708,7 @@ function RefundContent() {
                                 <div className="p-6 space-y-4">
                                     <div className={`p-3 rounded-xl text-sm border space-y-1 ${actionModal.type === 'approve' ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/50' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-800/50'}`}>
                                         <p className="text-gray-500 dark:text-gray-400">User: <span className="font-semibold text-gray-900 dark:text-white">{actionModal.item.userName}</span></p>
-                                        <p className="text-gray-500 dark:text-gray-400">Nilai Refund: <span className="font-bold text-rose-600 dark:text-rose-400">{formatRupiah(actionModal.item.refundAmount ?? actionModal.item.amount)}</span></p>
+                                        <p className="text-gray-500 dark:text-gray-400">Nilai Refund: <span className="font-bold text-red-600 dark:text-red-400">{formatRupiah(actionModal.item.refundAmount ?? actionModal.item.amount)}</span></p>
                                         {actionModal.item.refundReason && <p className="text-gray-500 dark:text-gray-400 italic text-xs">"{actionModal.item.refundReason}"</p>}
                                     </div>
 

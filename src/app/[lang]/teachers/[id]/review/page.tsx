@@ -483,14 +483,8 @@ function GuruDetailContent() {
             return
         }
         const token = getClientToken()
-        // 1. Call review approve
-        try {
-            await fetch(`${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ approve: 1, rejectionReason: null }),
-            })
-        } catch { /* mock */ }
+        // Removed premature review approve. The trainer will remain in the pending list
+        // and their status will be mapped to 'seleksi' via sessionStorage.
         // 2. Save seleksi data
         const selData = {
             id: `session-${detail.id}`,
@@ -524,6 +518,9 @@ function GuruDetailContent() {
             const statuses = stored ? JSON.parse(stored) : {}
             statuses[detail.id] = "seleksi"
             sessionStorage.setItem("pengajuanGuruStatuses", JSON.stringify(statuses))
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("sessionStorageChanged"))
+            }
         } catch { }
 
         setSeleksiModalOpen(false)
@@ -563,6 +560,7 @@ function GuruDetailContent() {
             })
             const result = await res.json()
             if (result.success) {
+                setDetail((prev) => prev ? { ...prev, status: "seleksi" } : null)
                 showToast({
                     type: "success",
                     title: result.mock ? "Jadwal Tersimpan (Email Disimulasi)" : "📧 Email Terkirim!",

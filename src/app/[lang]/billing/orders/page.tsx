@@ -10,6 +10,7 @@ import {
     ChevronRight, Trash2,
     ChevronDown, Check, Timer, BarChart2, History, Calendar,
     Loader2, AlertCircle, Wifi, MapPin, CreditCard,
+    Filter, Banknote, XCircle
 } from "lucide-react"
 import dummyData from "@/data/billing-dummy.json"
 import {
@@ -25,123 +26,10 @@ import {
 import { formatTooltipDate } from "@/lib/date-utils"
 import { SmartPagination } from "@/components/ui/smart-pagination"
 import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // PipelineStatus comes from the Qurani booking API normalizer.
-
-// ─── Filter Range Tanggal ─────────────────────────────────────────────────────────
-type FilterKey =
-    | "all"
-    | "today" | "yesterday"
-    | "this_week" | "this_month" | "this_year" | "last_year"
-    | "last_week" | "last_month"
-    | "last_7_days" | "last_30_days"
-
-const FILTER_OPTIONS: { key: FilterKey; label: string; group: string }[] = [
-    { key: "all",        label: "All (Semua)",  group: "Quick" },
-    { key: "today",      label: "Today",        group: "Quick" },
-    { key: "yesterday",  label: "Yesterday",    group: "Quick" },
-    { key: "this_week",  label: "This week",    group: "Period" },
-    { key: "this_month", label: "This month",   group: "Period" },
-    { key: "this_year",  label: "This year",    group: "Period" },
-    { key: "last_week",  label: "Last week",    group: "Historical" },
-    { key: "last_month", label: "Last month",   group: "Historical" },
-    { key: "last_year",  label: "Last year",    group: "Historical" },
-    { key: "last_7_days",  label: "Last 7 days",  group: "Historical" },
-    { key: "last_30_days", label: "Last 30 days", group: "Historical" },
-]
-const GROUP_ICONS: Record<string, React.ReactNode> = {
-    Quick:      <Timer    className="w-3.5 h-3.5 inline-block mr-1 text-gray-400" />,
-    Period:     <BarChart2 className="w-3.5 h-3.5 inline-block mr-1 text-gray-400" />,
-    Historical: <History  className="w-3.5 h-3.5 inline-block mr-1 text-gray-400" />,
-}
-
-function getDateRange(filter: FilterKey): { from: Date; to: Date } | null {
-    if (filter === "all") return null
-    const now = new Date()
-    const sod = (d: Date) => { d.setHours(0, 0, 0, 0); return d }
-    const eod = (d: Date) => { d.setHours(23, 59, 59, 999); return d }
-    switch (filter) {
-        case "today":      return { from: sod(new Date(now)), to: eod(new Date(now)) }
-        case "yesterday":  { const y = new Date(now); y.setDate(y.getDate() - 1); return { from: sod(y), to: eod(new Date(y)) } }
-        case "this_week":  { const d = now.getDay(); const m = new Date(now); m.setDate(now.getDate() - (d === 0 ? 6 : d - 1)); return { from: sod(m), to: eod(new Date(now)) } }
-        case "this_month": return { from: sod(new Date(now.getFullYear(), now.getMonth(), 1)), to: eod(new Date(now.getFullYear(), now.getMonth() + 1, 0)) }
-        case "this_year":  return { from: sod(new Date(now.getFullYear(), 0, 1)), to: eod(new Date(now.getFullYear(), 11, 31)) }
-        case "last_week":  { const d = now.getDay(); const end = new Date(now); end.setDate(now.getDate() - (d === 0 ? 7 : d)); const start = new Date(end); start.setDate(end.getDate() - 6); return { from: sod(start), to: eod(end) } }
-        case "last_month": return { from: sod(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: eod(new Date(now.getFullYear(), now.getMonth(), 0)) }
-        case "last_year":  return { from: sod(new Date(now.getFullYear() - 1, 0, 1)), to: eod(new Date(now.getFullYear() - 1, 11, 31)) }
-        case "last_7_days":  { const f = new Date(now); f.setDate(now.getDate() - 6);  return { from: sod(f), to: eod(new Date(now)) } }
-        case "last_30_days": { const f = new Date(now); f.setDate(now.getDate() - 29); return { from: sod(f), to: eod(new Date(now)) } }
-    }
-}
-
-function FilterDropdown({ value, onChange }: { value: FilterKey; onChange: (k: FilterKey) => void }) {
-    const [open, setOpen] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
-    const displayDate = useMemo(() => {
-        const now = new Date()
-        const pad = (n: number) => String(n).padStart(2, "0")
-        const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-        switch (value) {
-            case "all":        return "Semua Data"
-            case "today":      return fmt(now)
-            case "yesterday":  { const y = new Date(now); y.setDate(y.getDate() - 1); return fmt(y) }
-            case "this_week":  { const d = now.getDay(); const m = new Date(now); m.setDate(now.getDate() - (d === 0 ? 6 : d - 1)); const s = new Date(m); s.setDate(m.getDate() + 6); return `${pad(m.getDate())} – ${pad(s.getDate())} ${now.toLocaleDateString("en-US", { month: "short", year: "numeric" })}` }
-            case "this_month": return now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-            case "this_year":  return `Year ${now.getFullYear()}`
-            case "last_week":  { const d = now.getDay(); const end = new Date(now); end.setDate(now.getDate() - (d === 0 ? 7 : d)); const start = new Date(end); start.setDate(end.getDate() - 6); return `${fmt(start)} – ${fmt(end)}` }
-            case "last_month": { const m = new Date(now.getFullYear(), now.getMonth() - 1, 1); return m.toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
-            case "last_year":  return `Year ${now.getFullYear() - 1}`
-            case "last_7_days":  { const f = new Date(now); f.setDate(now.getDate() - 6); return `${fmt(f)} – ${pad(now.getDate())}` }
-            case "last_30_days": { const f = new Date(now); f.setDate(now.getDate() - 29); return `${f.toLocaleDateString("en-US", { month: "short", day: "2-digit" })} – ${fmt(now)}` }
-        }
-    }, [value])
-    useEffect(() => {
-        function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-        document.addEventListener("mousedown", h)
-        return () => document.removeEventListener("mousedown", h)
-    }, [])
-    const groups = ["Quick", "Period", "Historical"]
-    return (
-        <div className="relative" ref={ref}>
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-emerald-400 dark:hover:border-emerald-500 transition-all shadow-sm"
-            >
-                <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="flex-1 text-left font-medium text-xs">{displayDate}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
-            </button>
-            {open && (
-                <div className="absolute left-0 top-full mt-1.5 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden py-1.5">
-                    {groups.map((group, gi) => {
-                        const items = FILTER_OPTIONS.filter(o => o.group === group)
-                        return (
-                            <div key={group}>
-                                {gi > 0 && <div className="h-px bg-gray-100 dark:bg-gray-800 mx-3 my-1" />}
-                                <div className="px-2">
-                                    {items.map(opt => (
-                                        <button
-                                            key={opt.key}
-                                            onClick={() => { onChange(opt.key); setOpen(false) }}
-                                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-sm text-left transition-colors ${value === opt.key
-                                                ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-semibold"
-                                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60"
-                                                }`}
-                                        >
-                                            {opt.label}
-                                            {value === opt.key && <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            )}
-        </div>
-    )
-}
 
 type PipelineOrder = {
     id: string | number
@@ -252,17 +140,15 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
 
 const STATUS_CONFIG: Record<PipelineStatus, { label: string; dotCls: string; badgeCls: string }> = {
     baru:         { label: "Pending",  dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
-    lunas:        { label: "Lunas",           dotCls: "bg-emerald-500", badgeCls: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" },
+    lunas:        { label: "Aktif",           dotCls: "bg-sky-500",     badgeCls: "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400" },
     aktif:        { label: "Aktif",           dotCls: "bg-sky-500",     badgeCls: "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400" },
     gagal:        { label: "Batal",           dotCls: "bg-rose-500",    badgeCls: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400" },
     selesai:      { label: "Selesai",         dotCls: "bg-blue-500",    badgeCls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
-    menunggu_guru:{ label: "Menunggu Guru",   dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
+    menunggu_guru:{ label: "Pending",   dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
 }
 
 const STATUS_ACTIONS: { key: PipelineStatus; label: string; dot: string; text: string; hover: string; border: string }[] = [
     { key: "baru",         label: "Pending",  dot: "bg-amber-400",   text: "text-amber-700 dark:text-amber-400",   hover: "hover:bg-amber-50 dark:hover:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800" },
-    { key: "menunggu_guru",label: "Menunggu Guru",   dot: "bg-orange-400",  text: "text-orange-700 dark:text-orange-400", hover: "hover:bg-orange-50 dark:hover:bg-orange-900/20", border: "border-orange-200 dark:border-orange-800" },
-    { key: "lunas",        label: "Lunas",           dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400",hover: "hover:bg-emerald-50 dark:hover:bg-emerald-900/20",border: "border-emerald-200 dark:border-emerald-800" },
     { key: "aktif",        label: "Aktif",           dot: "bg-sky-500",     text: "text-sky-700 dark:text-sky-400",       hover: "hover:bg-sky-50 dark:hover:bg-sky-900/20",       border: "border-sky-200 dark:border-sky-800" },
     { key: "selesai",      label: "Selesai",         dot: "bg-blue-500",    text: "text-blue-700 dark:text-blue-400",     hover: "hover:bg-blue-50 dark:hover:bg-blue-900/20",     border: "border-blue-200 dark:border-blue-800" },
     { key: "gagal",        label: "Batal",           dot: "bg-rose-500",    text: "text-rose-700 dark:text-rose-400",     hover: "hover:bg-rose-50 dark:hover:bg-rose-900/20",     border: "border-rose-200 dark:border-rose-800" },
@@ -570,7 +456,18 @@ function PesananContent() {
     const [search, setSearch] = useState("")
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    const [dateFilter, setDateFilter] = useState<FilterKey>("this_year")
+    const [filterOpen, setFilterOpen] = useState(false)
+    const [filter, setFilter] = useState({ dateFrom: '', dateTo: '', status: '', mode: '', minPrice: '', maxPrice: '' })
+    const [activeFilter, setActiveFilter] = useState({ dateFrom: '', dateTo: '', status: '', mode: '', minPrice: '', maxPrice: '' })
+
+    const hasActiveFilter = activeFilter.dateFrom || activeFilter.dateTo || activeFilter.status || activeFilter.mode || activeFilter.minPrice || activeFilter.maxPrice;
+
+    const applyFilter = () => { setActiveFilter({ ...filter }); setPage(1); setFilterOpen(false); };
+    const resetFilter = () => {
+        const empty = { dateFrom: '', dateTo: '', status: '', mode: '', minPrice: '', maxPrice: '' };
+        setFilter(empty); setActiveFilter(empty); setPage(1); setFilterOpen(false);
+    };
+
     const [statusTab, setStatusTab] = useState<"all" | PipelineStatus>("all")
     const [simOrders, setSimOrders] = useState<SimOrder[]>([])
     const [apiOrders, setApiOrders] = useState<PipelineOrder[]>([])
@@ -595,11 +492,13 @@ function PesananContent() {
     const refreshApi = useCallback((keyword?: string) => {
         setApiLoading(true)
         setApiError(null)
-        const range = getDateRange(dateFilter)
+        const dateFrom = activeFilter.dateFrom ? new Date(activeFilter.dateFrom) : undefined;
+        const dateTo = activeFilter.dateTo ? new Date(activeFilter.dateTo) : undefined;
+        if (dateTo) dateTo.setHours(23, 59, 59, 999);
         fetchAdminBookings({
             page: 1,
             pageSize: 100,
-            ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
+            ...(dateFrom && dateTo ? { dateFrom, dateTo } : {}),
             ...(keyword ? { keyword } : {}),
         })
             .then(rows => setApiOrders(rows as PipelineOrder[]))
@@ -609,7 +508,7 @@ function PesananContent() {
                 setApiError("API booking belum bisa dimuat, menampilkan data dummy untuk testing.")
             })
             .finally(() => setApiLoading(false))
-    }, [dateFilter])
+    }, [activeFilter.dateFrom, activeFilter.dateTo])
 
     useEffect(() => {
         refreshApi(search || undefined)
@@ -777,16 +676,31 @@ function PesananContent() {
 
     // ── Client-side filtering: date range + status tab (search already applied server-side)
     const filtered = useMemo(() => {
-        const range = getDateRange(dateFilter)
         return allOrders.filter(o => {
             // For API orders, date filtering already done server-side; apply locally for dummy data only
-            if (!o.isApi && range !== null) {
-                const inRange = o.rawDate >= range.from && o.rawDate <= range.to
-                if (!inRange) return false
+            if (!o.isApi && (activeFilter.dateFrom || activeFilter.dateTo)) {
+                const dateFrom = activeFilter.dateFrom ? new Date(activeFilter.dateFrom) : null;
+                const dateTo = activeFilter.dateTo ? new Date(activeFilter.dateTo) : null;
+                if (dateTo) dateTo.setHours(23, 59, 59, 999);
+                if (dateFrom && o.rawDate < dateFrom) return false;
+                if (dateTo && o.rawDate > dateTo) return false;
             }
+            if (activeFilter.status) {
+                if (activeFilter.status === 'pending' && !['baru', 'menunggu_guru'].includes(o.status)) return false;
+                if (activeFilter.status === 'aktif' && !['lunas', 'aktif'].includes(o.status)) return false;
+                if (activeFilter.status === 'selesai' && o.status !== 'selesai') return false;
+                if (activeFilter.status === 'gagal' && !['gagal', 'batal'].includes(o.status)) return false;
+            }
+            if (activeFilter.mode && o.mode !== activeFilter.mode) return false;
+            if (activeFilter.minPrice && o.harga < parseInt(activeFilter.minPrice)) return false;
+            if (activeFilter.maxPrice && o.harga > parseInt(activeFilter.maxPrice)) return false;
             if (statusTab !== "all") {
                 if (statusTab === "baru") {
-                    if (o.status !== "baru" && o.status !== "menunggu_guru") return false
+                    if (!['baru', 'menunggu_guru'].includes(o.status)) return false
+                } else if (statusTab === "aktif") {
+                    if (!['lunas', 'aktif'].includes(o.status)) return false
+                } else if (statusTab === "gagal") {
+                    if (!['gagal', 'batal'].includes(o.status)) return false
                 } else {
                     if (o.status !== statusTab) return false
                 }
@@ -804,18 +718,20 @@ function PesananContent() {
             }
             return true
         })
-    }, [allOrders, dateFilter, statusTab, search])
+    }, [allOrders, activeFilter, statusTab, search])
 
     const dateFiltered = useMemo(() => {
-        const range = getDateRange(dateFilter)
         return allOrders.filter(o => {
-            if (!o.isApi && range !== null) {
-                const inRange = o.rawDate >= range.from && o.rawDate <= range.to
-                if (!inRange) return false
+            if (!o.isApi && (activeFilter.dateFrom || activeFilter.dateTo)) {
+                const dateFrom = activeFilter.dateFrom ? new Date(activeFilter.dateFrom) : null;
+                const dateTo = activeFilter.dateTo ? new Date(activeFilter.dateTo) : null;
+                if (dateTo) dateTo.setHours(23, 59, 59, 999);
+                if (dateFrom && o.rawDate < dateFrom) return false;
+                if (dateTo && o.rawDate > dateTo) return false;
             }
             return true
         })
-    }, [allOrders, dateFilter])
+    }, [allOrders, activeFilter])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
     const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
@@ -854,31 +770,67 @@ function PesananContent() {
             <div className="max-w-[1600px] mx-auto">
                 {/* ── Page Header ── */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pesanan</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <ShoppingBag className="w-6 h-6 text-emerald-500" />
+                        Order
+                    </h1>
+                </div>
+
+                {/* ── Stats Cards ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex-shrink-0"><Timer className="w-6 h-6 text-amber-600 dark:text-amber-400" /></div>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Pending</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{dateFiltered.filter(o => ['baru', 'menunggu_guru'].includes(o.status)).length}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                        <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-lg flex-shrink-0"><Zap className="w-6 h-6 text-sky-600 dark:text-sky-400" /></div>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Aktif</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{dateFiltered.filter(o => ['lunas', 'aktif'].includes(o.status)).length}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0"><CheckCircle2 className="w-6 h-6 text-blue-600 dark:text-blue-400" /></div>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Selesai</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{dateFiltered.filter(o => ['selesai'].includes(o.status)).length}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                        <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-lg flex-shrink-0"><XCircle className="w-6 h-6 text-rose-600 dark:text-rose-400" /></div>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Batal</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{dateFiltered.filter(o => ['gagal', 'batal'].includes(o.status)).length}</p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* ── Action Toolbar ── */}
                 <div className="flex items-center gap-4 mb-6">
                     {/* Search & Filter Container */}
                     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 shadow-sm flex items-center gap-3 flex-1 max-w-[calc(100%-180px)]">
-                        <div className="relative group flex-1 max-w-2xl">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                            {apiLoading && search && (
-                                <Loader2 className="absolute right-16 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                            )}
-                            <input
-                                type="text"
-                                placeholder="Cari member, guru, paket, kode pesanan..."
-                                value={searchInput}
-                                onChange={e => handleSearchChange(e.target.value)}
-                                onKeyDown={handleKeyPress}
-                                className="w-full pl-11 pr-24 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all"
-                            />
+                        <div className="relative group flex-1 max-w-2xl flex">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                                {apiLoading && search && (
+                                    <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                )}
+                                <input
+                                    type="text"
+                                    placeholder="Cari member, guru, paket, kode pesanan..."
+                                    value={searchInput}
+                                    onChange={e => handleSearchChange(e.target.value)}
+                                    onKeyDown={handleKeyPress}
+                                    className="w-full pl-11 pr-4 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all border-r-0"
+                                />
+                            </div>
                             <button
                                 onClick={handleSearchSubmit}
-                                className="absolute right-1.5 top-1.5 bottom-1.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-2 text-xs font-bold transition-all cursor-pointer border border-gray-200 dark:border-gray-600 shadow-sm"
+                                className="px-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer"
                             >
-                                <Search className="w-3.5 h-3.5" />
                                 Cari
                             </button>
                         </div>
@@ -889,18 +841,105 @@ function PesananContent() {
                             disabled={selectedIds.length === 0 || updatingStatus}
                             className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all shadow-sm ${
                                 selectedIds.length > 0 
-                                ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-emerald-400 cursor-pointer" 
+                                ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
                                 : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
                             }`}
                         >
                             Bulk Status
-                            {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] ml-1">{selectedIds.length}</span>}
+                            {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-white text-[10px] ml-1">{selectedIds.length}</span>}
                             <ChevronDown className="w-3.5 h-3.5" />
                         </button>
 
                         <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
-                        <FilterDropdown value={dateFilter} onChange={k => { setDateFilter(k); setPage(1) }} />
+                        <button
+                            onClick={() => setFilterOpen(true)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
+                                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            Filter
+                        </button>
                     </div>
+
+                    <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Filter Data Pesanan</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-2">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Status</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['', 'pending', 'aktif', 'selesai', 'gagal'].map(s => (
+                                            <button
+                                                key={s}
+                                                onClick={() => setFilter(f => ({ ...f, status: s }))}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${filter.status === s
+                                                    ? 'bg-emerald-500 text-white border-emerald-500'
+                                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                                                }`}
+                                            >
+                                                {s === '' ? 'Semua' : s === 'pending' ? 'Pending' : s === 'aktif' ? 'Aktif' : s === 'selesai' ? 'Selesai' : 'Batal'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Mode</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['', 'online', 'offline'].map(s => (
+                                            <button
+                                                key={s}
+                                                onClick={() => setFilter(f => ({ ...f, mode: s }))}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${filter.mode === s
+                                                    ? 'bg-emerald-500 text-white border-emerald-500'
+                                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                                                }`}
+                                            >
+                                                {s === '' ? 'Semua' : s === 'online' ? 'Online' : 'Tatap Muka'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><Calendar className="w-3 h-3" />Rentang Tanggal</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 mb-1">Dari</p>
+                                            <input type="date" value={filter.dateFrom} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value }))}
+                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 mb-1">Sampai</p>
+                                            <input type="date" value={filter.dateTo} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value }))}
+                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Harga</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 mb-1">Minimum (Rp)</p>
+                                            <input type="number" value={filter.minPrice} onChange={e => setFilter(f => ({ ...f, minPrice: e.target.value }))} placeholder="0"
+                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 mb-1">Maksimum (Rp)</p>
+                                            <input type="number" value={filter.maxPrice} onChange={e => setFilter(f => ({ ...f, maxPrice: e.target.value }))} placeholder="Tak terbatas"
+                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800 sm:justify-between">
+                                <button onClick={resetFilter} className="flex-1 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Reset</button>
+                                <button onClick={applyFilter} className="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors">Terapkan</button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     {/* Simulation Tools Container */}
                     <div className="flex items-center gap-2.5 ml-auto">
@@ -959,11 +998,10 @@ function PesananContent() {
                 <div className="flex items-center gap-6 border-b border-gray-100 dark:border-gray-800 mb-0">
                     {([
                         { key: "all",     label: "Semua",   count: dateFiltered.length,                                                                              activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
-                        { key: "lunas",   label: "Lunas",   count: dateFiltered.filter(o => o.status === "lunas").length,                                             activeText: "text-emerald-600 dark:text-emerald-400", activeBorder: "border-emerald-500", activeCount: "text-emerald-500" },
-                        { key: "aktif",   label: "Aktif",   count: dateFiltered.filter(o => o.status === "aktif").length,                                             activeText: "text-sky-600 dark:text-sky-400",         activeBorder: "border-sky-500",     activeCount: "text-sky-500"     },
-                        { key: "baru",    label: "Pending", count: dateFiltered.filter(o => o.status === "baru" || o.status === "menunggu_guru").length,               activeText: "text-amber-600 dark:text-amber-400",     activeBorder: "border-amber-500",   activeCount: "text-amber-500"   },
-                        { key: "gagal",   label: "Batal",   count: dateFiltered.filter(o => o.status === "gagal").length,                                             activeText: "text-rose-600 dark:text-rose-400",       activeBorder: "border-rose-500",    activeCount: "text-rose-500"    },
+                        { key: "baru",    label: "Pending", count: dateFiltered.filter(o => ['baru', 'menunggu_guru'].includes(o.status)).length,               activeText: "text-amber-600 dark:text-amber-400",     activeBorder: "border-amber-500",   activeCount: "text-amber-500"   },
+                        { key: "aktif",   label: "Aktif",   count: dateFiltered.filter(o => ['lunas', 'aktif'].includes(o.status)).length,                                             activeText: "text-sky-600 dark:text-sky-400",         activeBorder: "border-sky-500",     activeCount: "text-sky-500"     },
                         { key: "selesai", label: "Selesai", count: dateFiltered.filter(o => o.status === "selesai").length,                                           activeText: "text-blue-600 dark:text-blue-400",       activeBorder: "border-blue-500",    activeCount: "text-blue-500"    },
+                        { key: "gagal",   label: "Batal",   count: dateFiltered.filter(o => ['gagal', 'batal'].includes(o.status)).length,                                             activeText: "text-rose-600 dark:text-rose-400",       activeBorder: "border-rose-500",    activeCount: "text-rose-500"    },
                     ] as { key: "all" | PipelineStatus; label: string; count: number; activeText: string; activeBorder: string; activeCount: string }[]).map(tab => (
                         <button key={tab.key} onClick={() => { setStatusTab(tab.key); setPage(1) }}
                             className={`cursor-pointer flex items-center gap-1.5 pb-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${statusTab === tab.key
@@ -978,7 +1016,8 @@ function PesananContent() {
 
                 {/* ── Table List ── */}
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="overflow-x-auto">
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700">
@@ -1051,7 +1090,7 @@ function PesananContent() {
                                                             setSelectedWalletUserName(order.member);
                                                         }
                                                     }} className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : ''}`}>{order.member}</p>
-                                                    <p className="text-[11px] text-gray-500">{order.username}</p>
+                                                    <p className="text-[11px] text-gray-500">@{order.username.replace(/^@/, '')}</p>
                                                 </div>
                                             </td>
                                             {/* Guru */}
@@ -1139,6 +1178,90 @@ function PesananContent() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
+                        {paged.length === 0 ? (
+                            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                <p>{search ? `Tidak ada pesanan untuk "${search}"` : "Tidak ada pesanan ditemukan"}</p>
+                            </div>
+                        ) : paged.map(order => {
+                            const st = STATUS_CONFIG[order.status]
+                            const isSelected = selectedIds.some(id => String(id) === String(order.id))
+                            return (
+                                <div key={order.id} onClick={() => router.push(`/billing/orders/${order.id}`)} className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer relative ${isSelected ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""}`}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={(e) => { e.stopPropagation(); toggleSelected(order.id); }}
+                                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <div className="flex flex-col gap-0.5 items-start">
+                                                <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">{order.bookingCode}</span>
+                                                {order.isApi && <span className="text-[9px] font-medium text-emerald-500 pl-1">API</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badgeCls}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${st.dotCls} inline-block`} />
+                                                {st.label}
+                                            </span>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setOpenActionId(openActionId === order.id ? null : order.id) }}
+                                                disabled={updatingStatus}
+                                                className="flex items-center justify-center w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                            >
+                                                <MoreHorizontal className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-start mb-3 pl-7">
+                                        <div>
+                                            <p className="text-[10px] text-gray-500 mb-0.5">Murid</p>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.member}</p>
+                                            <p className="text-[11px] text-gray-500">@{order.username.replace(/^@/, '')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-gray-500 mb-0.5">Guru</p>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
+                                            <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800 ml-7">
+                                        <div>
+                                            <p className="text-[10px] text-gray-500 mb-0.5">{order.paket} &bull; {order.sesiSelesai}/{order.sesi} Sesi</p>
+                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{formatRupiah(order.harga)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold border ${order.mode === "offline" ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800" : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${order.mode === "offline" ? "bg-purple-500" : "bg-blue-500"}`} />
+                                                {order.mode === "offline" ? "Tatap Muka" : "Online"}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Action dropdown for mobile */}
+                                    {openActionId === order.id && (
+                                        <div onClick={e => e.stopPropagation()} className="absolute right-4 top-14 z-40 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl py-1.5 overflow-hidden">
+                                            <button onClick={() => router.push(`/billing/orders/${order.id}`)} className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Lihat Detail
+                                            </button>
+                                            <div className="my-1 h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+                                            <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ubah Status</div>
+                                            {STATUS_ACTIONS.map(action => (
+                                                <button key={action.key} onClick={() => handleAdvance(order.id, action.key)} className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center gap-2 ${action.text} ${action.hover} transition-colors`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${action.dot} flex-shrink-0`} /> {action.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
 
                     {/* ── Pagination ── */}

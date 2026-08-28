@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { I18nProvider } from "@/components/providers/i18n-provider"
@@ -10,7 +10,7 @@ import { useTranslation } from "@/hooks/use-translation"
 import {
     Search, ChevronLeft, ChevronRight, CheckCircle2, Clock, XCircle,
     Wallet, ArrowUpRight, Check, X, MoreVertical, RefreshCw, AlertCircle,
-    Banknote, Users, TrendingUp, CheckSquare
+    Banknote, Users, TrendingUp, CheckSquare, Filter, Calendar, DollarSign, ChevronDown, FileText
 } from "lucide-react"
 import Image from "next/image"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
@@ -104,25 +104,28 @@ interface PendingPayout {
     notes?: string;
 }
 
-type ActivePayoutTab = 'pending' | 'selesai';
+interface FilterState {
+    status: string;
+    method: string;
+    dateFrom: string;
+    dateTo: string;
+    amountMin: string;
+    amountMax: string;
+}
 
 function getPayoutStatusBadge(status: string | undefined) {
     const s = (status || "").toLowerCase();
     if (s === "paid_out" || s === "completed") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3 h-3" />Selesai</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3 h-3" />Disetujui</span>;
     }
-    if (s === "paid" || s === "pending_payout") {
+    if (s === "paid" || s === "pending_payout" || s === "pending") {
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" />Pending</span>;
     }
     if (s === "failed" || s === "rejected" || s === "cancelled") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"><XCircle className="w-3 h-3" />Gagal</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"><XCircle className="w-3 h-3" />Ditolak</span>;
     }
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{status || "—"}</span>;
 }
-
-// Data sepenuhnya dari sim-billing-store (persistent localStorage).
-// DUMMY lama dihapus — gunakan getSimPayoutPending() dan getSimPayoutHistory()
-// yang sudah sinkron dengan 10 pesanan di halaman Orders/Pesanan.
 
 function PayoutContent() {
     const { t, locale } = useTranslation(['billing', 'common'])
@@ -149,23 +152,35 @@ function PayoutContent() {
     const [userTimezone, setUserTimezone] = useState<string>("UTC")
     useEffect(() => { setUserTimezone(resolveTimezone()) }, [resolveTimezone])
 
-    const [activeTab, setActiveTab] = useState<ActivePayoutTab>('pending');
     const [loading, setLoading] = useState(true);
-    const [payouts, setPayouts] = useState<PendingPayout[]>([]);
-    const [completedPayouts, setCompletedPayouts] = useState<PendingPayout[]>([]);
-    const [completedLoading, setCompletedLoading] = useState(false);
+    const [allPayouts, setAllPayouts] = useState<PendingPayout[]>([]);
     const [isDemoMode, setIsDemoMode] = useState(false);
 
-    // Search & Pagination (Pending)
+    // Search & Pagination
     const [searchInput, setSearchInput] = useState("");
     const [activeSearch, setActiveSearch] = useState("");
     const [page, setPage] = useState(1);
-    const [completedPage, setCompletedPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [completedPageSize, setCompletedPageSize] = useState(10);
+
+    // Filter state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [filter, setFilter] = useState<FilterState>({ status: '', method: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
+    const [activeFilter, setActiveFilter] = useState<FilterState>({ status: '', method: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // Close filter modal on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && filterOpen) {
+                setFilterOpen(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [filterOpen]);
 
     // Stats
-    const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, completedCount: 0 });
+    const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, approvedCount: 0, rejectedCount: 0 });
 
     // Bulk select
     const [selectedIds, setSelectedIds] = useState<Array<number | string>>([]);
@@ -178,74 +193,125 @@ function PayoutContent() {
     const [payoutNotes, setPayoutNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // User wallet modal
-        
-    // ── Fetch Pending Payouts ────────────────────────────────────────────────
+    // Close filter on outside click
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    // ── Fetch all payout data ────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await paymentsApi.getPendingPayouts({ page: 1, pageSize: 100 });
-            let items: PendingPayout[] = Array.isArray(res) ? res : (res?.data || res?.items || []);
-            if (!Array.isArray(items)) items = [];
+            const [pendingRes, completedRes] = await Promise.allSettled([
+                paymentsApi.getPendingPayouts({ page: 1, pageSize: 100 }),
+                paymentsApi.search({ Status: 'paid_out', Page: 1, PageSize: 100 } as any),
+            ]);
 
-            if (items.length === 0) {
-                // Gunakan sim-billing-store (persistent localStorage)
-                items = getSimPayoutPending();
+            let pendingItems: PendingPayout[] = [];
+            let completedItems: PendingPayout[] = [];
+
+            if (pendingRes.status === 'fulfilled') {
+                const res = pendingRes.value;
+                pendingItems = Array.isArray(res) ? res : (res?.data || res?.items || []);
+            }
+            if (completedRes.status === 'fulfilled') {
+                const res = completedRes.value;
+                completedItems = Array.isArray(res) ? res : (res?.items || res?.data || []);
+            }
+
+            let combined = [...pendingItems, ...completedItems];
+
+            if (combined.length === 0) {
+                const simPending = getSimPayoutPending();
+                const simHistory = getSimPayoutHistory();
+                combined = [...simPending, ...simHistory];
                 setIsDemoMode(true);
             } else {
                 setIsDemoMode(false);
             }
 
-            if (activeSearch) {
-                const q = activeSearch.toLowerCase();
-                items = items.filter(p =>
-                    p.userName?.toLowerCase().includes(q) ||
-                    p.trainerName?.toLowerCase().includes(q) ||
-                    String(p.id).includes(q) ||
-                    String(p.bookingId || '').includes(q)
-                );
-            }
-
-            setPayouts(items);
-            setStats(prev => ({ ...prev, pendingCount: items.length, pendingTotal: items.reduce((a, b) => a + b.amount, 0) }));
+            setAllPayouts(combined);
+            setStats({
+                pendingCount: combined.filter(p => ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase())).length,
+                pendingTotal: combined.filter(p => ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase())).reduce((a, b) => a + b.amount, 0),
+                approvedCount: combined.filter(p => ['paid_out', 'completed'].includes((p.status || '').toLowerCase())).length,
+                rejectedCount: combined.filter(p => ['failed', 'rejected', 'cancelled'].includes((p.status || '').toLowerCase())).length,
+            });
         } catch (error) {
-            console.error("Error fetching pending payouts:", error);
-            const fallback = getSimPayoutPending();
-            setPayouts(fallback);
+            const simPending = getSimPayoutPending();
+            const simHistory = getSimPayoutHistory();
+            const combined = [...simPending, ...simHistory];
+            setAllPayouts(combined);
             setIsDemoMode(true);
-            setStats(prev => ({ ...prev, pendingCount: fallback.length, pendingTotal: fallback.reduce((a, b) => a + b.amount, 0) }));
+            setStats({
+                pendingCount: combined.filter(p => ['pending', 'pending_payout'].includes((p.status || '').toLowerCase())).length,
+                pendingTotal: combined.filter(p => ['pending', 'pending_payout'].includes((p.status || '').toLowerCase())).reduce((a, b) => a + b.amount, 0),
+                approvedCount: combined.filter(p => ['paid_out', 'completed'].includes((p.status || '').toLowerCase())).length,
+                rejectedCount: 0,
+            });
         } finally {
             setLoading(false);
         }
-    }, [activeSearch]);
-
-    // ── Fetch Completed Payouts ──────────────────────────────────────────────
-    const fetchCompleted = useCallback(async () => {
-        setCompletedLoading(true);
-        try {
-            const res = await paymentsApi.search({ Status: 'paid_out', Page: 1, PageSize: 100 } as any);
-            let items: PendingPayout[] = Array.isArray(res) ? res : (res?.items || res?.data || []);
-            if (!Array.isArray(items)) items = [];
-
-            if (items.length === 0) {
-                // Gunakan sim-billing-store (persistent localStorage)
-                items = getSimPayoutHistory();
-            }
-            setCompletedPayouts(items);
-            setStats(prev => ({ ...prev, completedCount: items.length }));
-        } catch {
-            const fallback = getSimPayoutHistory();
-            setCompletedPayouts(fallback);
-            setStats(prev => ({ ...prev, completedCount: fallback.length }));
-        } finally {
-            setCompletedLoading(false);
-        }
     }, []);
 
-    useEffect(() => { fetchData(); fetchCompleted(); }, [fetchData, fetchCompleted]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleSearch = () => { setActiveSearch(searchInput); setPage(1); setSelectedIds([]); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch(); };
+
+    // Apply filters + search client-side
+    const filteredPayouts = allPayouts.filter(p => {
+        if (activeSearch) {
+            const q = activeSearch.toLowerCase();
+            if (!(p.userName?.toLowerCase().includes(q) || p.trainerName?.toLowerCase().includes(q) || String(p.id).includes(q) || String(p.bookingId || '').includes(q))) return false;
+        }
+        if (activeFilter.status) {
+            const s = (p.status || '').toLowerCase();
+            if (activeFilter.status === 'pending' && !['pending', 'pending_payout', 'paid'].includes(s)) return false;
+            if (activeFilter.status === 'approved' && !['paid_out', 'completed'].includes(s)) return false;
+            if (activeFilter.status === 'rejected' && !['failed', 'rejected', 'cancelled'].includes(s)) return false;
+        }
+        if (activeFilter.method) {
+            const m = (p.paymentMethod || '').toLowerCase();
+            if (!m.includes(activeFilter.method.toLowerCase())) return false;
+        }
+        if (activeFilter.dateFrom && new Date(p.createdAt) < new Date(activeFilter.dateFrom)) return false;
+        if (activeFilter.dateTo) {
+            const to = new Date(activeFilter.dateTo); to.setHours(23, 59, 59);
+            if (new Date(p.createdAt) > to) return false;
+        }
+        if (activeFilter.amountMin && p.amount < Number(activeFilter.amountMin)) return false;
+        if (activeFilter.amountMax && p.amount > Number(activeFilter.amountMax)) return false;
+        return true;
+    });
+
+    const hasActiveFilter = activeFilter.status || activeFilter.method || activeFilter.dateFrom || activeFilter.dateTo || activeFilter.amountMin || activeFilter.amountMax;
+    const applyFilter = () => { setActiveFilter({ ...filter }); setPage(1); setFilterOpen(false); };
+    const resetFilter = () => {
+        const empty = { status: '', method: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' };
+        setFilter(empty); setActiveFilter(empty); setPage(1); setFilterOpen(false);
+    };
+
+    const totalPages = Math.max(1, Math.ceil(filteredPayouts.length / pageSize));
+    const paged = filteredPayouts.slice((page - 1) * pageSize, page * pageSize);
+
+    const toggleSelectAll = () => {
+        const pendingPaged = paged.filter(p => ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase()));
+        if (selectedIds.length === pendingPaged.length) setSelectedIds([]);
+        else setSelectedIds(pendingPaged.map(p => p.id));
+    };
+    const toggleSelect = (id: number | string) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleRowClick = (bookingId: number | string | undefined) => {
+        if (!bookingId) return
+        router.push(`/${locale}/billing/orders/${bookingId}?from=payout`)
+    };
 
     // ── Payout Action: mark single payment as paid out ───────────────────────
     const handleMarkPayout = async (paymentId: string | number) => {
@@ -255,7 +321,6 @@ function PayoutContent() {
         }
         setIsSubmitting(true);
         try {
-            // paymentsApi.markPayout → POST /api/v1/Payments/{id}/mark-payout
             await paymentsApi.markPayout(paymentId, { payoutReference: payoutReference.trim(), notes: payoutNotes });
             showToast({ type: 'success', title: 'Payout Berhasil', message: 'Pembayaran telah berhasil ditandai sebagai sudah dibayarkan ke guru.' });
             setMarkPayoutModal(null);
@@ -263,21 +328,8 @@ function PayoutContent() {
             setPayoutNotes("");
             fetchData();
         } catch (err: any) {
-            // Demo fallback: simpan ke sim-billing-store (persistent)
             confirmSimPayout(paymentId, payoutReference.trim(), payoutNotes.trim() || undefined);
-
-            // Update state lokal
-            setPayouts(getSimPayoutPending());
-            setCompletedPayouts(getSimPayoutHistory());
-
-            const newPending = getSimPayoutPending();
-            setStats(prev => ({
-                ...prev,
-                pendingCount: newPending.length,
-                pendingTotal: newPending.reduce((a, b) => a + b.amount, 0),
-                completedCount: getSimPayoutHistory().length,
-            }));
-
+            fetchData();
             showToast({ type: 'info', title: '[DEMO] Payout Ditandai', message: 'Pembayaran berhasil ditandai sebagai sudah dibayarkan (simulasi lokal).' });
             setMarkPayoutModal(null);
             setPayoutReference("");
@@ -295,7 +347,6 @@ function PayoutContent() {
         }
         setIsSubmitting(true);
         try {
-            // paymentsApi.bulkPayout → POST /api/v1/Payments/bulk-payout
             await paymentsApi.bulkPayout({ paymentIds: selectedIds, payoutReference: payoutReference.trim(), notes: payoutNotes });
             showToast({ type: 'success', title: 'Bulk Payout Berhasil', message: `${selectedIds.length} pembayaran berhasil ditandai sebagai sudah dibayarkan.` });
             setBulkPayoutModal(false);
@@ -304,21 +355,8 @@ function PayoutContent() {
             setSelectedIds([]);
             fetchData();
         } catch {
-            // Demo fallback: simpan ke sim-billing-store (persistent)
             selectedIds.forEach(pid => confirmSimPayout(pid, payoutReference.trim(), payoutNotes.trim() || undefined));
-
-            // Refresh dari store
-            const newPending = getSimPayoutPending();
-            const newHistory = getSimPayoutHistory();
-            setPayouts(newPending);
-            setCompletedPayouts(newHistory);
-            setStats(prev => ({
-                ...prev,
-                pendingCount: newPending.length,
-                pendingTotal: newPending.reduce((a, b) => a + b.amount, 0),
-                completedCount: newHistory.length,
-            }));
-
+            fetchData();
             showToast({ type: 'info', title: '[DEMO] Bulk Payout', message: `${selectedIds.length} pembayaran ditandai (simulasi lokal).` });
             setBulkPayoutModal(false);
             setPayoutReference("");
@@ -327,25 +365,6 @@ function PayoutContent() {
         } finally {
             setIsSubmitting(false);
         }
-    };
-
-    const totalPages = Math.max(1, Math.ceil(payouts.length / pageSize));
-    const paged = payouts.slice((page - 1) * pageSize, page * pageSize);
-
-    const totalCompletedPages = Math.max(1, Math.ceil(completedPayouts.length / completedPageSize));
-    const pagedCompleted = completedPayouts.slice((completedPage - 1) * completedPageSize, completedPage * completedPageSize);
-
-    const toggleSelectAll = () => {
-        if (selectedIds.length === paged.length) setSelectedIds([]);
-        else setSelectedIds(paged.map(p => p.id));
-    };
-    const toggleSelect = (id: number | string) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    };
-
-    const handleRowClick = (bookingId: number | string | undefined) => {
-        if (!bookingId) return
-        router.push(`/${locale}/billing/orders/${bookingId}?from=payout`)
     };
 
     const tz = userTimezone;
@@ -372,12 +391,12 @@ function PayoutContent() {
                         </div>
                     </div>
 
-                    {/* ── Overview Cards ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* ── Overview Cards (3 cards) ── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[
                             { label: "Pending Payout", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", iconClr: "text-amber-600 dark:text-amber-400", isNum: true },
-                            { label: "Total Nilai Pending", value: formatRupiah(stats.pendingTotal), icon: Banknote, bg: "bg-blue-100 dark:bg-blue-900/30", iconClr: "text-blue-600 dark:text-blue-400", isNum: false },
-                            { label: "Selesai Dibayar", value: stats.completedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400", isNum: true },
+                            { label: "Payout Nilai Pending", value: formatRupiah(stats.pendingTotal), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400", isNum: false },
+                            { label: "Disetujui", value: stats.approvedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400", isNum: true },
                         ].map(card => {
                             const Icon = card.icon;
                             return (
@@ -396,84 +415,137 @@ function PayoutContent() {
                         })}
                     </div>
 
-                    {/* ── Tabs + Table ── */}
+                    {/* ── Table ── */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 
-                        {/* Tab Header */}
-                        <div className="flex flex-col-reverse sm:flex-row items-center border-b border-gray-100 dark:border-gray-700 px-4 gap-3 justify-between">
-                            {/* Toolbar (Search, Bulk Payout, Refresh) - Left Side */}
-                            <div className="py-2 w-full sm:w-auto flex flex-wrap items-center gap-2">
-                                {activeTab === 'pending' && (
-                                    <>
-                                        <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow w-full sm:w-auto">
-                                            <div className="relative bg-white dark:bg-gray-900 flex-1">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                                                <input
-                                                    value={searchInput}
-                                                    onChange={e => setSearchInput(e.target.value)}
-                                                    onKeyDown={handleKeyDown}
-                                                    placeholder="Cari nama guru, user..."
-                                                    className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={handleSearch}
-                                                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors"
-                                            >
-                                                Cari
-                                            </button>
-                                        </div>
-                                        {selectedIds.length > 0 && (
-                                            <button
-                                                onClick={() => setBulkPayoutModal(true)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors w-full sm:w-auto justify-center"
-                                            >
-                                                <CheckSquare className="w-3.5 h-3.5" />
-                                                Bulk Payout ({selectedIds.length})
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                                {activeTab === 'selesai' && (
+                        {/* Toolbar: Search + Filter */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center border-b border-gray-100 dark:border-gray-700 px-4 py-3 gap-3">
+                            <div className="flex items-center gap-2 flex-1 flex-wrap">
+                                {/* Search - bigger */}
+                                <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow flex-1 max-w-md min-w-0">
+                                    <div className="relative bg-white dark:bg-gray-900 flex-1 min-w-0">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            value={searchInput}
+                                            onChange={e => setSearchInput(e.target.value)}
+                                            onKeyDown={handleKeyDown}
+                                            placeholder="Cari nama guru, user..."
+                                            className="w-full pl-10 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
+                                        />
+                                    </div>
                                     <button
-                                        onClick={() => fetchCompleted()}
-                                        className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 transition-colors w-full sm:w-auto justify-center"
+                                        onClick={handleSearch}
+                                        className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors whitespace-nowrap"
                                     >
-                                        <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                                        Cari
                                     </button>
-                                )}
-                            </div>
+                                </div>
 
-                            {/* Tabs - Right Side */}
-                            <div className="flex items-center gap-0 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
-                                {[
-                                    { key: 'pending' as ActivePayoutTab, label: 'Pending Payout', count: payouts.length },
-                                    { key: 'selesai' as ActivePayoutTab, label: 'Sudah Dibayar' },
-                                ].map(tab => (
+                                {/* Bulk Action & Filter */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative" ref={filterRef}>
+                                        <button
+                                            onClick={() => setFilterOpen(prev => !prev)}
+                                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
+                                                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                            }`}
+                                        >
+                                            <Filter className="w-4 h-4" />
+                                            Filter
+                                        </button>
+
+                                    {/* Filter Modal */}
+                                    {filterOpen && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Filter className="w-5 h-5 text-emerald-500" /> Filter Data Payout</h3>
+                                                    <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
+                                                </div>
+                                                <div className="p-6 space-y-4">
+                                                    {/* Status */}
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Status</label>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {['', 'pending', 'approved', 'rejected'].map(s => (
+                                                                <button key={s} onClick={() => setFilter(f => ({ ...f, status: s }))}
+                                                                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${filter.status === s
+                                                                        ? 'bg-emerald-500 text-white border-emerald-500'
+                                                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                                                                    }`}>
+                                                                    {s === '' ? 'Semua' : s === 'pending' ? 'Pending' : s === 'approved' ? 'Disetujui' : 'Ditolak'}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Date Range */}
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><Calendar className="w-3 h-3" />Tanggal</label>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <p className="text-[10px] text-gray-400 mb-1">Dari</p>
+                                                                <input type="date" value={filter.dateFrom} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value }))}
+                                                                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[10px] text-gray-400 mb-1">Sampai</p>
+                                                                <input type="date" value={filter.dateTo} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value }))}
+                                                                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Amount Range */}
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><DollarSign className="w-3 h-3" />Nominal (Rp)</label>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <p className="text-[10px] text-gray-400 mb-1">Lebih dari</p>
+                                                                <input type="number" placeholder="0" value={filter.amountMin} onChange={e => setFilter(f => ({ ...f, amountMin: e.target.value }))}
+                                                                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[10px] text-gray-400 mb-1">Kurang dari</p>
+                                                                <input type="number" placeholder="∞" value={filter.amountMax} onChange={e => setFilter(f => ({ ...f, amountMax: e.target.value }))}
+                                                                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                                        <button onClick={resetFilter} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Reset</button>
+                                                        <button onClick={applyFilter} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors">Terapkan</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* end filterRef */}
+
                                     <button
-                                        key={tab.key}
-                                        onClick={() => setActiveTab(tab.key)}
-                                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 -mb-px whitespace-nowrap ${
-                                            activeTab === tab.key
-                                                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                        onClick={() => setBulkPayoutModal(true)}
+                                        disabled={selectedIds.length === 0}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
+                                            selectedIds.length > 0
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                                         }`}
                                     >
-                                        {tab.label}
-                                        {tab.count !== undefined && tab.count > 0 && (
-                                            <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">
-                                                {tab.count}
-                                            </span>
-                                        )}
+                                        <CheckSquare className={`w-4 h-4 ${selectedIds.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-500'}`} />
+                                        Bulk Action {selectedIds.length > 0 && `(${selectedIds.length})`}
                                     </button>
-                                ))}
                             </div>
+                            {/* end Bulk+Filter flex */}
                         </div>
+                        {/* end left flex flex-1 */}
+                    </div>
+                    {/* end toolbar */}
 
-                        {/* ══ TAB: PENDING PAYOUT ══ */}
-                        {activeTab === 'pending' && (
-                        <>
-                        {/* MOBILE CARD VIEW (<640px) */}
+                    {/* MOBILE CARD VIEW (<640px) */}
                         <div className="space-y-3 sm:hidden p-4">
                             {loading ? (
                                 <div className="space-y-3">
@@ -487,38 +559,55 @@ function PayoutContent() {
                             ) : paged.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
                                     <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                    <p>Tidak ada antrean payout pending</p>
+                                    <p>Tidak ada data payout</p>
                                 </div>
-                            ) : paged.map(p => (
-                                <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2">
-                                            <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} className="w-4 h-4 text-emerald-600 rounded border-gray-300" />
-                                            <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800">
-                                                #{p.bookingId || p.id}
-                                            </span>
+                            ) : paged.map(p => {
+                                const isPending = ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase());
+                                return (
+                                    <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-2">
+                                                {isPending && <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} className="w-4 h-4 text-emerald-600 rounded border-gray-300" />}
+                                                <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
+                                                    #{p.bookingId || p.id}
+                                                </span>
+                                            </div>
+                                            {getPayoutStatusBadge(p.status)}
                                         </div>
-                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                            {formatDate(p.createdAt, 'relative', tz, locale)}
-                                        </span>
+                                        <div className="text-xs text-gray-500 space-y-1">
+                                            <div>User: <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
+                                            <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName || `Trainer ID: ${p.trainerId}`}</span></div>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-48">
+                                                        <DropdownMenuLabel>Aksi Payout</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        {isPending ? (
+                                                            <DropdownMenuItem onClick={() => setMarkPayoutModal(p)}>
+                                                                <Check className="w-4 h-4 mr-2 text-emerald-600" />
+                                                                <span className="font-medium text-emerald-600">Tandai Selesai</span>
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem onClick={() => setViewModal({ open: true, item: p })}>
+                                                                <FileText className="w-4 h-4 mr-2 text-emerald-600" />
+                                                                <span className="font-medium text-emerald-600">Lihat Catatan</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 space-y-1">
-                                        <div>User: <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
-                                        <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName || `Trainer ID: ${p.trainerId}`}</span></div>
-                                        <div>Metode: <span className="font-medium text-gray-900 dark:text-white">{p.paymentMethod || '—'}</span></div>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
-                                        <button
-                                            onClick={() => setMarkPayoutModal(p)}
-                                            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                                        >
-                                            <Check className="w-3.5 h-3.5" /> Tandai Dibayar
-                                        </button>
-                                    </div>
-                                    <div className="pt-1">{getPayoutStatusBadge(p.status)}</div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* DESKTOP TABLE (≥640px) */}
@@ -528,7 +617,7 @@ function PayoutContent() {
                                     <tr>
                                         <th className="w-10 px-4 py-3 text-center">
                                             <input type="checkbox"
-                                                checked={paged.length > 0 && selectedIds.length === paged.length}
+                                                checked={paged.filter(p => ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase())).length > 0 && selectedIds.length === paged.filter(p => ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase())).length}
                                                 onChange={toggleSelectAll}
                                                 className="w-4 h-4 text-emerald-600 rounded border-gray-300" />
                                         </th>
@@ -537,7 +626,6 @@ function PayoutContent() {
                                         <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Guru (Penerima)</th>
                                         <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nominal</th>
                                         <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Metode</th>
                                         <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Bayar</th>
                                         <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Aksi</th>
                                     </tr>
@@ -556,189 +644,88 @@ function PayoutContent() {
                                     ) : paged.length === 0 ? (
                                         <tr><td colSpan={9} className="text-center py-12 text-gray-400">
                                             <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                            <p>Tidak ada antrean payout pending</p>
+                                            <p>Tidak ada data payout</p>
                                         </td></tr>
-                                    ) : paged.map(p => (
-                                        <tr
-                                            key={p.id}
-                                            onClick={() => handleRowClick(p.bookingId)}
-                                            className={`transition-colors ${p.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
-                                        >
-                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} className="w-4 h-4 text-emerald-600 rounded border-gray-300" />
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
-                                                    #{p.bookingId || p.id}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `User ID: ${p.userId}`}</button>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900 dark:text-white text-sm">{p.trainerName || `Trainer ID: ${p.trainerId}`}</div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right pr-8">
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {getPayoutStatusBadge(p.status)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell">
-                                                {p.paymentMethod || '—'}
-                                            </td>
-                                            <td className="px-4 py-3 hidden lg:table-cell">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-help border-b border-dashed border-gray-400 dark:border-gray-500 pb-px">
-                                                            {formatDate(p.createdAt, 'relative', tz, locale)}
-                                                        </span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="top">
-                                                        <p className="text-xs">{formatDate(p.createdAt, 'long', tz, locale)}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </td>
-                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <button className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
-                                                        <DropdownMenuLabel>Aksi Payout</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => setMarkPayoutModal(p)}>
-                                                            <Check className="w-4 h-4 mr-2 text-emerald-600" />
-                                                            <span className="font-medium text-emerald-600">Tandai Dibayarkan</span>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    ) : paged.map(p => {
+                                        const isPending = ['pending', 'pending_payout', 'paid'].includes((p.status || '').toLowerCase());
+                                        return (
+                                            <tr
+                                                key={p.id}
+                                                onClick={() => handleRowClick(p.bookingId)}
+                                                className={`transition-colors ${p.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
+                                            >
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                                    {isPending && <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} className="w-4 h-4 text-emerald-600 rounded border-gray-300" />}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
+                                                        #{p.bookingId || p.id}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `User ID: ${p.userId}`}</button>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">{p.trainerName || `Trainer ID: ${p.trainerId}`}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right pr-8">
+                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {getPayoutStatusBadge(p.status)}
+                                                </td>
+                                                <td className="px-4 py-3 hidden lg:table-cell">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-help border-b border-dashed border-gray-400 dark:border-gray-500 pb-px">
+                                                                {formatDate(p.createdAt, 'relative', tz, locale)}
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top">
+                                                            <p className="text-xs">{formatDate(p.createdAt, 'long', tz, locale)}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </td>
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                                                <MoreVertical className="w-4 h-4" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48">
+                                                            <DropdownMenuLabel>Aksi Payout</DropdownMenuLabel>
+                                                            <DropdownMenuSeparator />
+                                                            {isPending ? (
+                                                                <DropdownMenuItem onClick={() => setMarkPayoutModal(p)}>
+                                                                    <Check className="w-4 h-4 mr-2 text-emerald-600" />
+                                                                    <span className="font-medium text-emerald-600">Tandai Selesai</span>
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem onClick={() => setViewModal({ open: true, item: p })}>
+                                                                    <FileText className="w-4 h-4 mr-2 text-emerald-600" />
+                                                                    <span className="font-medium text-emerald-600">Lihat Catatan</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Pagination Pending */}
+                        {/* Pagination */}
                         <SmartPagination
-                            total={payouts.length}
+                            total={filteredPayouts.length}
                             page={page}
                             pageSize={pageSize}
                             onPageChange={setPage}
                             onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
                             loading={loading}
                         />
-                        </>
-                        )}
-
-                        {/* ══ TAB: SUDAH DIBAYAR ══ */}
-                        {activeTab === 'selesai' && (
-                        <>
-                        <div className="hidden sm:block overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
-                                    <tr>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Kode Pesanan</th>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">User</th>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Guru</th>
-                                        <th className="text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 pr-8">Nominal</th>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Referensi Payout</th>
-                                        <th className="text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Tgl Bayar</th>
-                                        <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
-                                        <th className="text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                    {completedLoading ? (
-                                        <tr><td colSpan={8}>
-                                            <div className="space-y-3 py-4 px-6">
-                                                {[...Array(3)].map((_, i) => <div key={i} className="flex items-center gap-4 animate-pulse"><Skeleton className="h-3 w-full" /></div>)}
-                                            </div>
-                                        </td></tr>
-                                    ) : pagedCompleted.length === 0 ? (
-                                        <tr><td colSpan={8} className="text-center py-12 text-gray-400">
-                                            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                            <p>Belum ada payout yang selesai</p>
-                                        </td></tr>
-                                    ) : pagedCompleted.map(p => (
-                                        <tr
-                                            key={p.id}
-                                            onClick={() => handleRowClick(p.bookingId)}
-                                            className={`transition-colors ${p.bookingId ? 'cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'}`}
-                                        >
-                                            <td className="px-4 py-3">
-                                                <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
-                                                    #{p.bookingId || p.id}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 font-medium text-sm text-gray-900 dark:text-white">
-                                                <button onClick={(e) => { e.stopPropagation(); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `ID: ${p.userId}`}</button>
-                                            </td>
-                                            <td className="px-4 py-3 font-medium text-sm text-gray-900 dark:text-white">{p.trainerName || `ID: ${p.trainerId}`}</td>
-                                            <td className="px-4 py-3 text-right pr-8">
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
-                                            </td>
-                                            <td className="px-4 py-3 hidden md:table-cell text-xs font-mono text-gray-500">{p.payoutReference || '—'}</td>
-                                            <td className="px-4 py-3 hidden lg:table-cell">
-                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                                    {formatDate(p.updatedAt || p.createdAt, 'relative', tz, locale)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">{getPayoutStatusBadge(p.status)}</td>
-                                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                {p.notes ? (
-                                                    <button onClick={() => setViewModal({ open: true, item: p })} className="text-xs text-emerald-600 hover:underline">
-                                                        Lihat Catatan
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile Selesai */}
-                        <div className="space-y-3 sm:hidden p-4">
-                            {pagedCompleted.map(p => (
-                                <div
-                                    key={p.id}
-                                    onClick={() => handleRowClick(p.bookingId)}
-                                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2 bg-white dark:bg-gray-800 shadow-sm transition-colors ${p.bookingId ? 'cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10' : ''}`}
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">#{p.bookingId || p.id}</span>
-                                        {getPayoutStatusBadge(p.status)}
-                                    </div>
-                                    <div className="text-xs text-gray-500 space-y-1">
-                                        <div>User: <button onClick={(e) => { e.stopPropagation(); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
-                                        <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName}</span></div>
-                                        {p.payoutReference && <div>Ref: <span className="font-mono text-gray-700 dark:text-gray-300">{p.payoutReference}</span></div>}
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                                        <span className="font-bold text-emerald-600 text-sm">{formatRupiah(p.amount)}</span>
-                                        <span className="text-xs text-gray-500">{formatDate(p.createdAt, 'relative', tz, locale)}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Pagination Selesai */}
-                        <SmartPagination
-                            total={completedPayouts.length}
-                            page={completedPage}
-                            pageSize={completedPageSize}
-                            onPageChange={setCompletedPage}
-                            onPageSizeChange={(s) => { setCompletedPageSize(s); setCompletedPage(1); }}
-                            loading={completedLoading}
-                        />
-                        </>
-                        )}
                     </div>
 
                     {/* ── Modals ── */}
@@ -754,7 +741,7 @@ function PayoutContent() {
                                 <div className="p-6 space-y-4">
                                     <div>
                                         <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan Admin:</p>
-                                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{viewModal.item.notes || 'Tidak ada catatan.'}</p>
+                                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{viewModal.item.notes || 'Transfer Berhasil!'}</p>
                                     </div>
                                     <div className="flex justify-end pt-2">
                                         <button onClick={() => setViewModal({ open: false, item: null })} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl font-semibold transition-colors text-sm">Tutup</button>
@@ -832,8 +819,8 @@ function PayoutContent() {
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
                                 <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                                        <CheckSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                                        <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                     <div>
                                         <h3 className="text-base font-bold text-gray-900 dark:text-white">Bulk Payout</h3>
@@ -841,9 +828,9 @@ function PayoutContent() {
                                     </div>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-xl text-sm border border-blue-100 dark:border-blue-800/50">
-                                        <p className="text-gray-600 dark:text-gray-300">Total dipilih: <span className="font-bold text-blue-600 dark:text-blue-400">{selectedIds.length} pembayaran</span></p>
-                                        <p className="text-gray-600 dark:text-gray-300 mt-0.5">Total nilai: <span className="font-bold text-emerald-600">{formatRupiah(payouts.filter(p => selectedIds.includes(p.id)).reduce((a, b) => a + b.amount, 0))}</span></p>
+                                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-xl text-sm border border-emerald-100 dark:border-emerald-800/50">
+                                        <p className="text-gray-600 dark:text-gray-300">Total dipilih: <span className="font-bold text-emerald-600 dark:text-emerald-400">{selectedIds.length} pembayaran</span></p>
+                                        <p className="text-gray-600 dark:text-gray-300 mt-0.5">Total nilai: <span className="font-bold text-emerald-600">{formatRupiah(allPayouts.filter(p => selectedIds.includes(p.id)).reduce((a, b) => a + b.amount, 0))}</span></p>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">

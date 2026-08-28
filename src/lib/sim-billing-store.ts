@@ -9,7 +9,7 @@ import { getSimTransactions } from "@/lib/sim-wallet-store"
 // ── Storage Keys ──────────────────────────────────────────────────────────────
 // STORE_VERSION: Naikkan angka ini setiap kali dummy data berubah agar
 // localStorage lama otomatis di-reset ke data terbaru.
-const STORE_VERSION        = "v6-dummy-fix"  // ← ubah ini saat dummy data diperbarui
+const STORE_VERSION        = "v7-payout-wallet"  // ← ubah ini saat dummy data diperbarui
 const STORE_VERSION_KEY    = "qurani_sim_billing_version"
 const PAYOUT_PENDING_KEY   = "qurani_sim_payout_pending"
 const PAYOUT_HISTORY_KEY   = "qurani_sim_payout_history"
@@ -102,16 +102,16 @@ const DUMMY_PAYOUT_PENDING: SimPayout[] = [
     // Pesanan #3002 — Siti Aminah / Indi fitriani (status: Lunas, belum dipayout)
     { id: "178572300220100000", userId: 103, userName: "Siti Aminah", trainerName: "Indi fitriani", bookingId: 3002, amount: 90000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 345600000).toISOString() },
     // Pesanan #3003 — Budi Santoso / Ustadz Iwan (status: Lunas, belum dipayout)
-    { id: "178572300220200000", userId: 104, userName: "Budi Santoso", trainerName: "Ustadz Iwan", bookingId: 3003, amount: 705000, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 432000000).toISOString() },
+    { id: "178572300220200000", userId: 104, userName: "Budi Santoso", trainerName: "Ustadz Iwan", bookingId: 3003, amount: 705000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 432000000).toISOString() },
     // Pesanan #3007 — Farid Al-Amin / Zain (status: Lunas, belum dipayout)
-    { id: "178572300220300000", userId: 107, userName: "Farid Al-Amin", trainerName: "Zain", bookingId: 3007, amount: 387500, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 518400000).toISOString() },
+    { id: "178572300220300000", userId: 107, userName: "Farid Al-Amin", trainerName: "Zain", bookingId: 3007, amount: 387500, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 518400000).toISOString() },
     // Pesanan #3010 — Zulfa Hanum / Hasyim asy'ari (status: Selesai, belum dipayout)
-    { id: "178572300220400000", userId: 110, userName: "Zulfa Hanum", trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "pending", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 604800000).toISOString() },
+    { id: "178572300220400000", userId: 110, userName: "Zulfa Hanum", trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "pending", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 604800000).toISOString() },
 ];
 
 const DUMMY_PAYOUT_HISTORY: SimPayout[] = [
     // Pesanan #3004 — Dewi Rahayu / Hasyim asy'ari (sudah dipayout ke guru)
-    { id: "178572300230100000", userId: 105, userName: "Dewi Rahayu", trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000, status: "paid_out", paymentMethod: "GoPay", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
+    { id: "178572300230100000", userId: 105, userName: "Dewi Rahayu", trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000, status: "paid_out", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 691200000).toISOString(), payoutReference: "PAY-2026-001", notes: "Transfer berhasil" },
     // Pesanan #3008 — Halimah Tussa'diyah / Hasyim asy'ari, Lc (sudah dipayout ke guru)
     { id: "178572300230200000", userId: 108, userName: "Halimah Tussa'diyah", trainerName: "Hasyim asy'ari, Lc", bookingId: 3008, amount: 90000, status: "paid_out", paymentMethod: "Qurani Wallet", createdAt: new Date(Date.now() - 777600000).toISOString(), payoutReference: "PAY-2026-002", notes: "Transfer berhasil" },
 ];

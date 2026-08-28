@@ -330,3 +330,174 @@ export async function updateCertificateVisibility(
     return { success: false, error: msg };
   }
 }
+
+// ============================================
+// Additional API Endpoints (from Qurani API Docs)
+// ============================================
+
+/**
+ * [Gambar 2] Get certificate by ID
+ * GET /api/v1/Certificates/{id}
+ * Kegunaan: Mengambil detail satu sertifikat berdasarkan ID-nya. Digunakan untuk
+ * menampilkan detail lengkap sertifikat (misalnya saat admin klik baris di tabel).
+ * (Already implemented above as getCertificateById)
+ */
+
+/**
+ * [Gambar 2] Get certificate by certificate number
+ * GET /api/v1/Certificates/number/{certificateNumber}
+ * Kegunaan: Mencari sertifikat berdasarkan nomor sertifikat unik (misalnya QRN-2026-0001).
+ * Berguna untuk fitur pencarian cepat atau verifikasi mandiri oleh admin.
+ * (Already implemented above as getCertificateByNumber)
+ */
+
+/**
+ * [Gambar 3] Get certificates issued by a specific trainer (by trainerId)
+ * GET /api/v1/Certificates/trainer/{trainerId}?page=&pageSize=
+ * Kegunaan: Mengambil daftar semua sertifikat yang diterbitkan oleh trainer tertentu.
+ * Berbeda dari getCertificatesByTrainer() yang mengambil milik trainer yang sedang login,
+ * endpoint ini memungkinkan admin melihat sertifikat trainer manapun berdasarkan ID-nya.
+ */
+export async function getCertificatesByTrainerId(
+  trainerId: number,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<{ success: boolean; data?: CertificatePagedResponse; error?: string }> {
+  try {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    const data = await apiClient.get<CertificatePagedResponse>(
+      `${BASE}/trainer/${trainerId}?${query.toString()}`
+    );
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal mengambil sertifikat trainer';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * [Gambar 3] Get certificate for a specific booking
+ * GET /api/v1/Certificates/booking/{bookingId}
+ * Kegunaan: Mengambil sertifikat yang terkait dengan satu sesi booking (satu transaksi kelas).
+ * Berguna untuk menampilkan sertifikat di halaman detail booking/transaksi.
+ * (Already implemented above as getCertificateForBooking)
+ */
+
+/**
+ * [Gambar 4] Bulk issue certificates (Admin)
+ * POST /api/v1/Certificates/bulk-issue
+ * Body: { bookingIds: number[], credentialType?: string, templateId?: string, validityMonths?: number }
+ * Kegunaan: Menerbitkan sertifikat secara massal untuk banyak booking sekaligus.
+ * Cocok digunakan setelah kelas selesai untuk menerbitkan sertifikat ke semua peserta.
+ * (Already implemented above as bulkIssueCertificates)
+ */
+
+/**
+ * Get expiring certificates
+ * GET /api/v1/Certificates/expiring
+ * Kegunaan: Mengambil daftar sertifikat yang akan segera kadaluarsa. Berguna untuk
+ * menampilkan peringatan kepada admin atau mengirim notifikasi ke pengguna.
+ * (Already implemented above as getExpiringCertificates)
+ */
+
+/**
+ * Send expiry reminder to users with expiring certificates
+ * POST /api/v1/Certificates/send-expiry-reminder
+ * Kegunaan: Memicu pengiriman email/notifikasi pengingat kepada pengguna yang
+ * sertifikatnya akan segera kadaluarsa. Dieksekusi oleh admin secara manual.
+ */
+export async function sendExpiryReminder(): Promise<{ success: boolean; error?: string }> {
+  try {
+    await apiClient.post<unknown>(`${BASE}/send-expiry-reminder`, {});
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal mengirim pengingat kadaluarsa';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Verify certificate (public endpoint — no auth required)
+ * POST /api/v1/Certificates/verify
+ * Body: { certificateNumber: string }
+ * Kegunaan: Endpoint publik untuk memverifikasi keaslian sertifikat tanpa perlu login.
+ * Biasanya digunakan dari halaman verifikasi sertifikat yang dapat diakses siapapun.
+ */
+export async function verifyPublicCertificate(
+  certificateNumber: string
+): Promise<{ success: boolean; data?: { isValid: boolean; certificate?: CertificateDto }; error?: string }> {
+  try {
+    const data = await apiClient.post<{ isValid: boolean; certificate?: CertificateDto }>(
+      `${BASE}/verify`,
+      { certificateNumber }
+    );
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal memverifikasi sertifikat';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Get public certificate for sharing (no auth required)
+ * GET /api/v1/Certificates/public/{shareToken}
+ * Kegunaan: Mengambil data sertifikat menggunakan share token unik yang aman.
+ * Digunakan ketika pemilik sertifikat membagikan link sertifikat ke publik.
+ */
+export async function getPublicCertificate(
+  shareToken: string
+): Promise<{ success: boolean; data?: CertificateDto; error?: string }> {
+  try {
+    const data = await apiClient.get<CertificateDto>(`${BASE}/public/${shareToken}`);
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal mengambil sertifikat publik';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Extend certificate validity period
+ * POST /api/v1/Certificates/{id}/extend
+ * Body: { additionalMonths: number }
+ * Kegunaan: Memperpanjang masa berlaku sertifikat yang sudah ada atau hampir kadaluarsa.
+ * Hanya dapat dilakukan oleh admin atau owner.
+ */
+export async function extendCertificateValidity(
+  id: number,
+  additionalMonths: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await apiClient.post<unknown>(`${BASE}/${id}/extend`, { additionalMonths });
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal memperpanjang masa berlaku sertifikat';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Create custom certificate template (Trainer)
+ * POST /api/v1/Certificates/templates
+ * Kegunaan: Trainer atau admin dapat membuat template sertifikat kustom baru
+ * dengan desain dan konten yang disesuaikan.
+ */
+export interface CreateCertificateTemplateRequest {
+  name: string;
+  description?: string | null;
+  previewUrl?: string | null;
+  isDefault?: boolean;
+}
+
+export async function createCertificateTemplate(
+  payload: CreateCertificateTemplateRequest
+): Promise<{ success: boolean; data?: CertificateTemplateDto; error?: string }> {
+  try {
+    const data = await apiClient.post<CertificateTemplateDto>(`${BASE}/templates`, payload);
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Gagal membuat template sertifikat';
+    return { success: false, error: msg };
+  }
+}
+

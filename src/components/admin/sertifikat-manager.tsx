@@ -10,21 +10,15 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Download,
   RotateCcw,
   ShieldOff,
   LayoutGrid,
   BarChart3,
   List,
   Loader2,
-  Send,
-  ChevronLeft,
-  ChevronRight,
   FileText,
   Calendar,
-  User,
   Filter,
-  MoreHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -68,7 +62,6 @@ import {
 import {
   revokeCertificate,
   reinstateCertificate,
-  bulkIssueCertificates,
 } from "@/services/api/certificates"
 import type {
   CertificateDto,
@@ -271,163 +264,7 @@ function TemplatesSection() {
   )
 }
 
-// ============================================
-// Bulk Issue Dialog
-// ============================================
-function BulkIssueDialog({
-  templates,
-  onSuccess,
-}: {
-  templates: { id: string; name: string }[]
-  onSuccess: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [bookingIdsRaw, setBookingIdsRaw] = useState("")
-  const [credentialType, setCredentialType] = useState("")
-  const [templateId, setTemplateId] = useState("")
-  const [validityMonths, setValidityMonths] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = async () => {
-    const bookingIds = bookingIdsRaw
-      .split(",")
-      .map((id) => Number(id.trim()))
-      .filter((id) => !isNaN(id) && id > 0)
-
-    if (bookingIds.length === 0) {
-      toast.error("Masukkan minimal satu ID Booking yang valid.")
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const result = await bulkIssueCertificates({
-        bookingIds,
-        credentialType: credentialType || null,
-        templateId: templateId || null,
-        validityMonths: validityMonths ? Number(validityMonths) : null,
-      })
-
-      if (result.success) {
-        toast.success("Sertifikat berhasil diterbitkan!")
-        setOpen(false)
-        setBookingIdsRaw("")
-        setCredentialType("")
-        setTemplateId("")
-        setValidityMonths("")
-        onSuccess()
-      } else {
-        toast.error(result.error || "Gagal menerbitkan sertifikat.")
-      }
-    } catch {
-      toast.error("Terjadi kesalahan saat menerbitkan sertifikat.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          size="sm"
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-0 text-white shadow-sm hover:shadow-md transition-all duration-200 gap-1.5"
-        >
-          <Send className="h-4 w-4" />
-          Terbitkan Sertifikat
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-gray-900">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5 text-emerald-600" />
-            Terbitkan Sertifikat Massal
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {/* Booking IDs */}
-          <div className="space-y-1.5">
-            <Label>ID Booking (Pisahkan dengan koma)</Label>
-            <Textarea
-              placeholder="Contoh: 1001, 1002, 1005"
-              value={bookingIdsRaw}
-              onChange={(e) => setBookingIdsRaw(e.target.value)}
-              rows={2}
-            />
-            <p className="text-xs text-muted-foreground">Sertifikat akan dikaitkan dengan user pada booking tersebut.</p>
-          </div>
-
-          {/* Credential Type */}
-          <div className="space-y-1.5">
-            <Label>Tipe Credential</Label>
-            <Input
-              placeholder="Contoh: Tahfidz, Quran, Hafidz..."
-              value={credentialType}
-              onChange={(e) => setCredentialType(e.target.value)}
-            />
-          </div>
-
-          {/* Template */}
-          {templates.length > 0 && (
-            <div className="space-y-1.5">
-              <Label>Template Sertifikat</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih template (opsional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Validity Months */}
-          <div className="space-y-1.5">
-            <Label>Masa Berlaku (Bulan)</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Kosongkan jika tidak ada kadaluarsa"
-              value={validityMonths}
-              onChange={(e) => setValidityMonths(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
-            Batal
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !bookingIdsRaw.trim()}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-0"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                Menerbitkan...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-1" />
-                Terbitkan
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ============================================
 // Main Component
 // ============================================
 export function SertifikatManager() {
@@ -445,19 +282,18 @@ export function SertifikatManager() {
   const [credentialTypeFilter, setCredentialTypeFilter] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("")
   
-  // Active filters that trigger API refetch
   const [activeFilters, setActiveFilters] = useState({
     status: "all" as StatusFilter,
     credentialType: "",
     category: "",
   })
 
-  const PAGE_SIZE = 10
+  const [pageSize, setPageSize] = useState(10)
 
   // Build search params
   const searchParams: CertificateSearchParams = {
     Page: page,
-    PageSize: PAGE_SIZE,
+    PageSize: pageSize,
     ...(activeFilters.status === "active" && { IsRevoked: 0, IsExpired: 0 }),
     ...(activeFilters.status === "revoked" && { IsRevoked: 1 }),
     ...(activeFilters.status === "expired" && { IsExpired: 1 }),
@@ -470,16 +306,35 @@ export function SertifikatManager() {
 
   const { templates } = useCertificateTemplates(activeTab === "list" || activeTab === "templates")
 
-  // Client-side filter by search query (using activeSearch)
-  const filtered = activeSearch.trim()
-    ? certificates.filter(
-        (c) =>
-          c.userName?.toLowerCase().includes(activeSearch.toLowerCase()) ||
-          c.certificateNumber?.toLowerCase().includes(activeSearch.toLowerCase()) ||
-          c.credentialType?.toLowerCase().includes(activeSearch.toLowerCase()) ||
-          c.trainerName?.toLowerCase().includes(activeSearch.toLowerCase())
-      )
-    : certificates
+  // Client-side filter by search query (using activeSearch) and activeFilters
+  let filtered = certificates.filter((c) => {
+    if (activeSearch.trim()) {
+      const q = activeSearch.toLowerCase();
+      const match = c.userName?.toLowerCase().includes(q) ||
+        c.certificateNumber?.toLowerCase().includes(q) ||
+        c.credentialType?.toLowerCase().includes(q) ||
+        c.trainerName?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    
+    // Fallback filters (especially for dummy data where server didn't filter)
+    if (activeFilters.status === "active" && (c.isRevoked || c.isExpired)) return false;
+    if (activeFilters.status === "revoked" && !c.isRevoked) return false;
+    if (activeFilters.status === "expired" && !c.isExpired) return false;
+    
+    if (activeFilters.credentialType && !c.credentialType?.toLowerCase().includes(activeFilters.credentialType.toLowerCase())) return false;
+    if (activeFilters.category && !c.category?.toLowerCase().includes(activeFilters.category.toLowerCase())) return false;
+
+    return true;
+  });
+
+  const displayTotalPages = totalPages > 1 ? totalPages : Math.ceil(filtered.length / pageSize) || 1;
+  const displayTotalCount = totalPages > 1 ? totalCount : filtered.length;
+
+  // Apply client-side pagination for dummy data fallback
+  if (certificates.length > pageSize || totalPages <= 1) {
+    filtered = filtered.slice((page - 1) * pageSize, page * pageSize);
+  }
 
   const handleSearch = () => {
     setActiveSearch(searchQuery)
@@ -541,19 +396,109 @@ export function SertifikatManager() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight">Manajemen Sertifikat</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => refresh()}
+          title="Refresh data"
+        >
+          <RefreshCcw className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Statistics di atas Tabs */}
       <StatisticsSection />
       
       <Card className="dark:bg-gray-800/50 bg-white/80 backdrop-blur-sm shadow-md rounded-2xl border border-border/50 overflow-hidden">
-        {/* Header Tabs & Actions */}
+        {/* Header: Search+Filter Left | Tabs Right */}
         <CardHeader className="pb-3 border-b border-border/40">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Tabs */}
-            <div className="flex gap-1 bg-muted/40 dark:bg-gray-900/40 rounded-xl p-1 w-fit">
+
+            {/* LEFT: Search + Filter (only on list tab) */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {activeTab === "list" && (
+                <>
+                  <div className="relative flex items-center w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari murid, trainer, no sertifikat..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSearch() }}
+                      className="pl-9 h-9 text-sm rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                    <Button
+                      onClick={handleSearch}
+                      className="h-9 px-3 rounded-l-none bg-emerald-500 hover:bg-emerald-600 text-white shadow-none flex-shrink-0"
+                    >
+                      Cari
+                    </Button>
+                  </div>
+
+                  <button
+                    onClick={() => setIsFilterOpen(true)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors border h-9 flex-shrink-0 ${
+                      activeFilters.status !== "all" || activeFilters.credentialType || activeFilters.category
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                        : "bg-white text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" /> Filter
+                  </button>
+
+                  <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Filter Sertifikat</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Status</label>
+                          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Semua Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Semua Status</SelectItem>
+                              <SelectItem value="active">Aktif</SelectItem>
+                              <SelectItem value="revoked">Dicabut</SelectItem>
+                              <SelectItem value="expired">Kadaluarsa</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tipe Kredensial</label>
+                          <Input
+                            placeholder="Contoh: Tahfidz, Basic Quran..."
+                            value={credentialTypeFilter}
+                            onChange={(e) => setCredentialTypeFilter(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Kategori</label>
+                          <Input
+                            placeholder="Contoh: Kelulusan, Prestasi..."
+                            value={categoryFilter}
+                            onChange={(e) => setCategoryFilter(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={applyFilters} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white">
+                          Terapkan Filter
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+            </div>
+
+            {/* RIGHT: Tabs */}
+            <div className="flex gap-1 bg-muted/40 dark:bg-gray-900/40 rounded-xl p-1 w-fit flex-shrink-0 self-end sm:self-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -570,13 +515,6 @@ export function SertifikatManager() {
               ))}
             </div>
 
-            {/* Bulk Issue Button */}
-            {activeTab === "list" && (
-              <BulkIssueDialog
-                templates={templates}
-                onSuccess={refresh}
-              />
-            )}
           </div>
         </CardHeader>
 
@@ -590,110 +528,9 @@ export function SertifikatManager() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4 mt-1"
+                className="flex flex-col gap-4"
               >
-                {/* Filter Row */}
-                <div className="flex flex-col sm:flex-row gap-2 justify-between">
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    {/* Search (Shorter) */}
-                    <div className="relative w-full sm:w-64 flex items-center">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Cari murid, trainer, no sertifikat..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleSearch()
-                          }
-                        }}
-                        className="pl-9 h-9 text-sm rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                      <Button
-                        onClick={handleSearch}
-                        className="h-9 px-3 rounded-l-none bg-emerald-500 hover:bg-emerald-600 text-white shadow-none"
-                      >
-                        Cari
-                      </Button>
-                    </div>
 
-                    <button
-                      onClick={() => setIsFilterOpen(true)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border h-9 ${
-                        activeFilters.status !== "all" || activeFilters.credentialType || activeFilters.category
-                          ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
-                          : "bg-white text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <Filter className="w-4 h-4" /> Filter
-                    </button>
-                    
-                    <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Filter Sertifikat</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Status</label>
-                            <Select
-                              value={statusFilter}
-                              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Semua Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="active">Aktif</SelectItem>
-                                <SelectItem value="revoked">Dicabut</SelectItem>
-                                <SelectItem value="expired">Kadaluarsa</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tipe Kredensial</label>
-                            <Input
-                              placeholder="Contoh: Tahfidz, Basic Quran..."
-                              value={credentialTypeFilter}
-                              onChange={(e) => setCredentialTypeFilter(e.target.value)}
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Kategori</label>
-                            <Input
-                              placeholder="Contoh: Kelulusan, Prestasi..."
-                              value={categoryFilter}
-                              onChange={(e) => setCategoryFilter(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button 
-                            onClick={applyFilters}
-                            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white"
-                          >
-                            Terapkan Filter
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 flex-shrink-0"
-                      onClick={() => refresh()}
-                      title="Refresh"
-                    >
-                      <RefreshCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
 
                 {/* Error */}
                 {error && (
@@ -771,19 +608,7 @@ export function SertifikatManager() {
                               <td className="px-6 py-4 whitespace-nowrap">{statusBadge(cert)}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-right">
                                 <div className="flex items-center gap-1 justify-end">
-                                  {/* Download */}
-                                  {cert.downloadUrl && (
-                                    <a
-                                      href={cert.downloadUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      title="Download PDF"
-                                    >
-                                      <button className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors">
-                                        <Download className="h-4 w-4" />
-                                      </button>
-                                    </a>
-                                  )}
+
 
                                   {/* Revoke */}
                                   {!cert.isRevoked && (
@@ -872,7 +697,18 @@ export function SertifikatManager() {
                       </table>
                     </div>
 
-
+                    {/* Pagination */}
+                    {displayTotalCount > 0 && (
+                      <div className="mt-4">
+                        <SmartPagination
+                          total={displayTotalCount}
+                          page={page}
+                          pageSize={pageSize}
+                          onPageChange={setPage}
+                          onPageSizeChange={setPageSize}
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </motion.div>

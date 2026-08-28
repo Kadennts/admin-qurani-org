@@ -285,16 +285,30 @@ function PengajuanContent() {
     const [penilaianData, setPenilaianData] = useState<Record<number, any>>({})
     const [rescheduleFlags, setRescheduleFlags] = useState<Record<number, boolean>>({})
 
-    useEffect(() => {
-        const s = getSession<Record<number, PengajuanStatus>>(STATUS_KEY)
-        const sel = getSession<Record<number, any>>(SELEKSI_KEY)
-        const pen = getSession<Record<number, any>>(PENILAIAN_KEY)
-        const res = getSession<Record<number, boolean>>(RESCHEDULE_KEY)
-        if (s) setStatuses(s)
-        if (sel) setSeleksiData(sel)
-        if (pen) setPenilaianData(pen)
-        if (res) setRescheduleFlags(res)
+    // Helper: normalize keys from sessionStorage (JSON.parse returns string keys, but g.id is number)
+    const normalizeNumericKeys = <T,>(obj: Record<string, T> | null): Record<number, T> => {
+        if (!obj) return {}
+        return Object.fromEntries(
+            Object.entries(obj).map(([k, v]) => [Number(k), v])
+        ) as Record<number, T>
+    }
+
+    const loadFromSession = useCallback(() => {
+        const s = getSession<Record<string, PengajuanStatus>>(STATUS_KEY)
+        const sel = getSession<Record<string, any>>(SELEKSI_KEY)
+        const pen = getSession<Record<string, any>>(PENILAIAN_KEY)
+        const res = getSession<Record<string, boolean>>(RESCHEDULE_KEY)
+        if (s) setStatuses(normalizeNumericKeys(s))
+        if (sel) setSeleksiData(normalizeNumericKeys(sel))
+        if (pen) setPenilaianData(normalizeNumericKeys(pen))
+        if (res) setRescheduleFlags(normalizeNumericKeys(res))
     }, [])
+
+    useEffect(() => {
+        loadFromSession()
+        window.addEventListener("sessionStorageChanged", loadFromSession)
+        return () => window.removeEventListener("sessionStorageChanged", loadFromSession)
+    }, [loadFromSession])
 
     const updateStatus = (id: number, status: PengajuanStatus) => {
         setStatuses(prev => {
