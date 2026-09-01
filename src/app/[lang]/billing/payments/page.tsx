@@ -196,7 +196,9 @@ function PaymentsContent() {
     const [stats, setStats] = useState({
         revenue: 0,
         totalPayments: 0,
-        pendingRefunds: 0
+        pendingRefunds: 0,
+        pendingCount: 0,
+        completedCount: 0
     });
     const [statsLoading, setStatsLoading] = useState(true);
 
@@ -220,6 +222,8 @@ function PaymentsContent() {
                     ...prev,
                     totalPayments: statsData?.totalPayments ?? statsData?.total ?? statsData?.count ?? prev.totalPayments,
                     revenue: revenueData?.totalRevenue ?? revenueData?.revenue ?? revenueData?.total ?? prev.revenue,
+                    pendingCount: statsData?.pendingCount ?? statsData?.pending ?? prev.pendingCount,
+                    completedCount: statsData?.completedCount ?? statsData?.completed ?? prev.completedCount,
                 }));
             } catch {
                 // fallback: data will be updated from fetchPayments
@@ -333,7 +337,9 @@ function PaymentsContent() {
                     ...prev,
                     revenue: prev.revenue || dataArr.filter((p: any) => p.status === 'paid').reduce((a: number, b: any) => a + b.amount, 0) || 5000000,
                     totalPayments: prev.totalPayments || response.totalCount || dataArr.length || 0,
-                    pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2
+                    pendingRefunds: dataArr.filter((p: any) => p.status === 'refunded').length || 2,
+                    pendingCount: prev.pendingCount || dataArr.filter((p: any) => ['pending', 'pending_payment'].includes((p.status || '').toLowerCase())).length,
+                    completedCount: prev.completedCount || dataArr.filter((p: any) => ['paid', 'completed', 'lunas'].includes((p.status || '').toLowerCase())).length,
                 }));
             }
 
@@ -369,7 +375,9 @@ function PaymentsContent() {
                 ...prev,
                 revenue: prev.revenue || dummy.filter(p => p.status === 'paid').reduce((a, b) => a + b.amount, 0),
                 totalPayments: prev.totalPayments || dummy.length,
-                pendingRefunds: dummy.filter(p => p.status === 'pending_refund').length
+                pendingRefunds: dummy.filter(p => p.status === 'pending_refund').length,
+                pendingCount: prev.pendingCount || dummy.filter(p => ['pending', 'pending_payment'].includes((p.status || '').toLowerCase())).length,
+                completedCount: prev.completedCount || dummy.filter(p => ['paid', 'completed', 'lunas'].includes((p.status || '').toLowerCase())).length,
             }))
         } finally {
             setLoading(false)
@@ -470,7 +478,7 @@ function PaymentsContent() {
             {activeTab === 'payments' && (
             <div className="px-4 sm:px-6 lg:px-8 mt-6">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
                     {/* Card: Total Pembayaran */}
                     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3 sm:gap-4">
                         <div className="p-2.5 sm:p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex-shrink-0">
@@ -487,18 +495,34 @@ function PaymentsContent() {
                             )}
                         </div>
                     </div>
-                    {/* Card: Revenue */}
+                    {/* Card: Payment Pending */}
+                    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3 sm:gap-4">
+                        <div className="p-2.5 sm:p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg flex-shrink-0">
+                            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">Payment Pending</p>
+                            {statsLoading ? (
+                                <div className="h-7 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-0.5" />
+                            ) : (
+                                <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                                    {(stats.pendingCount).toLocaleString('id-ID')}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    {/* Card: Selesai */}
                     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3 sm:gap-4">
                         <div className="p-2.5 sm:p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg flex-shrink-0">
                             <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">{t("billing.payments.summary.revenue", "Revenue")}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">Selesai</p>
                             {statsLoading ? (
                                 <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-0.5" />
                             ) : (
                                 <p className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white">
-                                    {formatCurrency(stats.revenue)}
+                                    {(stats.completedCount).toLocaleString('id-ID')}
                                 </p>
                             )}
                         </div>

@@ -370,8 +370,8 @@ function RefundContent() {
                     {/* ── Stats Cards (4 cards) ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: "Pending Refund", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", clr: "text-amber-600 dark:text-amber-400" },
-                            { label: "Refund Total Nilai", value: formatRupiah(stats.totalValue), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400", isStr: true },
+                            { label: "Refund Pending", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", clr: "text-amber-600 dark:text-amber-400" },
+                            { label: "Nilai Refund", value: formatRupiah(stats.totalValue), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400", isStr: true },
                             { label: "Disetujui", value: stats.approvedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", clr: "text-emerald-600 dark:text-emerald-400" },
                             { label: "Ditolak", value: stats.rejectedCount, icon: XCircle, bg: "bg-red-100 dark:bg-red-900/30", clr: "text-red-600 dark:text-red-400" },
                         ].map(c => {

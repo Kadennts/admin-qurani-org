@@ -337,8 +337,8 @@ function WithdrawContent() {
                     {/* ── Overview Cards ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: "Pending Withdraw", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", iconClr: "text-amber-600 dark:text-amber-400" },
-                            { label: "Withdraw Nilai Pending", value: formatRupiah(stats.pendingTotal), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400", isStr: true },
+                            { label: "Withdraw Pending", value: stats.pendingCount, icon: Clock, bg: "bg-amber-100 dark:bg-amber-900/30", iconClr: "text-amber-600 dark:text-amber-400" },
+                            { label: "Nilai Withdraw", value: formatRupiah(stats.pendingTotal), icon: Banknote, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400", isStr: true },
                             { label: "Disetujui", value: stats.approvedCount, icon: CheckCircle2, bg: "bg-emerald-100 dark:bg-emerald-900/30", iconClr: "text-emerald-600 dark:text-emerald-400" },
                             { label: "Ditolak", value: stats.rejectedCount, icon: XCircle, bg: "bg-red-100 dark:bg-red-900/30", iconClr: "text-red-600 dark:text-red-400" },
                         ].map(card => {

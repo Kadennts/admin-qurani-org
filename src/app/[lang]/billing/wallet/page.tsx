@@ -1,97 +1,33 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import { I18nProvider } from "@/components/providers/i18n-provider"
 import { Skeleton } from "@/components/ui/skeleton"
-import Link from "next/link"
 import {
     Wallet,
-    TrendingUp,
     Clock,
-    Search,
+    RefreshCw,
+    Filter,
     CheckCircle,
     XCircle,
-    Check,
+    Download,
+    Info,
     X,
-    MoreVertical,
-    Banknote,
-    Users,
-    Activity,
-    CreditCard,
-    ArrowUpDown,
-    ArrowUp,
-    ArrowDown,
-    RefreshCw,
-    Eye,
-    Filter,
-    Calendar,
-    DollarSign,
-    ChevronDown,
+    History
 } from "lucide-react"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { useI18n } from "@/components/providers/i18n-provider"
 import { walletApi } from "@/lib/api"
-import { formatTooltipDate } from "@/lib/date-utils"
 import { showToast, ToastContainer } from "@/components/ui/toast-sim"
 import { SmartPagination } from "@/components/ui/smart-pagination"
 import {
-    getSimPendingTopups,
-    getSimTopupHistory,
     getSimWalletStats,
-    confirmSimTopup,
-    rejectSimTopup
+    getSimTransactions
 } from "@/lib/sim-wallet-store"
-import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface UserInfo {
-    id: number | string;
-    name: string;
-    email: string;
-    username?: string;
-}
-
-interface PendingTopup {
-    id: number | string;
-    userId: number | string;
-    user?: UserInfo;
-    amount: number;
-    status: string;
-    paymentMethod?: string;
-    createdAt: string;
-    externalReference?: string | null;
-}
-
-interface TopupHistory {
-    id: number | string;
-    userId?: number | string;
-    user?: UserInfo;
-    amount?: number;
-    status?: string;
-    paymentMethod?: string;
-    createdAt?: string;
-    externalReference?: string | null;
-    rejectionReason?: string;
-}
-
-interface FilterState {
-    status: string;
-    paymentMethod: string;
-    dateFrom: string;
-    dateTo: string;
-    amountMin: string;
-    amountMax: string;
-}
+import { getSimPayoutPending } from "@/lib/sim-billing-store"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,814 +40,459 @@ function formatCurrency(amount: number) {
     }).format(amount).replace("IDR", "Rp")
 }
 
-function timeAgo(dateStr: string, t: any): { relative: string; full: string } {
-    if (!dateStr) return { relative: "-", full: "-" };
-    let normalized = dateStr.trim();
-    if (normalized.includes(" ") && !normalized.includes("T")) normalized = normalized.replace(" ", "T");
-    if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) normalized += "Z";
-    const date = new Date(normalized);
-    if (isNaN(date.getTime())) return { relative: "-", full: "-" };
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-    const diffWeek = Math.floor(diffDay / 7);
-    const diffMonth = Math.floor(diffDay / 30);
-    const diffYear = Math.floor(diffDay / 365);
+function formatDate(dateString: string | undefined, format: 'relative' | 'long' | 'short' = 'relative', tz: string = 'UTC', locale: string = 'id-ID') {
+    if (!dateString) return "-"
+    try {
+        let normalized = dateString.trim()
+        if (normalized.includes(" ") && !normalized.includes("T")) normalized = normalized.replace(" ", "T")
+        if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) normalized += "Z"
+        const date = new Date(normalized)
+        if (isNaN(date.getTime())) return "-"
+        if (format === 'long') return new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(date)
+        if (format === 'short') return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: tz }).format(date)
+        const now = new Date()
+        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+        if (diffInSeconds < 60) return "Baru saja"
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit lalu`
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`
+        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} hari lalu`
+        return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: tz }).format(date)
+    } catch {
+        return dateString
+    }
+}
 
-    let relative: string;
-    if (diffSec < 60) relative = t("common.timeAgo.justNow", "Baru saja");
-    else if (diffMin < 60) relative = t("common.timeAgo.minutesAgo", "{minutes} menit lalu").replace("{minutes}", String(diffMin));
-    else if (diffHour < 24) relative = t("common.timeAgo.hoursAgo", "{hours} jam lalu").replace("{hours}", String(diffHour));
-    else if (diffDay === 1) relative = t("common.timeAgo.yesterday", "Kemarin");
-    else if (diffDay < 7) relative = t("common.timeAgo.daysAgo", "{days} hari lalu").replace("{days}", String(diffDay));
-    else if (diffWeek < 5) relative = t("common.timeAgo.weeksAgo", "{weeks} minggu lalu").replace("{weeks}", String(diffWeek));
-    else if (diffMonth < 12) relative = t("common.timeAgo.monthsAgo", "{months} bulan lalu").replace("{months}", String(diffMonth));
-    else relative = t("common.timeAgo.yearsAgo", "{years} tahun lalu").replace("{years}", String(diffYear));
-
-    return { relative, full: "" };
+function getTxTypeBadge(type: number | undefined, typeName?: string) {
+    if (type === 1 || typeName === 'TopUp') return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">TopUp</span>
+    if (type === 2 || typeName === 'Withdraw') return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">Withdraw</span>
+    if (type === 3) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">Transfer</span>
+    if (type === 4) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">Payment</span>
+    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Lainnya</span>
 }
 
 function getStatusBadge(status: string | undefined) {
-    const s = (status || "").toLowerCase();
-    if (s === "success" || s === "completed" || s === "approved" || s === "confirmed") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"><CheckCircle className="w-3 h-3" />Disetujui</span>;
+    const s = (status || "").toLowerCase()
+    if (s === "success" || s === "completed" || s === "approved") {
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"><CheckCircle className="w-3 h-3" />Berhasil</span>
     }
     if (s === "pending" || s === "waiting") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" />Pending</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" />Pending</span>
     }
     if (s === "failed" || s === "rejected" || s === "cancelled") {
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"><XCircle className="w-3 h-3" />Ditolak</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"><XCircle className="w-3 h-3" />Gagal</span>
     }
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{status || "—"}</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{status || "-"}</span>
 }
 
-// ─── Components ───────────────────────────────────────────────────────────────
+function getPaymentMethodName(raw: string | undefined): string {
+    if (!raw) return "-"
+    const lower = raw.toLowerCase()
+    if (lower.includes("qurani wallet") || lower.includes("wallet qurani") || lower.includes("saldo wallet") || lower.includes("qurani")) return "Qurani Wallet"
+    if (lower.includes("gopay")) return "GoPay"
+    if (lower.includes("dana")) return "DANA"
+    if (lower.includes("ovo")) return "OVO"
+    if (lower.includes("shopeepay") || lower.includes("spay")) return "ShopeePay"
+    if (lower.includes("bca")) return "Bank BCA"
+    if (lower.includes("mandiri")) return "Bank Mandiri"
+    if (lower.includes("bni")) return "Bank BNI"
+    if (lower.includes("bri")) return "Bank BRI"
+    if (lower.includes("bsi")) return "Bank BSI"
+    if (lower.includes("cimb")) return "Bank CIMB"
+    if (lower.includes("permata")) return "Bank Permata"
+    if (lower.includes("virtual account") || lower.includes("va")) return raw.replace(/virtual account/i, "VA").trim()
+    if (lower.includes("transfer bank")) return raw.replace(/transfer bank/i, "Bank").trim()
+    return raw
+}
 
-function WalletPageContent() {
-    const { t } = useI18n();
-    const router = useRouter();
-    const params = useParams();
-    const lang = params?.lang || "en";
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<any>(null);
-    const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+const DEFAULT_FILTERS = {
+    kategori: "all",
+    nominalMin: "",
+    nominalMax: "",
+    dateStart: "",
+    dateEnd: "",
+    metode: "",
+    status: "all"
+}
 
-    // Combined all topup data
-    const [allTopups, setAllTopups] = useState<(PendingTopup | TopupHistory)[]>([]);
+export default function FinanceDashboardPage() {
+    const { t } = useI18n()
+    const params = useParams()
+    const router = useRouter()
+    const lang = params?.lang || "en"
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const locale = 'id-ID'
 
-    // Search states
-    const [searchInput, setSearchInput] = useState("");
-    const [activeSearch, setActiveSearch] = useState("");
+    const [loading, setLoading] = useState(true)
+    const [stats, setStats] = useState<any>(null)
+    const [transactions, setTransactions] = useState<any[]>([])
+    const [allTransactions, setAllTransactions] = useState<any[]>([])
+    const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
+    const [totalCount, setTotalCount] = useState(0)
 
-    // Filter state
-    const [filterOpen, setFilterOpen] = useState(false);
-    const [filter, setFilter] = useState<FilterState>({ status: '', paymentMethod: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
-    const [activeFilter, setActiveFilter] = useState<FilterState>({ status: '', paymentMethod: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' });
-    const filterRef = useRef<HTMLDivElement>(null);
+    // Filter states
+    const [isFilterOpen, setIsFilterOpen] = useState(false)
+    const [kategoriFilter, setKategoriFilter] = useState("all")
+    const [nominalMin, setNominalMin] = useState("")
+    const [nominalMax, setNominalMax] = useState("")
+    const [dateStart, setDateStart] = useState("")
+    const [dateEnd, setDateEnd] = useState("")
+    const [metodeFilter, setMetodeFilter] = useState("")
+    const [statusFilter, setStatusFilter] = useState("all")
+    const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS)
 
-    // User wallet modal state
-    const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
-    const [selectedWalletUserName, setSelectedWalletUserName] = useState<string>("");
+    const isFilterActive =
+        activeFilters.kategori !== "all" ||
+        activeFilters.nominalMin !== "" ||
+        activeFilters.nominalMax !== "" ||
+        activeFilters.dateStart !== "" ||
+        activeFilters.dateEnd !== "" ||
+        activeFilters.metode !== "" ||
+        activeFilters.status !== "all"
 
-    // Modal states
-    const [actionModal, setActionModal] = useState<{
-        isOpen: boolean;
-        type: 'confirm_topup' | 'reject_topup' | null;
-        item: any;
-    }>({ isOpen: false, type: null, item: null });
+    function applyFiltersToItems(items: any[], filters: typeof DEFAULT_FILTERS) {
+        let filtered = [...items]
+        if (filters.kategori && filters.kategori !== "all") filtered = filtered.filter((item: any) => item.type === parseInt(filters.kategori))
+        if (filters.metode) { const m = filters.metode.toLowerCase(); filtered = filtered.filter((item: any) => item.paymentMethod?.toLowerCase().includes(m)) }
+        if (filters.status && filters.status !== "all") {
+            const s = filters.status.toLowerCase()
+            if (s === "berhasil") filtered = filtered.filter((item: any) => ["completed", "success", "approved"].includes((item.status || "").toLowerCase()))
+            else if (s === "pending") filtered = filtered.filter((item: any) => ["pending", "waiting"].includes((item.status || "").toLowerCase()))
+            else if (s === "tolak") filtered = filtered.filter((item: any) => ["failed", "rejected", "cancelled"].includes((item.status || "").toLowerCase()))
+        }
+        if (filters.nominalMin) filtered = filtered.filter((item: any) => Math.abs(item.amount) >= parseInt(filters.nominalMin))
+        if (filters.nominalMax) filtered = filtered.filter((item: any) => Math.abs(item.amount) <= parseInt(filters.nominalMax))
+        if (filters.dateStart) filtered = filtered.filter((item: any) => new Date(item.createdAt) >= new Date(filters.dateStart))
+        if (filters.dateEnd) { const endDate = new Date(filters.dateEnd); endDate.setHours(23, 59, 59, 999); filtered = filtered.filter((item: any) => new Date(item.createdAt) <= endDate) }
+        return filtered
+    }
 
-    const [modalInput, setModalInput] = useState({ reason: "", extId: "", ref: "" });
+    const fetchData = useCallback(async () => {
+        setLoading(true)
+        try {
+            const [statsRes, txRes] = await Promise.allSettled([
+                walletApi.getStatisticsOverview(),
+                walletApi.getTransactions({ page: 1, pageSize: 200 })
+            ])
+            let fetchedStats: any = null
+            let fetchedTxs: any[] = []
+            if (statsRes.status === 'fulfilled' && statsRes.value) fetchedStats = statsRes.value.data || statsRes.value
+            if (txRes.status === 'fulfilled' && txRes.value) {
+                const data = txRes.value?.data || txRes.value
+                fetchedTxs = Array.isArray(data) ? data : (data?.items || data?.data || [])
+            }
+            if (!fetchedStats) { fetchedStats = getSimWalletStats(); fetchedStats.activeBalance = 0; fetchedStats.pendingBalance = 0 }
+            if (fetchedTxs.length === 0) fetchedTxs = getSimTransactions()
+            
+            // Hitung Saldo Aktif dari riwayat transaksi yang berhasil (ditambah modal awal/base balance agar tidak minus karena data dummy withdraw > topup)
+            const BASE_BALANCE = 1240000;
+            const calculatedActiveBalance = BASE_BALANCE + fetchedTxs.reduce((sum, tx) => {
+                const s = (tx.status || "").toLowerCase()
+                if (s === "success" || s === "completed" || s === "approved") {
+                    return sum + (tx.amount || 0)
+                }
+                return sum
+            }, 0)
+            
+            // Hitung Saldo Pending dari data Payout Pending (uang user yang sudah masuk dan menunggu dicairkan ke guru)
+            const pendingPayouts = getSimPayoutPending()
+            const calculatedPendingBalance = pendingPayouts.reduce((sum, p) => sum + (p.amount || 0), 0)
 
-    // Rejection reason modal
-    const [rejectionModal, setRejectionModal] = useState<{
-        isOpen: boolean;
-        reason: string;
-        userName: string;
-        amount: number;
-    }>({ isOpen: false, reason: "", userName: "", amount: 0 });
+            fetchedStats.activeBalance = calculatedActiveBalance
+            fetchedStats.pendingBalance = calculatedPendingBalance
 
-    const [isDemoMode, setIsDemoMode] = useState(false);
+            setStats(fetchedStats)
+            setAllTransactions(fetchedTxs)
+        } catch {
+            const fallbackStats = getSimWalletStats()
+            const fallbackTxs = getSimTransactions()
+            
+            const BASE_BALANCE = 124000000;
+            const calculatedActiveBalance = BASE_BALANCE + fallbackTxs.reduce((sum, tx) => {
+                const s = (tx.status || "").toLowerCase()
+                if (s === "success" || s === "completed" || s === "approved") {
+                    return sum + (tx.amount || 0)
+                }
+                return sum
+            }, 0)
+            
+            const pendingPayouts = getSimPayoutPending()
+            const calculatedPendingBalance = pendingPayouts.reduce((sum, p) => sum + (p.amount || 0), 0)
 
-    // Filter click outside handled by modal backdrop
+            fallbackStats.activeBalance = calculatedActiveBalance
+            fallbackStats.pendingBalance = calculatedPendingBalance
+
+            setStats(fallbackStats)
+            setAllTransactions(fallbackTxs)
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => { fetchData() }, [fetchData])
 
     useEffect(() => {
-        const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                if (rejectionModal.isOpen) setRejectionModal(prev => ({ ...prev, isOpen: false }));
-                if (actionModal.isOpen) setActionModal({ isOpen: false, type: null, item: null });
-                if (filterOpen) setFilterOpen(false);
-            }
-        };
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, [rejectionModal.isOpen, actionModal.isOpen, filterOpen]);
+        const filtered = applyFiltersToItems(allTransactions, activeFilters)
+        setTotalCount(filtered.length)
+        const start = (page - 1) * pageSize
+        setTransactions(filtered.slice(start, start + pageSize))
+    }, [allTransactions, activeFilters, page, pageSize])
 
-    // ── Fetch all topup data (pending + history combined) ─────────────────────
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const [statsRes, pendingRes, historyRes] = await Promise.allSettled([
-                walletApi.getStatisticsOverview(),
-                walletApi.getPendingTopups(),
-                walletApi.getTopupHistory({ page: 1, pageSize: 200 }),
-            ]);
+    function handleApplyFilter() {
+        setActiveFilters({ kategori: kategoriFilter, nominalMin, nominalMax, dateStart, dateEnd, metode: metodeFilter, status: statusFilter })
+        setPage(1)
+        setIsFilterOpen(false)
+    }
 
-            let fetchedStats = null;
-            let pendingTopups: any[] = [];
-            let historyTopups: any[] = [];
+    function handleResetFilter() {
+        setKategoriFilter("all"); setNominalMin(""); setNominalMax(""); setDateStart(""); setDateEnd(""); setMetodeFilter(""); setStatusFilter("all")
+        setActiveFilters(DEFAULT_FILTERS)
+        setPage(1)
+        setIsFilterOpen(false)
+    }
 
-            if (statsRes.status === 'fulfilled' && statsRes.value) {
-                fetchedStats = statsRes.value.data || statsRes.value;
-            }
-            if (pendingRes.status === 'fulfilled' && pendingRes.value) {
-                pendingTopups = pendingRes.value.data || pendingRes.value;
-                if (!Array.isArray(pendingTopups)) pendingTopups = [];
-            }
-            if (historyRes.status === 'fulfilled' && historyRes.value) {
-                const data = historyRes.value?.data || historyRes.value;
-                historyTopups = Array.isArray(data) ? data : (data?.items || data?.data || []);
-            }
-
-            if (!fetchedStats) {
-                fetchedStats = getSimWalletStats();
-                setIsDemoMode(true);
-            } else {
-                setIsDemoMode(false);
-            }
-
-            let combined = [...pendingTopups, ...historyTopups];
-            if (combined.length === 0) {
-                const simPending = getSimPendingTopups();
-                const simHistory = getSimTopupHistory();
-                combined = [...simPending, ...simHistory];
-                setIsDemoMode(true);
-            }
-
-            setStats(fetchedStats);
-            setAllTopups(combined);
-        } catch (error) {
-            const simPending = getSimPendingTopups();
-            const simHistory = getSimTopupHistory();
-            setStats(getSimWalletStats());
-            setAllTopups([...simPending, ...simHistory]);
-            setIsDemoMode(true);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-
-    const handleSearch = () => { setActiveSearch(searchInput); setPage(1); };
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') handleSearch();
-    };
-
-    // Apply filters + search
-    const filteredTopups = allTopups.filter(item => {
-        const topup = item as any;
-        // Search
-        if (activeSearch) {
-            const q = activeSearch.toLowerCase();
-            if (!(topup.user?.name?.toLowerCase().includes(q) || String(topup.id).includes(q) || topup.paymentMethod?.toLowerCase().includes(q))) return false;
-        }
-        // Status
-        if (activeFilter.status) {
-            const s = (topup.status || '').toLowerCase();
-            if (activeFilter.status === 'pending' && !['pending', 'waiting'].includes(s)) return false;
-            if (activeFilter.status === 'approved' && !['success', 'completed', 'approved', 'confirmed'].includes(s)) return false;
-            if (activeFilter.status === 'rejected' && !['failed', 'rejected', 'cancelled'].includes(s)) return false;
-        }
-        // Payment method
-        if (activeFilter.paymentMethod) {
-            const m = (topup.paymentMethod || '').toLowerCase();
-            if (!m.includes(activeFilter.paymentMethod.toLowerCase())) return false;
-        }
-        // Date from
-        if (activeFilter.dateFrom && topup.createdAt) {
-            if (new Date(topup.createdAt) < new Date(activeFilter.dateFrom)) return false;
-        }
-        // Date to
-        if (activeFilter.dateTo && topup.createdAt) {
-            const to = new Date(activeFilter.dateTo); to.setHours(23, 59, 59);
-            if (new Date(topup.createdAt) > to) return false;
-        }
-        // Amount min
-        if (activeFilter.amountMin && topup.amount !== undefined) {
-            if (topup.amount < Number(activeFilter.amountMin)) return false;
-        }
-        // Amount max
-        if (activeFilter.amountMax && topup.amount !== undefined) {
-            if (topup.amount > Number(activeFilter.amountMax)) return false;
-        }
-        return true;
-    });
-
-    const pagedTopups = filteredTopups.slice((page - 1) * pageSize, page * pageSize);
-
-    const hasActiveFilter = activeFilter.status || activeFilter.paymentMethod || activeFilter.dateFrom || activeFilter.dateTo || activeFilter.amountMin || activeFilter.amountMax;
-
-    const applyFilter = () => { setActiveFilter({ ...filter }); setPage(1); setFilterOpen(false); };
-    const resetFilter = () => {
-        const empty = { status: '', paymentMethod: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '' };
-        setFilter(empty); setActiveFilter(empty); setPage(1); setFilterOpen(false);
-    };
-
-    const executeAction = async () => {
-        const { type, item } = actionModal;
-        if (!type || !item) return;
-
-        if (isDemoMode) {
-            if (type === 'confirm_topup') {
-                confirmSimTopup(item.id, modalInput.ref);
-                showToast({ type: 'success', title: '[DEMO] Topup Dikonfirmasi', message: `Saldo ${item.user?.name || 'User'} +${formatCurrency(item.amount)} (simulasi)` });
-            } else if (type === 'reject_topup') {
-                if (!modalInput.reason.trim()) {
-                    showToast({ type: 'error', title: 'Alasan wajib diisi', message: 'Harap isi alasan penolakan topup.' });
-                    return;
-                }
-                rejectSimTopup(item.id, modalInput.reason.trim());
-                showToast({ type: 'info', title: '[DEMO] Topup Ditolak', message: `Permintaan topup ${item.user?.name || 'User'} ditolak (simulasi)` });
-            }
-            fetchData();
-            setActionModal({ isOpen: false, type: null, item: null });
-            setModalInput({ reason: "", extId: "", ref: "" });
-            return;
-        }
-
-        try {
-            if (type === 'confirm_topup') {
-                await walletApi.confirmTopup(item.id, modalInput.ref);
-                showToast({ type: 'success', title: 'Topup Dikonfirmasi', message: `Saldo ${item.user?.name || 'User'} berhasil ditambahkan.` });
-            } else if (type === 'reject_topup') {
-                if (!modalInput.reason.trim()) {
-                    showToast({ type: 'error', title: 'Alasan wajib diisi', message: 'Harap isi alasan penolakan topup.' });
-                    return;
-                }
-                await walletApi.rejectTopup(item.id, modalInput.reason.trim());
-                showToast({ type: 'info', title: 'Topup Ditolak', message: `Permintaan topup ${item.user?.name || 'User'} telah ditolak.` });
-            }
-            fetchData();
-            setActionModal({ isOpen: false, type: null, item: null });
-            setModalInput({ reason: "", extId: "", ref: "" });
-        } catch (error: any) {
-            showToast({ type: 'error', title: 'Gagal Melakukan Aksi', message: error.message || 'Terjadi kesalahan. Coba lagi.' });
-        }
-    };
-
-    const openModal = (type: typeof actionModal.type, item: any) => {
-        setActionModal({ isOpen: true, type, item });
-        setModalInput({ reason: "", extId: "", ref: "" });
-    };
-
-    // Compute stats for cards
-    const approvedCount = allTopups.filter(t => ['success', 'completed', 'approved', 'confirmed'].includes(((t as any).status || '').toLowerCase())).length;
-    const rejectedCount = allTopups.filter(t => ['failed', 'rejected', 'cancelled'].includes(((t as any).status || '').toLowerCase())).length;
-
-    const WALLET_STATS = [
-        {
-            title: t("billing.wallet.stats.systemBalance", "Saldo Sistem"),
-            value: stats?.totalBalance || 0,
-            isCurrency: true,
-            icon: Wallet,
-            bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
-            iconColor: "text-emerald-500"
-        },
-        {
-            title: t("billing.wallet.stats.activeWallet", "Total Dompet Aktif"),
-            value: stats?.activeWallets || 0,
-            isCurrency: false,
-            icon: Users,
-            bgColor: "bg-sky-50 dark:bg-sky-900/20",
-            iconColor: "text-sky-500"
-        },
-        {
-            title: t("billing.wallet.stats.volumeToday", "Volume Hari Ini"),
-            value: stats?.volumeToday || 0,
-            isCurrency: true,
-            icon: Activity,
-            bgColor: "bg-purple-50 dark:bg-purple-900/20",
-            iconColor: "text-purple-500"
-        },
-        {
-            title: t("billing.wallet.stats.pendingTopup", "Topup Pending"),
-            value: stats?.totalPendingTopups || allTopups.filter(t => ['pending', 'waiting'].includes(((t as any).status || '').toLowerCase())).length,
-            isCurrency: false,
-            icon: Clock,
-            bgColor: "bg-amber-50 dark:bg-amber-900/20",
-            iconColor: "text-amber-500"
-        },
-        {
-            title: "Disetujui",
-            value: approvedCount,
-            isCurrency: false,
-            icon: CheckCircle,
-            bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
-            iconColor: "text-emerald-500"
-        },
-        {
-            title: "Ditolak",
-            value: rejectedCount,
-            isCurrency: false,
-            icon: XCircle,
-            bgColor: "bg-red-50 dark:bg-red-900/20",
-            iconColor: "text-red-500"
-        }
-    ];
-
-    // Collect unique payment methods for filter
-    const paymentMethods = Array.from(new Set(allTopups.map(t => (t as any).paymentMethod).filter(Boolean)));
+    // legacy compat
+    const pagedTransactions = transactions
 
     return (
-        <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 p-4 md:p-6 lg:p-8">
-            <ToastContainer />
-            <div className="max-w-[1400px] mx-auto space-y-8">
+        <DashboardLayout>
+            <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 p-4 md:p-6 lg:p-8">
+                <ToastContainer />
+                <div className="max-w-[1400px] mx-auto space-y-6">
 
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between">
-                    <div>
+                    {/* ── Header ── */}
+                    <div className="flex items-center justify-between">
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <Wallet className="w-6 h-6 text-emerald-500" />
                             Wallet
                         </h1>
-                    </div>
-                    <div className="flex items-center gap-2">
                         <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
                             <RefreshCw className="w-4 h-4 text-gray-500" />
                             Refresh
                         </button>
                     </div>
-                </div>
 
-                {/* ── Stats Cards (6 cards) ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {WALLET_STATS.map((stat, i) => {
-                        const Icon = stat.icon
-                        return (
-                            <div key={i} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">{stat.title}</span>
-                                        <div className={`p-2 rounded-xl ${stat.bgColor}`}>
-                                            <Icon className={`w-4 h-4 ${stat.iconColor}`} />
-                                        </div>
-                                    </div>
-                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                        {loading ? "..." : (stat.isCurrency ? formatCurrency(stat.value) : stat.value)}
-                                    </h3>
-                                </div>
+                    {/* ── Main Balance Cards ── */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Active Balance */}
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-6 right-6 p-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                                <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                             </div>
-                        )
-                    })}
-                </div>
-
-                {/* ── Table Section ── */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
-
-                    {/* Toolbar: Search + Filter */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center border-b border-gray-100 dark:border-gray-700 px-4 py-3 gap-3">
-                        <div className="flex items-center gap-2 flex-1">
-                            {/* Search - bigger */}
-                            <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-emerald-500 transition-shadow flex-1 max-w-md">
-                                <div className="relative bg-white dark:bg-gray-900 flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        value={searchInput}
-                                        onChange={e => setSearchInput(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        placeholder="Cari nama, metode pembayaran..."
-                                        className="w-full pl-10 pr-3 py-2.5 text-sm bg-transparent border-none focus:outline-none dark:text-white"
-                                    />
-                                </div>
-                                <button onClick={handleSearch} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition-colors whitespace-nowrap">Cari</button>
+                            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Saldo Aktif</h3>
+                            <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                                {loading ? <Skeleton className="h-10 w-48" /> : formatCurrency(stats?.activeBalance || 0)}
                             </div>
+                        </div>
 
-                            {/* Filter Button */}
-                            <div className="relative" ref={filterRef}>
+                        {/* Pending Balance */}
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-6 right-6 p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Saldo Pending</h3>
+                            <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                                {loading ? <Skeleton className="h-10 w-48" /> : formatCurrency(stats?.pendingBalance || 0)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Transaction Ledger Table ── */}
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Riwayat Transaksi</h2>
+                            <div className="flex gap-2">
                                 <button
-                                    onClick={() => setFilterOpen(prev => !prev)}
-                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
-                                        ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
-                                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    onClick={() => setIsFilterOpen(true)}
+                                    className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                                        isFilterActive
+                                            ? "bg-emerald-50 text-emerald-600 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-700"
+                                            : "bg-white text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                                     }`}
                                 >
-                                    <Filter className="w-4 h-4" />
-                                    Filter
+                                    <Filter className="w-4 h-4" /> Filter
+                                    {isFilterActive && <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-bold">✓</span>}
                                 </button>
-
-                                {/* Filter Modal */}
-                                {filterOpen && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
-                                            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                                                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Filter className="w-5 h-5 text-emerald-500" /> Filter Data Topup</h3>
-                                                <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
-                                            </div>
-                                            <div className="p-6 space-y-4">
-
-                                        {/* Status */}
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Status</label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {['', 'pending', 'approved', 'rejected'].map(s => (
-                                                    <button key={s} onClick={() => setFilter(f => ({ ...f, status: s }))}
-                                                        className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${filter.status === s
-                                                            ? 'bg-emerald-500 text-white border-emerald-500'
-                                                            : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
-                                                        }`}>
-                                                        {s === '' ? 'Semua' : s === 'pending' ? 'Pending' : s === 'approved' ? 'Disetujui' : 'Ditolak'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Payment Method */}
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Metode Pembayaran</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Contoh: GoPay, BCA, Transfer..."
-                                                value={filter.paymentMethod}
-                                                onChange={e => setFilter(f => ({ ...f, paymentMethod: e.target.value }))}
-                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            />
-                                        </div>
-
-                                        {/* Date Range */}
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><Calendar className="w-3 h-3" />Rentang Tanggal</label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400 mb-1">Dari</p>
-                                                    <input type="date" value={filter.dateFrom} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value }))}
-                                                        className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400 mb-1">Sampai</p>
-                                                    <input type="date" value={filter.dateTo} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value }))}
-                                                        className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Amount Range */}
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1"><DollarSign className="w-3 h-3" />Nominal (Rp)</label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400 mb-1">Lebih dari</p>
-                                                    <input type="number" placeholder="0" value={filter.amountMin} onChange={e => setFilter(f => ({ ...f, amountMin: e.target.value }))}
-                                                        className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400 mb-1">Kurang dari</p>
-                                                    <input type="number" placeholder="∞" value={filter.amountMax} onChange={e => setFilter(f => ({ ...f, amountMax: e.target.value }))}
-                                                        className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Actions */}
-                                            {/* Actions */}
-                                            <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                                <button onClick={resetFilter} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Reset</button>
-                                                <button onClick={applyFilter} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors">Terapkan</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                                <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+                                    <Download className="w-4 h-4" /> Export
+                                </button>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Mobile Card View */}
-                    <div className="space-y-3 sm:hidden p-4">
-                        {loading ? (
-                            <div className="space-y-3">
-                                {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 animate-pulse">
-                                        <div className="flex justify-between items-start"><Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" /></div>
-                                        <div className="grid grid-cols-2 gap-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /></div>
-                                    </div>
-                                ))}
+                        {isFilterActive && (
+                            <div className="px-6 py-2 border-b border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
+                                {activeFilters.kategori !== "all" && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Kategori: {activeFilters.kategori === "1" ? "TopUp" : activeFilters.kategori === "2" ? "Withdraw" : activeFilters.kategori === "3" ? "Transfer" : "Payment"}</span>}
+                                {activeFilters.status !== "all" && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Status: {activeFilters.status}</span>}
+                                {activeFilters.metode && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Metode: {activeFilters.metode}</span>}
+                                {(activeFilters.nominalMin || activeFilters.nominalMax) && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Nominal: {activeFilters.nominalMin || "0"} s/d {activeFilters.nominalMax || "max"}</span>}
+                                {(activeFilters.dateStart || activeFilters.dateEnd) && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Tanggal: {activeFilters.dateStart || "-"} s/d {activeFilters.dateEnd || "-"}</span>}
+                                <button onClick={handleResetFilter} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><X className="w-3 h-3" /> Reset</button>
                             </div>
-                        ) : pagedTopups.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">Tidak ada data topup.</div>
-                        ) : (
-                            pagedTopups.map((item: any) => (
-                                <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800 shadow-sm">
-                                    <div className="flex justify-between items-start">
-                                        <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
-                                            #{item.id}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            {getStatusBadge(item.status)}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <button className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-                                                        <MoreVertical className="w-5 h-5" />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Aksi Topup</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    {['pending', 'waiting'].includes((item.status || '').toLowerCase()) && (
-                                                        <>
-                                                            <DropdownMenuItem onClick={() => openModal('confirm_topup', item)}>
-                                                                <Check className="w-4 h-4 mr-2 text-emerald-600" />
-                                                                <span>Confirm Topup</span>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => openModal('reject_topup', item)}>
-                                                                <X className="w-4 h-4 mr-2 text-red-600" />
-                                                                <span className="text-red-600">Reject Topup</span>
-                                                            </DropdownMenuItem>
-                                                        </>
-                                                    )}
-                                                    {['success', 'completed', 'approved', 'confirmed'].includes((item.status || '').toLowerCase()) && (
-                                                        <DropdownMenuItem onClick={() => setRejectionModal({ isOpen: true, reason: item.rejectionReason || 'Tidak ada catatan.', userName: item.user?.name || `User #${item.userId}`, amount: item.amount || 0 })}>
-                                                            <Eye className="w-4 h-4 mr-2 text-blue-600" />
-                                                            <span>Lihat Detail Penerimaan</span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {['failed', 'rejected', 'cancelled'].includes((item.status || '').toLowerCase()) && (
-                                                        <DropdownMenuItem onClick={() => setRejectionModal({ isOpen: true, reason: item.rejectionReason || 'Ditolak oleh admin.', userName: item.user?.name || `User #${item.userId}`, amount: item.amount || 0 })}>
-                                                            <Eye className="w-4 h-4 mr-2 text-red-600" />
-                                                            <span className="text-red-600">Lihat Alasan Ditolak</span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Link href={`/${lang}/billing/${item.userId}/wallet`} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors">{item.user?.name || `User ID: ${item.userId}`}</Link>
-                                        <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                                            <CreditCard className="w-3 h-3" />
-                                            {item.paymentMethod || 'Transfer/Payment Gateway'}
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                                        <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{item.amount !== undefined ? formatCurrency(item.amount) : '—'}</div>
-                                        {item.createdAt && (
-                                            <span title={formatTooltipDate(item.createdAt)} className="text-xs text-gray-500 cursor-default border-b border-dashed border-gray-400 pb-px">{timeAgo(item.createdAt, t).relative}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))
                         )}
-                    </div>
 
-                    {/* Desktop Table */}
-                    <div className="hidden sm:block p-0 overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50/50 dark:bg-gray-800/30 text-gray-400 uppercase tracking-widest text-[10px] font-bold border-b border-gray-100 dark:border-gray-800">
-                                <tr>
-                                    <th className="px-6 py-4 text-left">ID</th>
-                                    <th className="px-6 py-4 text-left">User</th>
-                                    <th className="px-6 py-4 text-left">Metode Pembayaran</th>
-                                    <th className="px-6 py-4 text-right">Nominal</th>
-                                    <th className="px-6 py-4 text-center">Status</th>
-                                    <th className="px-6 py-4 text-left">Tanggal</th>
-                                    <th className="px-6 py-4 text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                {loading && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                <thead className="bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
                                     <tr>
-                                        <td colSpan={7}>
-                                            <div className="space-y-3 py-4 px-6">
-                                                {[...Array(4)].map((_, i) => (
-                                                    <div key={i} className="flex items-center gap-4 animate-pulse">
-                                                        <Skeleton className="h-3 w-full max-w-[120px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[80px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[100px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[60px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[90px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[60px]" />
-                                                        <Skeleton className="h-3 w-full max-w-[50px]" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </td>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">ID</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">User</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Kategori</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Nominal</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Metode</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Tanggal</th>
                                     </tr>
-                                )}
-                                {!loading && pagedTopups.length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} className="py-12 text-center text-gray-500">
-                                            <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                            <p>Tidak ada data topup.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!loading && pagedTopups.map((item: any) => {
-                                    const userUsername = item.user?.username
-                                        ? `@${item.user.username}`
-                                        : item.user?.email
-                                            ? `@${item.user.email.split('@')[0]}`
-                                            : null
-                                    const isPending = ['pending', 'waiting'].includes((item.status || '').toLowerCase());
-                                    const isRejected = ['failed', 'rejected', 'cancelled'].includes((item.status || '').toUpperCase() === 'REJECTED' ? 'rejected' : (item.status || '').toLowerCase());
-                                    const rejReason = item.rejectionReason;
-                                    return (
-                                        <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/40 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800">
-                                                    #{item.id}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <Link href={`/${lang}/billing/${item.userId}/wallet`} className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors">{item.user?.name || `User ID: ${item.userId}`}</Link>
-                                                {userUsername && <div className="text-[11px] text-gray-400 mt-0.5">{userUsername}</div>}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                                                    <CreditCard className="w-3 h-3" />
-                                                    {item.paymentMethod || 'Transfer/Payment Gateway'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{item.amount !== undefined ? formatCurrency(item.amount) : '—'}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    {getStatusBadge(item.status)}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {item.createdAt ? (
-                                                    <span title={formatTooltipDate(item.createdAt)} className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-default border-b border-dashed border-gray-400 dark:border-gray-500 pb-px whitespace-nowrap">{timeAgo(item.createdAt, t).relative}</span>
-                                                ) : '—'}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex justify-center items-center gap-2">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                                                                <MoreVertical className="w-4 h-4" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Aksi Topup</DropdownMenuLabel>
-                                                            <DropdownMenuSeparator />
-                                                            {isPending && (
-                                                                <>
-                                                                    <DropdownMenuItem onClick={() => openModal('confirm_topup', item)}>
-                                                                        <Check className="w-4 h-4 mr-2 text-emerald-600" />
-                                                                        <span>Confirm Topup</span>
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => openModal('reject_topup', item)}>
-                                                                        <X className="w-4 h-4 mr-2 text-red-600" />
-                                                                        <span className="text-red-600">Reject Topup</span>
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                            {!isPending && !isRejected && (
-                                                                <DropdownMenuItem onClick={() => setRejectionModal({ isOpen: true, reason: rejReason || 'Tidak ada catatan.', userName: item.user?.name || `User #${item.userId}`, amount: item.amount || 0 })}>
-                                                                    <Eye className="w-4 h-4 mr-2 text-blue-600" />
-                                                                    <span>Lihat Detail Penerimaan</span>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {isRejected && (
-                                                                <DropdownMenuItem onClick={() => setRejectionModal({ isOpen: true, reason: rejReason || 'Ditolak oleh admin.', userName: item.user?.name || `User #${item.userId}`, amount: item.amount || 0 })}>
-                                                                    <Eye className="w-4 h-4 mr-2 text-red-600" />
-                                                                    <span className="text-red-600">Lihat Alasan Ditolak</span>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                    {loading ? (
+                                        [...Array(5)].map((_, i) => (
+                                            <tr key={i}>
+                                                <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                                                <td className="px-6 py-4"><Skeleton className="h-4 w-28" /></td>
+                                                <td className="px-6 py-4 hidden lg:table-cell"><Skeleton className="h-4 w-20" /></td>
+                                                <td className="px-6 py-4 text-right"><Skeleton className="h-4 w-24 ml-auto" /></td>
+                                                <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                                                <td className="px-6 py-4"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                                                <td className="px-6 py-4 hidden xl:table-cell"><Skeleton className="h-4 w-24" /></td>
+                                            </tr>
+                                        ))
+                                    ) : pagedTransactions.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                                <History className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                                                <p>Belum ada riwayat transaksi</p>
                                             </td>
                                         </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                    ) : (
+                                        pagedTransactions.map((tx: any, idx: number) => (
+                                            <tr
+                                                key={tx.id || idx}
+                                                onClick={() => router.push(`/${lang}/billing/${tx.id}/transaction`)}
+                                                className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800">#{tx.id}</span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${tx.userId || tx.id}/wallet`) }}
+                                                        className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left"
+                                                    >
+                                                        {tx.user?.name || `User ID: ${tx.userId}`}
+                                                    </button>
+                                                    {tx.user?.username && <p className="text-[11px] text-gray-400">@{tx.user.username}</p>}
+                                                </td>
+                                                <td className="px-6 py-4 hidden lg:table-cell">
+                                                    <div className="mb-1">{getTxTypeBadge(tx.type, tx.typeName)}</div>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-300 max-w-[200px] truncate">{tx.description || '-'}</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <span className={`font-bold text-sm ${tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                        {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount || 0))}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="text-xs text-gray-700 dark:text-gray-300 font-semibold">{getPaymentMethodName(tx.paymentMethod)}</span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(tx.status)}</td>
+                                                <td className="px-6 py-4 hidden xl:table-cell whitespace-nowrap">
+                                                    <TooltipProvider delayDuration={100}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-help border-b border-dashed border-gray-400 pb-0.5">
+                                                                    {formatDate(tx.createdAt, 'relative', tz, locale)}
+                                                                </span>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="text-xs">
+                                                                {formatDate(tx.createdAt, 'long', tz, locale)}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
 
-                    {/* Pagination */}
-                    <SmartPagination
-                        total={filteredTopups.length}
-                        page={page}
-                        pageSize={pageSize}
-                        onPageChange={setPage}
-                        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-                        loading={loading}
-                    />
+                        <SmartPagination
+                            total={totalCount}
+                            page={page}
+                            pageSize={pageSize}
+                            onPageChange={setPage}
+                            onPageSizeChange={(s: number) => { setPageSize(s); setPage(1) }}
+                            loading={loading}
+                        />
+                    </div>
                 </div>
-
-                {/* ── Modal: Confirm / Reject Topup ── */}
-                {actionModal.isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                            <div className="p-6 border-b border-gray-100 dark:border-gray-800">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                    {actionModal.type === 'confirm_topup' && 'Confirm Topup'}
-                                    {actionModal.type === 'reject_topup' && 'Reject Topup'}
-                                </h3>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Anda akan melakukan aksi pada transaksi <span className="font-bold">{actionModal.item?.user?.name || `User ID: ${actionModal.item?.userId}`}</span> senilai <span className="font-bold">{formatCurrency(actionModal.item?.amount)}</span>.
-                                </p>
-                            </div>
-                            <div className="p-6 space-y-4">
-                                {actionModal.type === 'confirm_topup' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">External Reference</label>
-                                        <input
-                                            type="text"
-                                            value={modalInput.ref}
-                                            onChange={(e) => setModalInput({ ...modalInput, ref: e.target.value })}
-                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                                            placeholder="Opsional..."
-                                        />
-                                    </div>
-                                )}
-                                {actionModal.type === 'reject_topup' && (
-                                    <div className="space-y-3">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                                            Masukkan alasan penolakan topup untuk pengguna ini.
-                                        </p>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                                                Alasan Penolakan <span className="text-red-500">*</span>
-                                            </label>
-                                            <textarea
-                                                value={modalInput.reason}
-                                                onChange={(e) => setModalInput({ ...modalInput, reason: e.target.value })}
-                                                rows={3}
-                                                placeholder="Contoh: Bukti transfer tidak valid, nominal tidak sesuai..."
-                                                className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-800">
-                                <button
-                                    onClick={() => setActionModal({ isOpen: false, type: null, item: null })}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={executeAction}
-                                    className={`px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors shadow-sm ${actionModal.type?.includes('reject') ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                                >
-                                    Konfirmasi
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ── User Wallet Modal ── */}
-                {selectedWalletUserId && (
-                    <UserWalletModal
-                        onClose={() => {
-                            setSelectedWalletUserId(null);
-                            setSelectedWalletUserName("");
-                        }}
-                        userId={selectedWalletUserId}
-                        userName={selectedWalletUserName}
-                    />
-                )}
-
-                {/* ── Rejection Reason Modal ── */}
-                {rejectionModal.isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Alasan Penolakan Topup</h3>
-                                <button onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
-                            </div>
-                            <div className="p-6 space-y-4">
-                                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan/Alasan Admin:</p>
-                                    <p className="text-sm text-gray-900 dark:text-white leading-relaxed">{rejectionModal.reason || 'Tidak ada catatan.'}</p>
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                    <button onClick={() => setRejectionModal(prev => ({ ...prev, isOpen: false }))} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl font-semibold transition-colors text-sm">Tutup</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
             </div>
-        </div>
-    )
-}
 
-export default function WalletPage() {
-    return (
-        <DashboardLayout>
-            <I18nProvider namespaces={["billing", "common"]}>
-                <WalletPageContent />
-            </I18nProvider>
+            {/* ── Filter Dialog ── */}
+            <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                <DialogContent className="sm:max-w-[425px] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Filter className="w-5 h-5 text-emerald-500" /> Filter Transaksi
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Kategori</label>
+                            <Select value={kategoriFilter} onValueChange={setKategoriFilter}>
+                                <SelectTrigger className="w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"><SelectValue placeholder="Semua Kategori" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectItem value="all">Semua Kategori</SelectItem>
+                                        <SelectItem value="1">TopUp</SelectItem>
+                                        <SelectItem value="2">Withdraw</SelectItem>
+                                        <SelectItem value="3">Transfer</SelectItem>
+                                        <SelectItem value="4">Payment</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Metode Pembayaran</label>
+                            <input type="text" placeholder="Contoh: Bank BCA, DANA, dll" value={metodeFilter} onChange={e => setMetodeFilter(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-shadow" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Status</label>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"><SelectValue placeholder="Semua Status" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectItem value="all">Semua Status</SelectItem>
+                                        <SelectItem value="Berhasil">Berhasil</SelectItem>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="Tolak">Ditolak</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Nominal (Rp)</label>
+                            <div className="flex items-center gap-2">
+                                <input type="number" placeholder="Min" value={nominalMin} onChange={e => setNominalMin(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-shadow" />
+                                <span className="text-gray-400">-</span>
+                                <input type="number" placeholder="Max" value={nominalMax} onChange={e => setNominalMax(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-shadow" />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rentang Tanggal</label>
+                            <div className="flex items-center gap-2">
+                                <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-shadow [color-scheme:light] dark:[color-scheme:dark]" />
+                                <span className="text-gray-400">-</span>
+                                <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-shadow [color-scheme:light] dark:[color-scheme:dark]" />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex gap-2">
+                        <button onClick={handleResetFilter} className="flex-1 sm:flex-none px-4 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Reset</button>
+                        <button onClick={handleApplyFilter} className="flex-1 sm:flex-none px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg shadow-sm hover:shadow transition-all">Terapkan Filter</button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </DashboardLayout>
     )
 }

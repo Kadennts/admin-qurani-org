@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import dummyData from "@/data/billing-dummy.json"
+import pendingDummies from "@/data/pending-trainers-list.json"
 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -654,8 +655,47 @@ function GuruDetailContent() {
                 setError(null)
             })
             .catch((err) => {
-                setError(err.message)
-                setDetail(null)
+                // Fallback check in pendingDummies if API fails
+                const fromPending = pendingDummies.find(d => String(d.id) === String(id))
+                if (fromPending) {
+                    setDetail({
+                        id: fromPending.id,
+                        userId: fromPending.userId,
+                        userName: fromPending.userName,
+                        username: fromPending.username,
+                        userImage: "",
+                        headline: fromPending.headline,
+                        bio: fromPending.bio,
+                        location: fromPending.location,
+                        experienceYears: fromPending.experienceYears,
+                        expertise: fromPending.expertise,
+                        isOnline: Boolean(fromPending.isOnline),
+                        isOffline: Boolean(fromPending.isOffline),
+                        hourlyRate: fromPending.hourlyRate,
+                        currency: fromPending.currency,
+                        averageRating: 0,
+                        totalCourses: 0,
+                        totalStudents: 0,
+                        totalReviews: 0,
+                        status: "verified",
+                        createdAt: fromPending.createdAt,
+                        portfolioUrls: fromPending.portfolioUrls,
+                        certifications: fromPending.certifications as any,
+                        teachingMethods: fromPending.expertise.map(name => ({
+                            name,
+                            description: getMethodInfo(name).description,
+                        })),
+                    })
+                    setError(null)
+                } else {
+                    try {
+                        setDetail(buildFallbackDetail(id))
+                        setError(null)
+                    } catch (fallbackErr) {
+                        setError(err.message)
+                        setDetail(null)
+                    }
+                }
             })
             .finally(() => {
                 setLoading(false)

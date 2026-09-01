@@ -132,6 +132,11 @@ const getSidebarData = (
           icon: Wallet,
         },
         {
+          title: t("navigation.topup", "TopUp"),
+          url: "/billing/topup",
+          icon: ArrowDownToLine,
+        },
+        {
           title: t("navigation.transaksi", "Transaksi"),
           url: "/billing/transaction",
           icon: History,
