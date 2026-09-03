@@ -5,13 +5,15 @@ const TOPUP_HISTORY_KEY = "qurani_sim_topup_history"
 const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
+const STORE_VERSION_KEY = "qurani_sim_wallet_version"
+const STORE_VERSION = "v10-unique-ids"
 
 const DUMMY_TRANSACTIONS = [
     // ─── RIWAYAT TOPUP (dari Wallet/Riwayat Topup) ───────────────────────────
     // Sumber: DUMMY_TOPUP_HISTORY — hanya yang sudah selesai/ditolak
     {
         id: "1785723002101",
-        userId: 101,
+        userId: 889977665544101,
         user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         type: 1,
         typeName: "TopUp",
@@ -26,7 +28,7 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "1785723002102",
-        userId: 102,
+        userId: 889977665544102,
         user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         type: 1,
         typeName: "TopUp",
@@ -41,8 +43,8 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "1785723002103",
-        userId: 103,
-        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        userId: 889977665544103,
+        user: { name: "Siti Aminah", email: "siti.aminah@yahoo.com", username: "siti_a" },
         type: 1,
         typeName: "TopUp",
         description: "Top up via Bank Transfer",
@@ -56,8 +58,8 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "1785723002104",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        userId: 889977665544104,
+        user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" },
         type: 1,
         typeName: "TopUp",
         description: "Top up via GoPay",
@@ -71,8 +73,8 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "1785723002105",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        userId: 889977665544105,
+        user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" },
         type: 1,
         typeName: "TopUp",
         description: "Top up via Bank BNI",
@@ -89,32 +91,32 @@ const DUMMY_TRANSACTIONS = [
     // Sumber: DUMMY_REFUND_PROCESSED di sim-billing-store.ts
     {
         id: "178572300250100000",
-        userId: 106,
+        userId: 889977665544106,
         user: { name: "Nur Hidayah", email: "nur.hidayah@example.com", username: "nur_hidayah" },
         type: 5,
         typeName: "Refund",
-        description: "Refund disetujui — pesanan #3005 (0 dari 5 Pertemuan)",
+        description: "Refund disetujui — pesanan #3006 (0 dari 5 Pertemuan)",
         amount: 595000,
         balanceBefore: 0,
         balanceAfter: 595000,
         status: "completed",
         paymentMethod: "GoPay",
-        referenceId: "REFUND-3005",
+        referenceId: "REFUND-3006",
         createdAt: new Date(Date.now() - 691200000).toISOString()
     },
     {
         id: "178572300250200000",
-        userId: 108,
-        user: { name: "Muhammad Yusuf", email: "m.yusuf@example.com", username: "m_yusuf" },
+        userId: 889977665544109,
+        user: { name: "Halimah Tussa'diyah", email: "halimah.ts@gmail.com", username: "halimah_ts" },
         type: 5,
         typeName: "Refund",
-        description: "Refund ditolak — pesanan #3008 (5 dari 10 Pertemuan)",
+        description: "Refund ditolak — pesanan #3009 (5 dari 10 Pertemuan)",
         amount: 352500,
         balanceBefore: 0,
         balanceAfter: 0,
         status: "rejected",
         paymentMethod: "GoPay",
-        referenceId: "REFUND-3008",
+        referenceId: "REFUND-3009",
         createdAt: new Date(Date.now() - 777600000).toISOString()
     },
 
@@ -122,7 +124,7 @@ const DUMMY_TRANSACTIONS = [
     // Sumber: DUMMY_WITHDRAW_HISTORY di sim-billing-store.ts
     {
         id: "178572300270100000",
-        userId: 101,
+        userId: 889977665544101,
         user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         type: 2,
         typeName: "Withdraw",
@@ -137,7 +139,7 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "178572300270200000",
-        userId: 102,
+        userId: 889977665544102,
         user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         type: 2,
         typeName: "Withdraw",
@@ -152,7 +154,7 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "178572300270300000",
-        userId: 103,
+        userId: 889977665544103,
         user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
         type: 2,
         typeName: "Withdraw",
@@ -167,8 +169,8 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "178572300270400000",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        userId: 889977665544104,
+        user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" },
         type: 2,
         typeName: "Withdraw",
         description: "Penarikan ke Bank BRI — 6677889900",
@@ -182,8 +184,8 @@ const DUMMY_TRANSACTIONS = [
     },
     {
         id: "178572300270500000",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        userId: 889977665544105,
+        user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" },
         type: 2,
         typeName: "Withdraw",
         description: "Penarikan ke GoPay — 081234567890",
@@ -199,7 +201,7 @@ const DUMMY_TRANSACTIONS = [
     // ─── TRANSAKSI PAYMENT (data historis payment yang sudah selesai) ─────────
     {
         id: "1785723001907",
-        userId: 102,
+        userId: 889977665544102,
         user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         type: 4,
         typeName: "Payment",
@@ -209,13 +211,13 @@ const DUMMY_TRANSACTIONS = [
         balanceAfter: 450000,
         status: "completed",
         paymentMethod: "Qurani Wallet",
-        referenceId: "TXN-H-102",
+        referenceId: "TXN-H-889977665544102",
         createdAt: new Date(Date.now() - 432000000).toISOString()
     },
     {
         id: "1785723001910",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        userId: 889977665544105,
+        user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" },
         type: 4,
         typeName: "Payment",
         description: "Pembayaran kelas batal",
@@ -224,7 +226,7 @@ const DUMMY_TRANSACTIONS = [
         balanceAfter: 50000,
         status: "rejected",
         paymentMethod: "OVO",
-        referenceId: "TXN-H-105",
+        referenceId: "TXN-H-889977665544105",
         createdAt: new Date(Date.now() - 691200000).toISOString()
     }
 ];
@@ -232,7 +234,7 @@ const DUMMY_TRANSACTIONS = [
 const DUMMY_PENDING_TOPUPS = [
     {
         id: "1785723002001",
-        userId: 101,
+        userId: 889977665544101,
         user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         amount: 300000,
         status: "PENDING",
@@ -242,7 +244,7 @@ const DUMMY_PENDING_TOPUPS = [
     },
     {
         id: "1785723002002",
-        userId: 102,
+        userId: 889977665544102,
         user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         amount: 200000,
         status: "PENDING",
@@ -252,8 +254,8 @@ const DUMMY_PENDING_TOPUPS = [
     },
     {
         id: "1785723002003",
-        userId: 103,
-        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        userId: 889977665544103,
+        user: { name: "Siti Aminah", email: "siti.aminah@yahoo.com", username: "siti_a" },
         amount: 250000,
         status: "PENDING",
         paymentMethod: "Bank Transfer",
@@ -262,8 +264,8 @@ const DUMMY_PENDING_TOPUPS = [
     },
     {
         id: "1785723002004",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        userId: 889977665544104,
+        user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" },
         amount: 150000,
         status: "PENDING",
         paymentMethod: "GoPay",
@@ -272,8 +274,8 @@ const DUMMY_PENDING_TOPUPS = [
     },
     {
         id: "1785723002005",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        userId: 889977665544105,
+        user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" },
         amount: 500000,
         status: "PENDING",
         paymentMethod: "Bank BNI",
@@ -285,7 +287,7 @@ const DUMMY_PENDING_TOPUPS = [
 const DUMMY_TOPUP_HISTORY = [
     {
         id: "1785723002101",
-        userId: 101,
+        userId: 889977665544101,
         user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" },
         amount: 300000,
         status: "COMPLETED",
@@ -297,7 +299,7 @@ const DUMMY_TOPUP_HISTORY = [
     },
     {
         id: "1785723002102",
-        userId: 102,
+        userId: 889977665544102,
         user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" },
         amount: 200000,
         status: "COMPLETED",
@@ -309,8 +311,8 @@ const DUMMY_TOPUP_HISTORY = [
     },
     {
         id: "1785723002103",
-        userId: 103,
-        user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" },
+        userId: 889977665544103,
+        user: { name: "Siti Aminah", email: "siti.aminah@yahoo.com", username: "siti_a" },
         amount: 250000,
         status: "REJECTED",
         paymentMethod: "Bank Transfer",
@@ -321,8 +323,8 @@ const DUMMY_TOPUP_HISTORY = [
     },
     {
         id: "1785723002104",
-        userId: 104,
-        user: { name: "Ahmad Fauzi", email: "ahmad.fauzi@example.com", username: "ahmad_fauzi" },
+        userId: 889977665544104,
+        user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" },
         amount: 150000,
         status: "COMPLETED",
         paymentMethod: "GoPay",
@@ -333,8 +335,8 @@ const DUMMY_TOPUP_HISTORY = [
     },
     {
         id: "1785723002105",
-        userId: 105,
-        user: { name: "Budi Santoso", email: "budi.santoso@example.com", username: "budisan" },
+        userId: 889977665544105,
+        user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" },
         amount: 500000,
         status: "COMPLETED",
         paymentMethod: "Bank BNI",
@@ -348,10 +350,14 @@ const DUMMY_TOPUP_HISTORY = [
 export function initSimWalletStore(forceReset = false) {
     if (typeof window === "undefined") return;
 
-    if (forceReset) {
+    const currentVersion = localStorage.getItem(STORE_VERSION_KEY);
+    if (forceReset || currentVersion !== STORE_VERSION) {
         localStorage.removeItem(PENDING_TOPUPS_KEY);
         localStorage.removeItem(TOPUP_HISTORY_KEY);
         localStorage.removeItem(TRANSACTIONS_KEY);
+        localStorage.removeItem(WALLET_STATS_KEY);
+        localStorage.removeItem(WALLETS_KEY);
+        localStorage.setItem(STORE_VERSION_KEY, STORE_VERSION);
     }
 
     if (!localStorage.getItem(PENDING_TOPUPS_KEY)) {

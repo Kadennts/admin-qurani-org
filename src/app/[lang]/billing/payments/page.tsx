@@ -369,6 +369,19 @@ function PaymentsContent() {
                 dummy = dummy.filter(p => p.paymentMethod && p.paymentMethod.toLowerCase() === methodFilter.toLowerCase());
             }
 
+            // Urutkan dummy data: pending di atas, lalu urut berdasarkan tanggal terbaru
+            dummy.sort((a, b) => {
+                const isAPending = a.status === 'pending' || a.status === 'pending_payment';
+                const isBPending = b.status === 'pending' || b.status === 'pending_payment';
+                
+                if (isAPending && !isBPending) return -1;
+                if (!isAPending && isBPending) return 1;
+                
+                const timeA = new Date(a.createdAt || 0).getTime();
+                const timeB = new Date(b.createdAt || 0).getTime();
+                return timeB - timeA; // Descending (terbaru di atas)
+            });
+
             setPayments(dummy)
             setTotalItems(dummy.length)
             setStats(prev => ({
@@ -819,7 +832,8 @@ function PaymentsContent() {
                                                 <div className="flex items-baseline gap-1.5">
                                                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">User</span>
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }}
+                                                        onClick={(e) => { e.stopPropagation(); if (payment.userId) { router.push(`/${lang}/users/manage/${payment.userId}?tab=wallet`); } }}
+                                                        title="Lihat profil"
                                                         className="text-sm font-semibold text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left leading-tight"
                                                     >
                                                         {payment.userName || '-'}
@@ -942,7 +956,7 @@ function PaymentsContent() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <button onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${payment.userId || payment.id}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
+                                                <button onClick={(e) => { e.stopPropagation(); if (payment.userId) { router.push(`/${lang}/users/manage/${payment.userId}?tab=wallet`); } }} title="Lihat profil pengguna" className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>

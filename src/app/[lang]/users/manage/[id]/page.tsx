@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -75,11 +75,27 @@ const getAvatarSrc = (user: any): string | null => {
 export default function UserDetailPage() {
     const params = useParams()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const userId = params?.id as string
+    const lang = params?.lang as string || "en"
 
-    const { profile, loading: loadingProfile } = useUserProfile(userId)
+    const { profile, loading: loadingProfile, isMock } = useUserProfile(userId)
     const user = profile as any
-    const [activeTab, setActiveTab] = useState("overview")
+    
+    const defaultTab = searchParams?.get("tab") || "overview"
+    const [activeTab, setActiveTab] = useState(defaultTab)
+
+    useEffect(() => {
+        const tab = searchParams?.get("tab")
+        if (tab && tab !== activeTab) {
+            setActiveTab(tab)
+        }
+    }, [searchParams, activeTab])
+
+    const handleTabChange = (val: string) => {
+        setActiveTab(val)
+        router.replace(`/${lang}/users/manage/${userId}?tab=${val}`, { scroll: false })
+    }
 
     // State for tabs
     const [kycData, setKycData] = useState<any | null>(null)
@@ -101,10 +117,14 @@ export default function UserDetailPage() {
     useEffect(() => {
         if (user && userId) {
             fetchKyc()
-            fetchWallet()
-            fetchLogs()
+            // Skip real API calls for dummy/mock users — UserWalletDetail handles wallet display
+            // and audit logs don't exist for sim users. This prevents toast spam + API spam.
+            if (!isMock) {
+                fetchWallet()
+                fetchLogs()
+            }
         }
-    }, [user, userId])
+    }, [user?.id, userId, isMock])
 
     const fetchKyc = async () => {
         if (!user) return
@@ -136,16 +156,9 @@ export default function UserDetailPage() {
         } catch (error) {
             console.error("Failed to fetch Wallet", error)
             if (error instanceof Error && error.message.includes("403")) {
-                // setWalletForbidden(true)
-                // Mock data for UI preview since user requested to see the features
-                toast.info("Menggunakan data dompet simulasi (Mock) karena akses API ditolak (403).")
-                setWalletData({
-                    id: `W-MOCK-${userId.toString().slice(0,6)}`,
-                    balance: 2750000,
-                    status: "active",
-                    currency: "IDR",
-                    createdAt: new Date().toISOString()
-                })
+                // 403 = permission issue, show forbidden state silently without toast
+                setWalletForbidden(true)
+                setWalletData(null)
             } else {
                 setWalletData(null)
             }
@@ -193,7 +206,7 @@ export default function UserDetailPage() {
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <Activity className="w-12 h-12 text-gray-300 mb-4" />
                     <p className="text-gray-500">Pengguna tidak ditemukan.</p>
-                    <Button variant="outline" className="mt-4" onClick={() => router.push('/users/manage')}>
+                    <Button variant="outline" className="mt-4" onClick={() => router.back()}>
                         <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
                     </Button>
                 </div>
@@ -205,7 +218,7 @@ export default function UserDetailPage() {
         <DashboardLayout>
             <div className="max-w-5xl mx-auto space-y-6">
                 <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => router.push('/users/manage')} className="rounded-xl border-gray-200 dark:border-gray-800">
+                    <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-xl border-gray-200 dark:border-gray-800">
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
                     <div>
@@ -242,7 +255,7 @@ export default function UserDetailPage() {
                             </div>
                         </div>
 
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange} className="w-full">
                             <TabsList className="w-full justify-start border-b border-gray-100 dark:border-gray-800 rounded-none bg-transparent h-auto p-0 space-x-6">
                                 <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-0 py-3 data-[state=active]:shadow-none text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
                                     Overview

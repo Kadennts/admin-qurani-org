@@ -199,15 +199,15 @@ function ProfilePageContent() {
     if (profile) {
       // For Indonesian users, re-resolve the correct timezone from state/city
       // to fix stale values (e.g. stored "Asia/Jakarta" when actually in Bali = WITA)
-      const isIndonesia = profile.countryName?.toLowerCase().includes("indonesia") ||
-        profile.countryId === 101; // Indonesia countryId
+      const isIndonesia = (profile as any).countryName?.toLowerCase().includes("indonesia") ||
+        (profile as any).countryId === 101; // Indonesia countryId
       const correctedTimezone = isIndonesia
-        ? resolveIndonesiaTimezone(profile.stateName || "", profile.cityName || "")
+        ? resolveIndonesiaTimezone((profile as any).stateName || "", (profile as any).cityName || "")
         : (profile.timezone || "");
 
       setProfileData({
         fullName: profile.name || "",
-        nickname: profile.nickname || "",
+        nickname: (profile as any).nickname || "",
         username: profile.username || "",
         email: profile.email || "",
         gender: profile.gender ?? (profile as any).sex ?? null,
@@ -215,7 +215,7 @@ function ProfilePageContent() {
         job: profile.job || "",
         address: (profile as any).address || profile.hp || "",
         timezone: correctedTimezone,
-        bio: profile.bio || "",
+        bio: (profile as any).bio || "",
         language: (profile as any).language ?? 1,
         dateFormat: (profile as any).dateFormat || "",
         timeFormat: (profile as any).timeFormat || "",
@@ -223,18 +223,18 @@ function ProfilePageContent() {
         currencyFormat: (profile as any).currencyFormat || "",
       })
 
-      if (profile.stateId) {
-        setCurrentState({ id: profile.stateId, name: profile.stateName || "" })
+      if ((profile as any).stateId) {
+        setCurrentState({ id: (profile as any).stateId, name: (profile as any).stateName || "" })
       }
-      if (profile.cityId) {
+      if ((profile as any).cityId) {
         // Use corrected timezone so displayTimezone shows the right value immediately
-        setCurrentCity({ id: profile.cityId, name: profile.cityName || "", timezone: correctedTimezone })
+        setCurrentCity({ id: (profile as any).cityId, name: (profile as any).cityName || "", timezone: correctedTimezone })
       }
-      if (profile.countryId) {
-        const countryRow = countries.find(c => c.id === profile.countryId)
+      if ((profile as any).countryId) {
+        const countryRow = countries.find(c => c.id === (profile as any).countryId)
         setCurrentCountry({
-          id: profile.countryId,
-          name: profile.countryName || countryRow?.name || "",
+          id: (profile as any).countryId,
+          name: (profile as any).countryName || countryRow?.name || "",
           iso2: countryRow?.iso2 || ""
         })
       }

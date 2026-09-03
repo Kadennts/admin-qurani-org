@@ -22,7 +22,6 @@ import {
     rejectSimWithdraw,
     completeSimWithdraw,
 } from "@/lib/sim-billing-store"
-import { UserWalletModal } from "@/components/Wallet/UserWalletModal"
 import {
     Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
@@ -140,10 +139,6 @@ function WithdrawContent() {
     const filterRef = useRef<HTMLDivElement>(null);
 
     const [stats, setStats] = useState({ pendingCount: 0, pendingTotal: 0, approvedCount: 0, rejectedCount: 0 });
-
-    // User wallet modal
-    const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
-    const [selectedWalletUserName, setSelectedWalletUserName] = useState<string>("");
 
     // Action modal
     const [actionModal, setActionModal] = useState<{ open: boolean; item: WithdrawItem | null; type: ModalType }>({ open: false, item: null, type: null });
@@ -471,7 +466,7 @@ function WithdrawContent() {
                                             </div>
                                         </div>
                                         <div className="text-xs text-gray-500 space-y-0.5">
-                                            <button onClick={() => { setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-bold text-gray-800 dark:text-gray-200 hover:text-emerald-600 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button>
+                                            <button onClick={() => { router.push(`/${locale}/users/manage/${w.userId || w.id}`); }} className="font-bold text-gray-800 dark:text-gray-200 hover:text-emerald-600 hover:underline">{w.user?.name || `User ID: ${w.userId}`}</button>
                                             <div>{w.bankName ? `${w.bankName} • ${w.accountNumber}` : '—'}</div>
                                         </div>
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
@@ -512,7 +507,7 @@ function WithdrawContent() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div>
-                                                        <button onClick={() => { setSelectedWalletUserId(w.userId || w.id); setSelectedWalletUserName(w.user?.name || `User ID: ${w.userId || w.id}`); }} className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/users/manage/${w.userId || w.id}`); }} className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{w.user?.name || `User ID: ${w.userId}`}</button>
                                                         {userUsername && <p className="text-[11px] text-gray-400">{userUsername}</p>}
                                                     </div>
                                                 </td>
@@ -669,10 +664,6 @@ function WithdrawContent() {
 
                 </div>
             </div>
-
-            {selectedWalletUserId && (
-                <UserWalletModal onClose={() => { setSelectedWalletUserId(null); setSelectedWalletUserName(""); }} userId={selectedWalletUserId} userName={selectedWalletUserName} />
-            )}
         </TooltipProvider>
     )
 }

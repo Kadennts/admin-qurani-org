@@ -81,12 +81,12 @@ const BOOKING_STATUS = {
     pending:       { label: "Menunggu Bayar",   dotCls: "bg-amber-500",   badgeCls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800" },
 } as const
 
-// ─── Zulfa Hanum (#3010) Dummy Data ──────────────────────────────────────────
+// ─── Muhammad Yusuf (#3010) Dummy Data ──────────────────────────────────────
 const ZULFA_BOOKING = {
     id: 3010,
     bookingCode: "BK-QUR-3010",
-    userName: "Zulfa Hanum",
-    userEmail: "zulfa@email.com",
+    userName: "Muhammad Yusuf",
+    userEmail: "m.yusuf@qurani.id",
     trainerName: "Hasyim asy'ari, Lc",
     packageName: "3x Pertemuan",
     totalSessions: 3,
@@ -104,11 +104,11 @@ const ZULFA_DETAIL = {
     bookingCode: "BK-QUR-3010",
     member: {
         id: 110,
-        name: "Zulfa Hanum",
-        email: "zulfa@email.com",
+        name: "Muhammad Yusuf",
+        email: "m.yusuf@qurani.id",
         phone: "0812-3456-7890",
-        location: "Jakarta Selatan",
-        joinDate: "2025-10-15T00:00:00.000Z",
+        location: "Depok",
+        joinDate: "2026-01-12T00:00:00.000Z",
     },
     trainer: {
         id: 301,

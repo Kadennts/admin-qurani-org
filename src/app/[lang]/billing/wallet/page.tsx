@@ -189,6 +189,10 @@ export default function FinanceDashboardPage() {
             const calculatedActiveBalance = BASE_BALANCE + fetchedTxs.reduce((sum, tx) => {
                 const s = (tx.status || "").toLowerCase()
                 if (s === "success" || s === "completed" || s === "approved") {
+                    const isPayout = tx.amount < 0 && String(tx.description).toLowerCase().includes('payout');
+                    if (isPayout) {
+                        return sum;
+                    }
                     return sum + (tx.amount || 0)
                 }
                 return sum
@@ -211,6 +215,10 @@ export default function FinanceDashboardPage() {
             const calculatedActiveBalance = BASE_BALANCE + fallbackTxs.reduce((sum, tx) => {
                 const s = (tx.status || "").toLowerCase()
                 if (s === "success" || s === "completed" || s === "approved") {
+                    const isPayout = tx.amount < 0 && String(tx.description).toLowerCase().includes('payout');
+                    if (isPayout) {
+                        return sum;
+                    }
                     return sum + (tx.amount || 0)
                 }
                 return sum
@@ -340,7 +348,7 @@ export default function FinanceDashboardPage() {
                                         <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Nominal</th>
                                         <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Metode</th>
                                         <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Tanggal</th>
+                                        <th className="px-6 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Waktu</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -375,8 +383,9 @@ export default function FinanceDashboardPage() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); router.push(`/${lang}/billing/${tx.userId || tx.id}/wallet`) }}
+                                                        onClick={(e) => { e.stopPropagation(); if (tx.userId) { router.push(`/${lang}/users/manage/${tx.userId}?tab=wallet`) } }}
                                                         className="font-bold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left"
+                                                        title="Lihat profil"
                                                     >
                                                         {tx.user?.name || `User ID: ${tx.userId}`}
                                                     </button>

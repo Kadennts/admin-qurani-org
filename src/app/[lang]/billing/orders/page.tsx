@@ -73,9 +73,13 @@ function initials(name: string) {
 
 // ─── Mapping booking status → pipeline stage ───────────────────────────────
 function getStage(b: typeof dummyData.bookings[0]): PipelineStatus {
-    if (b.status === "cancelled") return "gagal"
-    if (b.status === "active" && b.completedSessions > 0) return "aktif"
-    if (b.status === "completed" || b.status === "active") return "lunas"
+    const s = b.status
+    if (s === "cancelled") return "gagal"
+    if (s === "completed") return "selesai"
+    if (s === "pending_trainer") return "menunggu_guru"
+    if (s === "pending_payment") return "baru"
+    if (s === "active" && b.completedSessions > 0) return "aktif"
+    if (s === "active") return "lunas"
     return "baru"
 }
 
@@ -381,75 +385,11 @@ function SimModal({ onClose, onOrderCreated }: { onClose: () => void; onOrderCre
 }
 
 
-
-// ─── Static dummy: Pesanan Selesai — Zulfa Hanum (#3010) ──────────────────────
-const ZULFA_COMPLETED_ORDER: PipelineOrder = {
-    id: 3010,
-    bookingCode: "#3010",
-    member: "Zulfa Hanum",
-    username: "zulfahanum",
-    memberAvatar: "ZH",
-    guru: "Hasyim asy'ari, Lc",
-    guruUsername: "@hasyim",
-    paket: "3x Pertemuan",
-    sesi: 3,
-    sesiSelesai: 3,
-    harga: 250000,
-    tglPesan: "10 Jan 2026",
-    payment: "GoPay",
-    rawDate: new Date("2026-01-10"),
-    status: "selesai",
-    isSim: true,
-    mode: "online",
-}
-
-// ─── Static dummy: Pesanan Menunggu Guru — Fauzia Nurrohma (#3098) ─────────────────
-const FAUZIA_WAITING_GURU_ORDER: PipelineOrder = {
-    id: 3098,
-    bookingCode: "#3098",
-    member: "Fauzia Nurrohma",
-    username: "fauzianurrohma",
-    memberAvatar: "FN",
-    guru: "Indi Fitriani",
-    guruUsername: "@indi.f",
-    paket: "1x Pertemuan",
-    sesi: 1,
-    sesiSelesai: 0,
-    harga: 89600,
-    tglPesan: "02 Apr 2026",
-    payment: "GoPay",
-    rawDate: new Date("2026-04-02"),
-    status: "menunggu_guru",
-    isPendingPayment: false,
-    isSim: true,
-    mode: "online",
-}
-
-// ─── Static dummy: Pesanan Pending — Rahma Aulia (#3099) ──────────────────────
-const RAHMA_PENDING_ORDER: PipelineOrder = {
-    id: 3099,
-    bookingCode: "#3099",
-    member: "Rahma Aulia",
-    username: "rahmaaulia",
-    memberAvatar: "RA",
-    guru: "Indi Fitriani",
-    guruUsername: "@indi.f",
-    paket: "5x Pertemuan",
-    sesi: 5,
-    sesiSelesai: 0,
-    harga: 420000,
-    tglPesan: "01 Apr 2026",
-    payment: "—",
-    rawDate: new Date("2026-04-01"),
-    status: "baru",
-    isPendingPayment: true,
-    isSim: true,
-    mode: "online",
-}
-
 // ─── Main Content ──────────────────────────────────────────────────────────────
 function PesananContent() {
     const router = useRouter()
+    const rawParams = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'
+    const langCode = rawParams || 'en'
 
     // ── Search state — server-side via API Keyword param
     const [searchInput, setSearchInput] = useState("")
@@ -541,7 +481,7 @@ function PesananContent() {
     }
 
     async function handleAdvance(id: string | number, next: PipelineStatus) {
-        const allOrders = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simOrders.map(simOrderToPipeline), ...dummyData.bookings.map(bookingToPipeline)]
+        const allOrders = [...apiOrders, ...simOrders.map(simOrderToPipeline), ...dummyData.bookings.map(bookingToPipeline)]
         const order = allOrders.find(o => String(o.id) === String(id))
         if (!order) return
 
@@ -661,7 +601,7 @@ function PesananContent() {
     const allOrders = useMemo<PipelineOrder[]>(() => {
         const simRows = simOrders.map(simOrderToPipeline)
         const staticRows = dummyData.bookings.map(bookingToPipeline)
-        const combined = [...apiOrders, FAUZIA_WAITING_GURU_ORDER, RAHMA_PENDING_ORDER, ZULFA_COMPLETED_ORDER, ...simRows, ...staticRows]
+        const combined = [...apiOrders, ...simRows, ...staticRows]
         const seen = new Set<string>()
         return combined
             .filter(o => {
@@ -671,7 +611,6 @@ function PesananContent() {
                 return true
             })
             .map(o => statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o)
-            .filter(o => o.member !== "Ahmad Fauzi")
     }, [apiOrders, simOrders, statusOverrides])
 
     // ── Client-side filtering: date range + status tab (search already applied server-side)
@@ -1055,7 +994,7 @@ function PesananContent() {
                                     return (
                                     <tr
                                         key={order.id}
-                                        onClick={() => router.push(`/billing/orders/${order.id}`)}
+                                        onClick={() => { const l = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'; router.push(`/${l}/billing/orders/${order.id}`); }}
                                         className={`${isSelected ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group cursor-pointer`}
                                     >
                                             <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -1070,7 +1009,7 @@ function PesananContent() {
                                             <td className="px-4 py-3 w-auto" onClick={e => e.stopPropagation()}>
                                                 <div className="flex flex-col gap-0.5 items-start">
                                                     <span
-                                                        onClick={() => router.push(`/billing/orders/${order.id}`)}
+                                                        onClick={() => { const l = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'; router.push(`/${l}/billing/orders/${order.id}`); }}
                                                         className="inline-flex w-fit items-center font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-100 dark:border-emerald-800 whitespace-nowrap cursor-pointer hover:bg-emerald-100 transition-colors"
                                                     >
                                                         {order.bookingCode}
@@ -1082,15 +1021,19 @@ function PesananContent() {
                                             </td>
                                             {/* Member */}
                                             <td className="px-4 py-3">
-                                                <div>
-                                                    <p onClick={(e) => {
+                                                <div
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (order.userId) {
-                                                            setSelectedWalletUserId(order.userId);
-                                                            setSelectedWalletUserName(order.member);
+                                                            const langStr = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en';
+                                                            router.push(`/${langStr}/users/manage/${order.userId}?tab=wallet`);
                                                         }
-                                                    }} className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : ''}`}>{order.member}</p>
-                                                    <p className="text-[11px] text-gray-500">@{order.username.replace(/^@/, '')}</p>
+                                                    }}
+                                                    className={order.userId ? 'cursor-pointer group/member inline-block' : ''}
+                                                    title={order.userId ? 'Lihat profil' : ''}
+                                                >
+                                                    <p className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'group-hover/member:text-emerald-600 dark:group-hover/member:text-emerald-400 group-hover/member:underline' : ''}`}>{order.member}</p>
+                                                    <p className={`text-[11px] ${order.userId ? 'text-emerald-600 dark:text-emerald-400 group-hover/member:underline' : 'text-gray-500'}`}>@{order.username.replace(/^@/, '')}</p>
                                                 </div>
                                             </td>
                                             {/* Guru */}
@@ -1152,7 +1095,7 @@ function PesananContent() {
                                                         className="absolute right-4 top-10 z-40 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl py-1.5 overflow-hidden"
                                                     >
                                                         <button
-                                                            onClick={() => router.push(`/billing/orders/${order.id}`)}
+                                                            onClick={() => { const l = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'; router.push(`/${l}/billing/orders/${order.id}`); }}
                                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
                                                         >
                                                             <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
@@ -1191,7 +1134,7 @@ function PesananContent() {
                             const st = STATUS_CONFIG[order.status]
                             const isSelected = selectedIds.some(id => String(id) === String(order.id))
                             return (
-                                <div key={order.id} onClick={() => router.push(`/billing/orders/${order.id}`)} className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer relative ${isSelected ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""}`}>
+                                <div key={order.id} onClick={() => { const l = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'; router.push(`/${l}/billing/orders/${order.id}`); }} className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer relative ${isSelected ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""}`}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <input
@@ -1220,10 +1163,20 @@ function PesananContent() {
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-start mb-3 pl-7">
-                                        <div>
+                                        <div
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (order.userId) {
+                                                    const langStr = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en';
+                                                    router.push(`/${langStr}/users/manage/${order.userId}?tab=wallet`);
+                                                }
+                                            }}
+                                            className={order.userId ? 'cursor-pointer group/membermobile inline-block' : ''}
+                                            title={order.userId ? 'Lihat profil' : ''}
+                                        >
                                             <p className="text-[10px] text-gray-500 mb-0.5">Murid</p>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.member}</p>
-                                            <p className="text-[11px] text-gray-500">@{order.username.replace(/^@/, '')}</p>
+                                            <p className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'group-hover/membermobile:text-emerald-600 dark:group-hover/membermobile:text-emerald-400' : ''}`}>{order.member}</p>
+                                            <p className={`text-[11px] ${order.userId ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>@{order.username.replace(/^@/, '')}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] text-gray-500 mb-0.5">Guru</p>
@@ -1247,7 +1200,7 @@ function PesananContent() {
                                     {/* Action dropdown for mobile */}
                                     {openActionId === order.id && (
                                         <div onClick={e => e.stopPropagation()} className="absolute right-4 top-14 z-40 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl py-1.5 overflow-hidden">
-                                            <button onClick={() => router.push(`/billing/orders/${order.id}`)} className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2">
+                                            <button onClick={() => { const l = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en'; router.push(`/${l}/billing/orders/${order.id}`); }} className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Lihat Detail
                                             </button>
                                             <div className="my-1 h-px bg-gray-100 dark:bg-gray-800 mx-3" />

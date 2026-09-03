@@ -565,7 +565,7 @@ function DiscountCodeDetailContent() {
     const dummyUsages: UsageItem[] = [
         { id: 1, userName: "Budi Santoso", userEmail: "budi@email.com", orderId: 10041, discountAmount: 25000, orderAmount: 125000, usedAt: "2026-07-01T10:23:00Z" },
         { id: 2, userName: "Siti Rahayu", userEmail: "siti@email.com", orderId: 10042, discountAmount: 25000, orderAmount: 200000, usedAt: "2026-07-02T14:10:00Z" },
-        { id: 3, userName: "Ahmad Fauzi", userEmail: "ahmad@email.com", orderId: 10055, discountAmount: 25000, orderAmount: 150000, usedAt: "2026-07-03T09:00:00Z" },
+        { id: 3, userName: "Budi Santoso", userEmail: "budi.santoso@email.com", orderId: 10055, discountAmount: 25000, orderAmount: 150000, usedAt: "2026-07-03T09:00:00Z" },
         { id: 4, userName: "Dewi Lestari", userEmail: "dewi@email.com", orderId: 10063, discountAmount: 15000, orderAmount: 90000, usedAt: "2026-07-04T16:45:00Z" },
         { id: 5, userName: "Rizky Pratama", userEmail: "rizky@email.com", orderId: 10071, discountAmount: 25000, orderAmount: 175000, usedAt: "2026-07-05T08:30:00Z" },
     ]

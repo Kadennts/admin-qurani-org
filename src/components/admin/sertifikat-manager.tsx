@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Award,
@@ -118,7 +119,7 @@ function StatisticsSection() {
 
   const cards = [
     {
-      label: "Total Diterbitkan",
+      label: "Diterbitkan",
       value: statistics?.totalIssued ?? 0,
       icon: Award,
       color: "from-emerald-500 to-teal-500",
@@ -191,7 +192,7 @@ function StatisticsSection() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground leading-tight">{card.label}</p>
-                <p className={`text-2xl font-bold ${card.text} leading-tight`}>{card.value}</p>
+                <p className={`text-2xl font-bold ${card.text} leading-tight`}>{Number(card.value).toLocaleString('id-ID')}</p>
               </div>
             </CardContent>
           </Card>
@@ -268,6 +269,10 @@ function TemplatesSection() {
 // Main Component
 // ============================================
 export function SertifikatManager() {
+  const router = useRouter()
+  const params = useParams()
+  const lang = params?.lang || "en"
+
   const [activeTab, setActiveTab] = useState<ActiveTab>("list")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -397,7 +402,7 @@ export function SertifikatManager() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">Manajemen Sertifikat</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Sertifikat</h2>
         <Button
           variant="ghost"
           size="icon"
@@ -564,7 +569,7 @@ export function SertifikatManager() {
                       <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                           <tr>
-                            {["Murid", "Trainer", "No. Sertifikat", "Tipe", "Tgl Terbit", "Status", "Aksi"].map((h) => (
+                            {["Murid", "Trainer", "No. Sertifikat", "Tipe", "Waktu", "Status", "Aksi"].map((h) => (
                               <th
                                 key={h}
                                 className={`px-6 py-4 text-[10px] font-extrabold tracking-wider text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/80 whitespace-nowrap ${h === "Aksi" ? "text-right" : "text-left"}`}
@@ -584,9 +589,13 @@ export function SertifikatManager() {
                             >
                               <td className="px-6 py-4 font-medium">
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate max-w-[150px]">
+                                  <button
+                                    onClick={() => router.push(`/${lang}/users/manage/${cert.userId}`)}
+                                    className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate max-w-[150px] hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left transition-colors"
+                                    title="Lihat profil"
+                                  >
                                     {cert.userName || `User #${cert.userId}`}
-                                  </span>
+                                  </button>
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">

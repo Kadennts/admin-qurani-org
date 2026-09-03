@@ -514,7 +514,7 @@ function RefundContent() {
                                         {getStatusBadge(r.status)}
                                     </div>
                                     <div className="text-xs text-gray-500 space-y-1">
-                                        <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
+                                        <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/users/manage/${r.userId}`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
                                         <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
                                         {r.sessionsInfo && <div>Sesi: <span className="font-medium text-emerald-600 dark:text-emerald-400">{r.sessionsInfo}</span></div>}
                                         {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
@@ -590,7 +590,7 @@ function RefundContent() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/billing/${r.userId}/wallet`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/users/manage/${r.userId}`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell">
                                                     <div className="font-medium text-gray-900 dark:text-white text-sm">{r.trainerName || `ID: ${r.trainerId}`}</div>

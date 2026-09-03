@@ -143,6 +143,11 @@ export const NavMain = React.memo(function NavMain({
   // Helper: check if current pathname is active for a given sub-item url
   const isSubItemActive = React.useCallback((subUrl: string): boolean => {
     if (pathname === subUrl) return true
+    
+    // Prevent auto-opening "Administrator" group when viewing a user profile (/users/manage/[id])
+    // so that if accessed from Billing, the Billing group stays open.
+    if (subUrl === '/users/manage' && pathname.startsWith('/users/manage/')) return false
+    
     // Match sub-pages, but avoid matching /groups when on /groups/categories etc.
     // Use startsWith only for paths that have dynamic children (not exact data pages)
     if (subUrl !== '/' && pathname.startsWith(subUrl + '/')) return true
