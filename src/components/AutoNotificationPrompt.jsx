@@ -208,7 +208,7 @@ export default function AutoNotificationPrompt({
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <CheckCircle className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
-                      <span>Notifikasi dari ustadz/examiner</span>
+                      <span>Notifikasi dari /examiner</span>
                     </div>
                   </div>
 

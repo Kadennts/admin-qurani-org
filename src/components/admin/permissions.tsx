@@ -583,11 +583,8 @@ export default function Permissions() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                            Manajemen Permissions
+                            Permissions
                         </h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                            Kelola izin akses API untuk setiap role dalam sistem Qurani
-                        </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold text-gray-800 dark:text-gray-200 shadow-sm text-sm">

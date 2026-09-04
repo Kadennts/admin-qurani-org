@@ -20,6 +20,8 @@ import { walletApi, auditApi, API_BASE } from "@/lib/api"
 import { getKycAll } from "@/utils/api/kyc/fetch"
 import { toast } from "sonner"
 import { UserWalletDetail } from "@/components/Wallet/UserWalletDetail"
+import { SIM_TRAINERS } from "@/data/sim-dummy-users"
+import { BookOpen } from "lucide-react"
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("id-ID", {
@@ -252,6 +254,20 @@ export default function UserDetailPage() {
                                 <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 px-2">
                                     <Calendar className="w-3.5 h-3.5" /> Bergabung {formatDate(user.created_at || user.createdAt || new Date().toISOString())}
                                 </span>
+                                <Button 
+                                    size="sm" 
+                                    className="ml-auto h-7 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 rounded-lg transition-colors inline-flex items-center gap-1.5 px-3 py-1.5 font-bold" 
+                                    onClick={() => {
+                                        const trainer = Object.values(SIM_TRAINERS).find(t => String(t.userId) === String(userId))
+                                        if (trainer) {
+                                            router.push(`/${lang}/teachers/manage/${trainer.id}`)
+                                        } else {
+                                            toast.error(`User ${user.name || user.username} tidak menjadi guru`)
+                                        }
+                                    }}
+                                >
+                                    <BookOpen className="w-3.5 h-3.5" /> Lihat Profil Guru
+                                </Button>
                             </div>
                         </div>
 
@@ -420,7 +436,7 @@ export default function UserDetailPage() {
 
                                 {/* WALLET TAB */}
                                 <TabsContent value="wallet" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <UserWalletDetail userId={userId} userData={user} hideProfileCard={true} hideLimitFeature={true} />
+                                    <UserWalletDetail userId={userId} userData={user} hideProfileCard={true} />
                                 </TabsContent>
 
                                 {/* ACTIVITY TAB */}

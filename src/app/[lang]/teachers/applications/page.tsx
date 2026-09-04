@@ -702,7 +702,7 @@ function PengajuanContent() {
                                                 <tr key={guru.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group">
                                                     {/* Pendaftar – nama & avatar bisa diklik */}
                                                     <td className="px-4 py-3">
-                                                        <Link href={`/teachers/${guru.id}/review`} className="flex items-center gap-3 group/name">
+                                                        <Link href={`/en/teachers/manage/${guru.id}/review`} className="flex items-center gap-3 group/name">
                                                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0 text-sm ring-2 ring-transparent group-hover/name:ring-emerald-300 transition-all">
                                                                 {guru.name.charAt(0).toUpperCase()}
                                                             </div>
@@ -740,7 +740,7 @@ function PengajuanContent() {
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity flex-wrap">
                                                             {/* Detail button – selalu tampil */}
-                                                            <Link href={`/teachers/${guru.id}/review`}
+                                                            <Link href={`/en/teachers/manage/${guru.id}/review`}
                                                                 className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors">
                                                                 <Eye className="w-3.5 h-3.5" /> Detail
                                                             </Link>
@@ -783,7 +783,7 @@ function PengajuanContent() {
                                     <div key={guru.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3 shadow-sm">
                                         {/* Header: Avatar + Nama + Status – bisa diklik */}
                                         <div className="flex items-start justify-between gap-3">
-                                            <Link href={`/teachers/${guru.id}/review`} className="flex items-center gap-3 min-w-0 group/name">
+                                            <Link href={`/en/teachers/manage/${guru.id}/review`} className="flex items-center gap-3 min-w-0 group/name">
                                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0 text-sm ring-2 ring-transparent group-hover/name:ring-emerald-300 transition-all">
                                                     {guru.name.charAt(0).toUpperCase()}
                                                 </div>
@@ -825,7 +825,7 @@ function PengajuanContent() {
 
                                         {/* Aksi */}
                                         <div className="flex items-center gap-2 flex-wrap pt-1">
-                                            <Link href={`/teachers/${guru.id}/review`}
+                                            <Link href={`/en/teachers/manage/${guru.id}/review`}
                                                 className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg transition-colors">
                                                 <Eye className="w-3.5 h-3.5" /> Detail
                                             </Link>

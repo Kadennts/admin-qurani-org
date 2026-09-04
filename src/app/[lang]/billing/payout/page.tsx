@@ -576,7 +576,7 @@ function PayoutContent() {
                                         </div>
                                         <div className="text-xs text-gray-500 space-y-1">
                                             <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale || 'id'}/users/manage/${p.userId}?tab=wallet`); }} title="Lihat profil" className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{p.userName || `ID: ${p.userId}`}</button></div>
-                                            <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{p.trainerName || `Trainer ID: ${p.trainerId}`}</span></div>
+                                            <div>Guru: <button onClick={(e) => { e.stopPropagation(); if (p.trainerId) router.push(`/${locale || 'id'}/teachers/manage/${p.trainerId}?from=payout`); }} title={p.trainerId ? "Lihat profil guru" : ""} className={`text-sm leading-tight text-left ${p.trainerId ? 'font-semibold text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'text-gray-700 dark:text-gray-300'}`}>{p.trainerName || `Trainer ID: ${p.trainerId}`}</button></div>
                                         </div>
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
                                             <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>
@@ -666,7 +666,7 @@ function PayoutContent() {
                                                     <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale || 'id'}/users/manage/${p.userId}?tab=wallet`); }} title="Lihat profil" className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{p.userName || `User ID: ${p.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">{p.trainerName || `Trainer ID: ${p.trainerId}`}</div>
+                                                    <button onClick={(e) => { e.stopPropagation(); if (p.trainerId) router.push(`/${locale || 'id'}/teachers/manage/${p.trainerId}?from=payout`); }} title={p.trainerId ? "Lihat profil guru" : ""} className={`text-left ${p.trainerId ? 'font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'font-medium text-gray-900 dark:text-white text-sm'}`}>{p.trainerName || `Trainer ID: ${p.trainerId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 text-right pr-8">
                                                     <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(p.amount)}</span>

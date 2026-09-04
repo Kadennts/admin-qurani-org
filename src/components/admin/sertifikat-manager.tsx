@@ -598,8 +598,14 @@ export function SertifikatManager() {
                                   </button>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
-                                {cert.trainerName || "—"}
+                              <td className="px-6 py-4 text-xs">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); if (cert.trainerId) router.push(`/${lang}/teachers/manage/${cert.trainerId}?from=certificates`); }}
+                                  title={cert.trainerId ? "Lihat profil guru" : ""}
+                                  className={`text-left ${cert.trainerId ? 'text-gray-800 dark:text-gray-200 font-semibold hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'text-gray-500 dark:text-gray-400'}`}
+                                >
+                                  {cert.trainerName || "—"}
+                                </button>
                               </td>
                               <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-semibold font-mono text-xs">
                                 {cert.certificateNumber || "—"}

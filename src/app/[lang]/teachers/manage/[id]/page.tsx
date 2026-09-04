@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo, ReactNode } from "react"
-import { useParams } from "next/navigation"
+import { useState, useEffect, useMemo, ReactNode, Suspense } from "react"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
@@ -16,6 +16,7 @@ import {
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import dummyData from "@/data/billing-dummy.json"
 import pendingDummies from "@/data/pending-trainers-list.json"
+import { SIM_TRAINERS } from "@/data/sim-dummy-users"
 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -506,7 +507,7 @@ function buildFallbackDetail(id: number): TrainerDetail {
         return {
             id: 999999,
             userId: 999999,
-            userName: "Ustadz Ahmad Faris",
+            userName: "Ahmad Faris",
             username: "ahmadfaris_tahsin",
             userImage: "https://i.pravatar.cc/150?img=11",
             headline: "Pengajar Tahsin & Tajwid Bersertifikat",
@@ -548,18 +549,19 @@ function buildFallbackDetail(id: number): TrainerDetail {
     const idx = (id - 1) % 5
     // Look up the name from dummyData to ensure consistency
     const found = dummyData.bookingDetails.map(bd => bd.trainer).find(t => t.id === Number(id))
+    const simFound = SIM_TRAINERS[id as keyof typeof SIM_TRAINERS]
     
     return {
         id,
-        userId: id,
-        userName: found?.name ?? DUMMY_NAMES[idx] ?? `Guru #${id}`,
-        username: found?.email?.split('@')[0] ?? `ustadz${id}`,
-        userImage: found?.avatar ?? "",
-        headline: found?.specialization ?? DUMMY_HEADLINES[idx] ?? "Pengajar Al-Qur'an",
+        userId: simFound?.userId ?? id,
+        userName: simFound?.name ?? found?.name ?? DUMMY_NAMES[idx] ?? `Guru #${id}`,
+        username: simFound?.username ?? found?.email?.split('@')[0] ?? `ustadz${id}`,
+        userImage: simFound?.avatar ?? found?.avatar ?? "",
+        headline: simFound?.specialty ?? found?.specialization ?? DUMMY_HEADLINES[idx] ?? "Pengajar Al-Qur'an",
         bio: DUMMY_BIOS[idx] ?? "Belum ada bio.",
         location: "Indonesia",
         experienceYears: 5 + (id % 10),
-        expertise: DUMMY_EXPERTISE_LIST[idx] ?? ["Tahfidz", "Tajwid"],
+        expertise: simFound?.specialty ? [simFound.specialty as string] : (DUMMY_EXPERTISE_LIST[idx] ?? ["Tahfidz", "Tajwid"]),
         isOnline: true,
         isOffline: id % 2 === 0,
         hourlyRate: 50000 + (id % 5) * 25000,
@@ -572,7 +574,7 @@ function buildFallbackDetail(id: number): TrainerDetail {
         createdAt: new Date(Date.now() - id * 30 * 24 * 3600 * 1000).toISOString(),
         portfolioUrls: DUMMY_GALLERY_URLS,
         certifications: DUMMY_CERTS,
-        teachingMethods: (DUMMY_EXPERTISE_LIST[idx] ?? ["Tahfidz"]).map(name => ({
+        teachingMethods: (simFound?.specialty ? [simFound.specialty as string] : (DUMMY_EXPERTISE_LIST[idx] ?? ["Tahfidz"])).map((name) => ({
             name,
             description: getMethodInfo(name).description,
         })),
@@ -582,6 +584,8 @@ function buildFallbackDetail(id: number): TrainerDetail {
 // ── GuruDetailContent ─────────────────────────────────────────────────────────
 function GuruDetailContent() {
     const params = useParams()
+    const searchParams = useSearchParams()
+    const fromParam = searchParams?.get("from")
     const id = Number(params?.id)
 
     const [loading, setLoading]         = useState(true)
@@ -589,7 +593,22 @@ function GuruDetailContent() {
     const [detail, setDetail]           = useState<TrainerDetail | null>(null)
     const [actionLoading, setActionLoading] = useState<"approve" | "reject" | "suspend" | "unsuspend" | "bgcheck" | null>(null)
     const [certLoading, setCertLoading] = useState<string | null>(null)
-    const [tab, setTab]                 = useState<DetailTab>("informasi")
+    const router = useRouter()
+    const defaultTab = (searchParams?.get("tab") as DetailTab) || "informasi"
+    const [tab, setTabState]            = useState<DetailTab>(defaultTab)
+
+    useEffect(() => {
+        const currentTab = searchParams?.get("tab") as DetailTab
+        if (currentTab && currentTab !== tab) {
+            setTabState(currentTab)
+        }
+    }, [searchParams, tab])
+
+    const setTab = (val: DetailTab) => {
+        setTabState(val)
+        router.replace(`/${params?.lang || "en"}/teachers/manage/${id}?tab=${val}`, { scroll: false })
+    }
+
     const [activeRequirement, setActiveRequirement] = useState<RequirementItem | null>(null)
     const [reviews, setReviews]         = useState<ReviewItem[]>([])
     const [reviewsLoading, setReviewsLoading] = useState(false)
@@ -628,7 +647,7 @@ function GuruDetailContent() {
                 const uname = d.userName ?? d.name ?? `Guru #${id}`
                 setDetail({
                     id: d.id,
-                    userId: d.userId ?? d.id,
+                    userId: d.userId ?? SIM_TRAINERS[id as keyof typeof SIM_TRAINERS]?.userId ?? d.id,
                     userName: uname,
                     username: d.username ?? d.userUsername ?? uname.toLowerCase().replace(/\s+/g, ""),
                     userImage: d.userImage ?? d.avatar ?? "",
@@ -992,7 +1011,14 @@ function GuruDetailContent() {
             <div className="max-w-[1320px] mx-auto space-y-4">
                 <div className="flex items-center gap-2">
                     <Link
-                        href="/teachers"
+                        href={
+                            fromParam === "payments" ? `/${params?.lang}/billing/payments` :
+                            fromParam === "orders" ? `/${params?.lang}/billing/orders` :
+                            fromParam === "payout" ? `/${params?.lang}/billing/payout` :
+                            fromParam === "refund" ? `/${params?.lang}/billing/refund` :
+                            fromParam === "sertifikat" ? `/${params?.lang}/sertifikat` :
+                            `/${params?.lang}/teachers`
+                        }
                         className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -1048,8 +1074,18 @@ function GuruDetailContent() {
                                         </div>
                                     </div>
                                     <div className="pt-12 px-5 pb-4">
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{detail.userName}</h2>
-                                        <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">{detail.headline || "Calon Pengajar"}</p>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div>
+                                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{detail.userName}</h2>
+                                                <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">{detail.headline || "Calon Pengajar"}</p>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700">ID User: {detail.userId}</span>
+                                                <Link href={`/${params?.lang || "en"}/users/manage/${detail.userId}`} className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5">
+                                                    <User className="w-3.5 h-3.5" /> Lihat Profil User
+                                                </Link>
+                                            </div>
+                                        </div>
                                         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
                                             <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-emerald-500" /> {detail.location || "-"}</span>
                                             <span className="inline-flex items-center gap-1"><Clock3 className="w-3.5 h-3.5 text-blue-500" /> {detail.experienceYears} tahun pengalaman</span>

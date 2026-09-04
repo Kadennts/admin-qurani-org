@@ -515,7 +515,7 @@ function RefundContent() {
                                     </div>
                                     <div className="text-xs text-gray-500 space-y-1">
                                         <div>User: <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/users/manage/${r.userId}`); }} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">{r.userName || `ID: ${r.userId}`}</button></div>
-                                        <div>Guru: <span className="font-medium text-gray-900 dark:text-white">{r.trainerName}</span></div>
+                                        <div>Guru: <button onClick={(e) => { e.stopPropagation(); if (r.trainerId) router.push(`/${locale}/teachers/manage/${r.trainerId}?from=refund`); }} title={r.trainerId ? "Lihat profil guru" : ""} className={`text-left ${r.trainerId ? 'font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'font-medium text-gray-900 dark:text-white'}`}>{r.trainerName}</button></div>
                                         {r.sessionsInfo && <div>Sesi: <span className="font-medium text-emerald-600 dark:text-emerald-400">{r.sessionsInfo}</span></div>}
                                         {r.refundReason && <div className="text-gray-500 italic">"{r.refundReason}"</div>}
                                     </div>
@@ -593,7 +593,7 @@ function RefundContent() {
                                                     <button onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/users/manage/${r.userId}`); }} className="font-medium text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{r.userName || `ID: ${r.userId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell">
-                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">{r.trainerName || `ID: ${r.trainerId}`}</div>
+                                                    <button onClick={(e) => { e.stopPropagation(); if (r.trainerId) router.push(`/${locale}/teachers/manage/${r.trainerId}?from=refund`); }} title={r.trainerId ? "Lihat profil guru" : ""} className={`text-left text-sm ${r.trainerId ? 'font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'font-medium text-gray-900 dark:text-white'}`}>{r.trainerName || `ID: ${r.trainerId}`}</button>
                                                 </td>
                                                 <td className="px-4 py-3 hidden xl:table-cell">
                                                     <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800 max-w-fit">{r.sessionsInfo || '—'}</div>

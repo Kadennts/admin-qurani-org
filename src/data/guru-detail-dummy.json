@@ -19,26 +19,26 @@
     { "name": "Ijazah Metode Ummi", "issuer": "Yayasan Ummi Foundation", "issuedDate": "2021-03-15T00:00:00Z", "expiryDate": "", "url": "" },
     { "name": "Sertifikat Pengajar Tilawatil Qur'an", "issuer": "LPTQ Provinsi", "issuedDate": "2023-01-20T00:00:00Z", "expiryDate": "2026-01-20T00:00:00Z", "url": "" }
   ],
-  "names": ["Ustadz Abdul Karim", "Ustadzah Siti Aminah", "Ustadz Muhammad Yusuf", "Ustadzah Khadijah", "Ustadz Ibrahim Al-Hafidz"],
+  "names": ["Hasyim Asy'ari, Lc", "Indi Fitriani", "Iwan", "Aisyah", "Zain Al-Fattah"],
   "headlines": [
-    "Hafidz 30 Juz | Lulusan Universitas Islam Madinah",
-    "Pengajar Tajwid & Tilawah | 10 Tahun Pengalaman",
-    "Spesialis Tahfidz Anak | Metode Ummi Bersanad",
-    "Pengajar Tartil & Tafsir | Alumni Al-Azhar Kairo",
-    "Pembimbing Hafalan | Metode Yanbu'a & Qiroati"
+    "Pengajar Tahfidz & Tajwid Bersertifikat",
+    "Spesialis Tilawah & Tartil",
+    "Pakar Tahsin & Makhraj Huruf",
+    "Pengajar Al-Quran Khusus Anak",
+    "Pembimbing Tahfidz Intensif"
   ],
   "bios": [
-    "Saya adalah seorang pengajar Al-Qur'an yang berpengalaman lebih dari 10 tahun. Metode pembelajaran yang saya gunakan menyesuaikan dengan kemampuan dan usia santri, mulai dari metode Iqro' untuk pemula hingga tahfidz untuk yang ingin menghafal Al-Qur'an. Saya percaya bahwa setiap santri memiliki potensi yang luar biasa dan tugas saya adalah membuka potensi tersebut.",
-    "Berpengalaman mengajar berbagai kalangan mulai dari anak-anak hingga dewasa. Saya menggunakan pendekatan yang ramah dan sabar serta selalu memotivasi santri untuk konsisten dalam belajar Al-Qur'an. Fokus utama saya adalah memastikan bacaan yang benar sesuai dengan ilmu tajwid.",
-    "Lulus dengan predikat mumtaz dari pesantren tahfidz ternama. Telah menghasilkan lebih dari 50 hafidz/hafidzah dari berbagai daerah. Metode pembelajaran saya menggabungkan talaqqi langsung, murajaah rutin, dan metode modern yang menyenangkan.",
-    "Alumni Al-Azhar Kairo, Mesir jurusan Tafsir & Ulum Al-Qur'an. Mengajar dengan pendekatan ilmiah namun tetap mudah dipahami. Spesialisasi dalam tafsir Al-Qur'an dan ilmu-ilmu terkait Al-Qur'an seperti asbabun nuzul dan nasikh-mansukh.",
-    "Pengajar bersertifikat dengan sanad keilmuan yang terjaga. Mengkhususkan diri dalam pembelajaran metode Yanbu'a dan Qiroati untuk anak-anak dan dewasa. Berpengalaman mengajar di TPQ, pesantren, dan secara privat."
+    "Lulusan Universitas Islam Madinah, hafidz 30 juz. Berpengalaman 8 tahun dalam membimbing tahfidz dan mengajarkan tajwid dengan sanad yang jelas.",
+    "Berpengalaman 5 tahun mengajarkan tilawah dan tartil. Sabar dan telaten dalam membimbing santri untuk memperbaiki kualitas bacaan Al-Quran.",
+    "Fokus pada perbaikan makharijul huruf dan tahsin. Memiliki pengalaman 7 tahun mengajar berbagai kalangan usia dengan metode yang mudah dipahami.",
+    "Menggunakan pendekatan interaktif dan menyenangkan (Metode Ummi) agar anak-anak betah belajar Al-Quran. Berpengalaman 4 tahun mengajar anak usia dini.",
+    "Spesialis program tahfidz intensif. Menggunakan metode murajaah yang sistematis untuk memastikan hafalan mutqin. Berpengalaman 6 tahun membimbing santri karantina tahfidz."
   ],
   "expertiseList": [
-    ["Tahfidz", "Tajwid", "Tilawati"],
-    ["Tajwid", "Tartil", "Talaqqi"],
-    ["Tahfidz", "Ummi", "Iqro"],
-    ["Tafsir", "Tartil", "Tilawati"],
-    ["Yanbu'a", "Qiroati", "Tahfidz"]
+    ["Tahfidz", "Tajwid", "Talaqqi"],
+    ["Tilawah", "Tartil", "Tajwid"],
+    ["Tahsin", "Makhraj", "Tajwid"],
+    ["Metode Ummi", "Iqro", "Tahfidz Anak"],
+    ["Tahfidz", "Murajaah", "Qiroati"]
   ]
 }

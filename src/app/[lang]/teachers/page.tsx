@@ -98,6 +98,28 @@ function GuruContent() {
                 try {
                     const pengajuanStatuses = JSON.parse(sessionStorage.getItem("pengajuanGuruStatuses") || "{}")
                     const acceptedIds = Object.keys(pengajuanStatuses).filter(id => pengajuanStatuses[id] === "diterima").map(String)
+
+                    // Inject billing dummy gurus
+                    import("@/data/sim-dummy-users").then(({ SIM_TRAINERS }) => {
+                        const billingGurus = Object.values(SIM_TRAINERS).map((d: any) => ({
+                            id: d.id,
+                            name: d.name || `Guru #${d.id}`,
+                            email: d.email || "",
+                            username: d.username || (d.name || "guru").toLowerCase().replace(/\s+/g, ""),
+                            specialization: d.specialty || "Pengajar Al-Qur'an",
+                            avatar: d.avatar || "",
+                            rating: 4.8 + Math.random() * 0.2, // mock rating 4.8 - 5.0
+                            status: "verified",
+                            teachingMethod: "Online / Offline",
+                            stats: { totalStudents: 20 + Math.floor(Math.random() * 50), totalSessions: 0, totalRevenue: 1000000 + Math.floor(Math.random() * 5000000), activeBookings: 0 }
+                        }))
+                        setApiGurus(prev => {
+                            const currentIds = new Set(prev.map(g => g.id))
+                            const toAdd = billingGurus.filter(g => !currentIds.has(g.id))
+                            return [...prev, ...toAdd]
+                        })
+                    })
+
                     if (acceptedIds.length > 0) {
                         import("@/data/pending-trainers-list.json").then(dummies => {
                             const newGurus = dummies.default.filter(d => acceptedIds.includes(String(d.id))).map((d: any) => ({
@@ -285,7 +307,7 @@ function GuruContent() {
             <div className="max-w-[1600px] mx-auto space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manajemen Guru</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Guru Aktif</h1>
                     </div>
                 </div>
 
@@ -361,7 +383,7 @@ function GuruContent() {
                                         <tr key={guru.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <Link href={`/teachers/${guru.id}`} className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30 hover:ring-emerald-400 dark:hover:ring-emerald-500 transition-all hover:scale-110" title={`Lihat profil ${guru.name}`}>
+                                                    <Link href={`/en/teachers/manage/${guru.id}`} className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30 hover:ring-emerald-400 dark:hover:ring-emerald-500 transition-all hover:scale-110" title={`Lihat profil ${guru.name}`}>
                                                         {guru.avatar ? (
                                                             <Image src={guru.avatar} alt={guru.name} fill className="object-cover" unoptimized />
                                                         ) : (
@@ -369,7 +391,7 @@ function GuruContent() {
                                                         )}
                                                     </Link>
                                                     <div>
-                                                        <Link href={`/teachers/${guru.id}`} className="font-bold text-gray-900 dark:text-white text-xs leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors">{guru.name}</Link>
+                                                        <Link href={`/en/teachers/manage/${guru.id}`} className="font-bold text-gray-900 dark:text-white text-xs leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors">{guru.name}</Link>
                                                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">@{guru.username}</p>
                                                     </div>
                                                 </div>
@@ -392,7 +414,7 @@ function GuruContent() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                    <Link href={`/teachers/${guru.id}`} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /> Detail</Link>
+                                                    <Link href={`/en/teachers/manage/${guru.id}`} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /> Detail</Link>
                                                     {guru.status === "verified" && (
                                                         <button onClick={() => openDeactivateModal(guru.id, guru.name)} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 dark:text-red-400 font-semibold border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg transition-colors"><ShieldOff className="w-3.5 h-3.5" /> Nonaktifkan</button>
                                                     )}
@@ -423,7 +445,7 @@ function GuruContent() {
                                 {/* Header: Avatar + Nama + Status + Rating */}
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <Link href={`/teachers/${guru.id}`} className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30">
+                                        <Link href={`/en/teachers/manage/${guru.id}`} className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-100 dark:ring-emerald-900/30">
                                             {guru.avatar ? (
                                                 <Image src={guru.avatar} alt={guru.name} fill className="object-cover" unoptimized />
                                             ) : (
@@ -431,7 +453,7 @@ function GuruContent() {
                                             )}
                                         </Link>
                                         <div className="min-w-0">
-                                            <Link href={`/teachers/${guru.id}`} className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate block hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{guru.name}</Link>
+                                            <Link href={`/en/teachers/manage/${guru.id}`} className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate block hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{guru.name}</Link>
                                             <p className="text-[11px] text-gray-400 truncate">@{guru.username}</p>
                                         </div>
                                     </div>
@@ -478,7 +500,7 @@ function GuruContent() {
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-2 flex-wrap pt-1">
-                                    <Link href={`/teachers/${guru.id}`} className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg transition-colors">
+                                    <Link href={`/en/teachers/manage/${guru.id}`} className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg transition-colors">
                                         <Eye className="w-3.5 h-3.5" /> Detail
                                     </Link>
                                     {guru.status === "verified" && (

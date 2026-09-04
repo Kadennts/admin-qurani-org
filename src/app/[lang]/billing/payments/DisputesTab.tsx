@@ -33,19 +33,19 @@ const PAGE_SIZE = 10;
 // Dummy data for disputes
 let localDisputeDummyData: DisputeData[] = [
     {
-        id: 101, paymentId: 1, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Ustadz Budi",
+        id: 101, paymentId: 1, userId: 101, userName: "Ahmad", trainerId: 201, trainerName: "Budi",
         amount: 150000, status: "Open", type: "Fraud", priority: "High", createdAt: new Date(Date.now() - 86400000).toISOString(),
         reason: "User claims unauthorized charge."
     },
     {
-        id: 102, paymentId: 2, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Ustadzah Aisyah",
+        id: 102, paymentId: 2, userId: 102, userName: "Siti", trainerId: 202, trainerName: "Aisyah",
         amount: 250000, status: "Resolved", type: "Service Not Delivered", priority: "Medium", createdAt: new Date(Date.now() - 172800000).toISOString(),
         reason: "Trainer did not attend the session.",
         response: "Trainer had technical issues.",
         resolution: "Refunded full amount to user."
     },
     {
-        id: 103, paymentId: 3, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Ustadz Budi",
+        id: 103, paymentId: 3, userId: 103, userName: "Fatimah", trainerId: 201, trainerName: "Budi",
         amount: 100000, status: "In Progress", type: "Duplicate Charge", priority: "Low", createdAt: new Date(Date.now() - 3600000).toISOString(),
         reason: "User was charged twice for the same booking."
     }

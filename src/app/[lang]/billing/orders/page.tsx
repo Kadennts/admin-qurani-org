@@ -55,6 +55,7 @@ type PipelineOrder = {
     isSim?: boolean
     isApi?: boolean
     apiStatus?: number | string | null
+    trainerId?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,6 +110,7 @@ function bookingToPipeline(b: typeof dummyData.bookings[0]): PipelineOrder {
         status: getStage(b),
         isPendingPayment,
         mode: "online",
+        trainerId: b.trainerId,
     }
 }
 
@@ -137,6 +139,7 @@ function simOrderToPipeline(o: SimOrder): PipelineOrder {
         isPendingPayment: o.paymentStatus === "pending",
         isSim: true,
         mode: "online",
+        trainerId: o.trainer.id,
     }
 }
 
@@ -1038,13 +1041,23 @@ function PesananContent() {
                                             </td>
                                             {/* Guru */}
                                             <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (order.trainerId) {
+                                                            const langStr = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en';
+                                                            router.push(`/${langStr}/teachers/manage/${order.trainerId}?from=orders`);
+                                                        }
+                                                    }}
+                                                    className={`flex items-center gap-2 ${order.trainerId ? 'cursor-pointer group/guru inline-flex' : ''}`}
+                                                    title={order.trainerId ? 'Lihat profil guru' : ''}
+                                                >
                                                     {order.guruImage ? (
                                                         <img src={order.guruImage} alt={order.guru} className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-gray-100" />
                                                     ) : null}
                                                     <div>
-                                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
-                                                        <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
+                                                        <p className={`text-sm font-semibold text-gray-900 dark:text-white ${order.trainerId ? 'group-hover/guru:text-emerald-600 dark:group-hover/guru:text-emerald-400 group-hover/guru:underline' : ''}`}>{order.guru}</p>
+                                                        <p className={`text-[11px] ${order.trainerId ? 'text-emerald-600 dark:text-emerald-400 group-hover/guru:underline' : 'text-gray-500'}`}>{order.guruUsername}</p>
                                                     </div>
                                                 </div>
                                             </td>
@@ -1178,10 +1191,19 @@ function PesananContent() {
                                             <p className={`text-sm font-semibold text-gray-900 dark:text-white ${order.userId ? 'group-hover/membermobile:text-emerald-600 dark:group-hover/membermobile:text-emerald-400' : ''}`}>{order.member}</p>
                                             <p className={`text-[11px] ${order.userId ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>@{order.username.replace(/^@/, '')}</p>
                                         </div>
-                                        <div className="text-right">
+                                        <div 
+                                            className={`text-right ${order.trainerId ? 'cursor-pointer group/gurumobile' : ''}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (order.trainerId) {
+                                                    const langStr = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'en';
+                                                    router.push(`/${langStr}/teachers/manage/${order.trainerId}?from=orders`);
+                                                }
+                                            }}
+                                        >
                                             <p className="text-[10px] text-gray-500 mb-0.5">Guru</p>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.guru}</p>
-                                            <p className="text-[11px] text-gray-500">{order.guruUsername}</p>
+                                            <p className={`text-sm font-semibold text-gray-900 dark:text-white ${order.trainerId ? 'group-hover/gurumobile:text-emerald-600 dark:group-hover/gurumobile:text-emerald-400 group-hover/gurumobile:underline' : ''}`}>{order.guru}</p>
+                                            <p className={`text-[11px] ${order.trainerId ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>{order.guruUsername}</p>
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800 ml-7">

@@ -841,7 +841,13 @@ function PaymentsContent() {
                                                 </div>
                                                 <div className="flex items-baseline gap-1.5">
                                                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">Trainer</span>
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300 leading-tight">{payment.trainerName || '-'}</span>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); if (payment.trainerId) { router.push(`/${lang}/teachers/manage/${payment.trainerId}?from=payments`); } }}
+                                                        title={payment.trainerId ? "Lihat profil guru" : ""}
+                                                        className={`text-sm leading-tight text-left ${payment.trainerId ? 'font-semibold text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'text-gray-700 dark:text-gray-300'}`}
+                                                    >
+                                                        {payment.trainerName || '-'}
+                                                    </button>
                                                 </div>
                                                 <div className="flex items-baseline gap-1.5">
                                                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide w-14 flex-shrink-0">Metode</span>
@@ -959,7 +965,13 @@ function PaymentsContent() {
                                                 <button onClick={(e) => { e.stopPropagation(); if (payment.userId) { router.push(`/${lang}/users/manage/${payment.userId}?tab=wallet`); } }} title="Lihat profil pengguna" className="font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left">{payment.userName || '-'}</button>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900 dark:text-white">{payment.trainerName || '-'}</div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); if (payment.trainerId) { router.push(`/${lang}/teachers/manage/${payment.trainerId}?from=payments`); } }}
+                                                    title={payment.trainerId ? "Lihat profil guru" : ""}
+                                                    className={`text-left ${payment.trainerId ? 'font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline cursor-pointer' : 'font-medium text-gray-900 dark:text-white'}`}
+                                                >
+                                                    {payment.trainerName || '-'}
+                                                </button>
                                             </td>
                                             <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400 text-right pr-16">
                                                 {formatCurrency(payment.amount)}

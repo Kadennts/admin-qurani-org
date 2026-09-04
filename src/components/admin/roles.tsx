@@ -653,7 +653,7 @@ export default function Roles() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Manajemen Role</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Role</h1>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                         <span className="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold text-gray-800 dark:text-gray-200 shadow-sm">

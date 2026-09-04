@@ -6,7 +6,7 @@ const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
 const STORE_VERSION_KEY = "qurani_sim_wallet_version"
-const STORE_VERSION = "v10-unique-ids"
+const STORE_VERSION = "v11-teacher-wallets"
 
 const DUMMY_TRANSACTIONS = [
     // ─── RIWAYAT TOPUP (dari Wallet/Riwayat Topup) ───────────────────────────
@@ -228,6 +228,82 @@ const DUMMY_TRANSACTIONS = [
         paymentMethod: "OVO",
         referenceId: "TXN-H-889977665544105",
         createdAt: new Date(Date.now() - 691200000).toISOString()
+    },
+    // ─── DUMMY TRANSACTIONS UNTUK GURU ───────────────────────────
+    {
+        id: "1785723001921",
+        userId: 889977665544201,
+        user: { name: "Hasyim Asy'ari, Lc", email: "hasyim.asyari@qurani.id", username: "hasyim_asyari" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pemasukan kelas",
+        amount: 500000,
+        balanceBefore: 0,
+        balanceAfter: 500000,
+        status: "completed",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-IN-889977665544201",
+        createdAt: new Date(Date.now() - 86400000).toISOString()
+    },
+    {
+        id: "1785723001922",
+        userId: 889977665544202,
+        user: { name: "Indi Fitriani", email: "indi.fitriani@qurani.id", username: "indi_fitriani" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pemasukan kelas",
+        amount: 300000,
+        balanceBefore: 0,
+        balanceAfter: 300000,
+        status: "completed",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-IN-889977665544202",
+        createdAt: new Date(Date.now() - 172800000).toISOString()
+    },
+    {
+        id: "1785723001923",
+        userId: 889977665544203,
+        user: { name: "Iwan", email: "iwan.trainer@qurani.id", username: "iwansudrajat" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pemasukan kelas",
+        amount: 250000,
+        balanceBefore: 0,
+        balanceAfter: 250000,
+        status: "completed",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-IN-889977665544203",
+        createdAt: new Date(Date.now() - 259200000).toISOString()
+    },
+    {
+        id: "1785723001924",
+        userId: 889977665544204,
+        user: { name: "Aisyah", email: "aisyah.trainer@qurani.id", username: "siti_aisyah" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pemasukan kelas",
+        amount: 150000,
+        balanceBefore: 0,
+        balanceAfter: 150000,
+        status: "completed",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-IN-889977665544204",
+        createdAt: new Date(Date.now() - 345600000).toISOString()
+    },
+    {
+        id: "1785723001925",
+        userId: 889977665544205,
+        user: { name: "Zain Al-Fattah", email: "zain.alfattah@qurani.id", username: "zain_alfattah" },
+        type: 4,
+        typeName: "Payment",
+        description: "Pemasukan kelas",
+        amount: 450000,
+        balanceBefore: 0,
+        balanceAfter: 450000,
+        status: "completed",
+        paymentMethod: "Qurani Wallet",
+        referenceId: "TXN-IN-889977665544205",
+        createdAt: new Date(Date.now() - 432000000).toISOString()
     }
 ];
 
