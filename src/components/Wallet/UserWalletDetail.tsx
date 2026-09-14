@@ -22,9 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/components/providers/i18n-provider";
 
-function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("id-ID", {
+function formatCurrency(amount: number, locale: string) {
+    return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: "IDR",
         minimumFractionDigits: 0,
@@ -32,7 +33,7 @@ function formatCurrency(amount: number) {
     }).format(amount).replace("IDR", "Rp")
 }
 
-function formatDate(dateString: string | undefined, format: 'relative' | 'long' | 'short' = 'long', tz: string = 'UTC', locale: string = 'id-ID') {
+function formatDate(dateString: string | undefined, format: 'relative' | 'long' | 'short' = 'long', tz: string = 'UTC', locale: string = 'id-ID', t?: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
     if (!dateString) return "—";
     try {
         const date = new Date(dateString);
@@ -41,34 +42,34 @@ function formatDate(dateString: string | undefined, format: 'relative' | 'long' 
         // relative
         const now = new Date();
         const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-        if (diffInSeconds < 60) return "Baru saja";
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit lalu`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`;
-        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} hari lalu`;
+        if (diffInSeconds < 60) return t ? t("billing.wallet_detail.rel.just_now", "Baru saja") : "Baru saja";
+        if (diffInSeconds < 3600) return t ? t("billing.wallet_detail.rel.minutes", "{{count}} menit lalu", { count: Math.floor(diffInSeconds / 60) }) : `${Math.floor(diffInSeconds / 60)} menit lalu`;
+        if (diffInSeconds < 86400) return t ? t("billing.wallet_detail.rel.hours", "{{count}} jam lalu", { count: Math.floor(diffInSeconds / 3600) }) : `${Math.floor(diffInSeconds / 3600)} jam lalu`;
+        if (diffInSeconds < 2592000) return t ? t("billing.wallet_detail.rel.days", "{{count}} hari lalu", { count: Math.floor(diffInSeconds / 86400) }) : `${Math.floor(diffInSeconds / 86400)} hari lalu`;
         return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: tz }).format(date);
     } catch {
         return dateString;
     }
 }
 
-function getTxTypeBadge(type: number | undefined) {
-    if (type === 1) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">TopUp</span>;
-    if (type === 2) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">Withdraw</span>;
-    if (type === 3) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">Transfer</span>;
-    if (type === 4) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">Payment</span>;
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Lainnya</span>;
+function getTxTypeBadge(type: number | undefined, t: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
+    if (type === 1) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{t("billing.wallet_detail.tx_types.topup", "TopUp")}</span>;
+    if (type === 2) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">{t("billing.wallet_detail.tx_types.withdraw", "Withdraw")}</span>;
+    if (type === 3) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">{t("billing.wallet_detail.tx_types.transfer", "Transfer")}</span>;
+    if (type === 4) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">{t("billing.wallet_detail.tx_types.payment", "Payment")}</span>;
+    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{t("billing.wallet_detail.tx_types.other", "Lainnya")}</span>;
 }
 
-function getStatusBadge(status: string | undefined) {
+function getStatusBadge(status: string | undefined, t: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
     const s = (status || "").toLowerCase();
     if (s === "success" || s === "completed" || s === "approved") {
-        return <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Berhasil</span>;
+        return <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{t("billing.wallet_detail.tx_status.success", "Berhasil")}</span>;
     }
     if (s === "pending" || s === "waiting") {
-        return <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Pending</span>;
+        return <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{t("billing.wallet_detail.tx_status.pending", "Pending")}</span>;
     }
     if (s === "failed" || s === "rejected" || s === "cancelled") {
-        return <span className="text-[10px] font-bold text-red-600 dark:text-red-400">Gagal</span>;
+        return <span className="text-[10px] font-bold text-red-600 dark:text-red-400">{t("billing.wallet_detail.tx_status.failed", "Gagal")}</span>;
     }
     return <span className="text-[10px] font-bold text-gray-500">{status || "—"}</span>;
 }
@@ -84,6 +85,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
     const router = useRouter();
     const pathname = usePathname();
     const lang = pathname?.split('/')[1] || 'en';
+    const { t, locale } = useI18n();
 
     const [loading, setLoading] = useState(true);
     const [walletData, setWalletData] = useState<any>(null);
@@ -125,7 +127,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
             setTransactions(txData);
         } catch (err) {
             console.error("Error fetching wallet data:", err);
-            toast.error("Gagal memuat data wallet");
+            toast.error(t("billing.wallet_detail.toasts.load_error", "Gagal memuat data wallet"));
         } finally {
             setLoading(false);
         }
@@ -139,17 +141,17 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
 
     const handleSuspendWallet = () => {
         if (!suspendReason.trim()) {
-            toast.error("Alasan penangguhan wajib diisi");
+            toast.error(t("billing.wallet_detail.toasts.suspend_reason_required", "Alasan penangguhan wajib diisi"));
             return;
         }
         setIsProcessing(true);
         try {
             updateSimWallet(userId, { status: "suspended", suspendReason: suspendReason });
             fetchData();
-            toast.success("Status dompet berhasil diubah menjadi Suspended");
+            toast.success(t("billing.wallet_detail.toasts.suspend_success", "Status dompet berhasil diubah menjadi Suspended"));
             setIsSuspendModalOpen(false);
         } catch (error) {
-            toast.error("Gagal melakukan suspend dompet");
+            toast.error(t("billing.wallet_detail.toasts.suspend_error", "Gagal melakukan suspend dompet"));
         } finally {
             setIsProcessing(false);
         }
@@ -160,10 +162,10 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
         try {
             updateSimWallet(userId, { status: "active", suspendReason: null });
             fetchData();
-            toast.success("Status dompet berhasil diaktifkan kembali");
+            toast.success(t("billing.wallet_detail.toasts.activate_success", "Status dompet berhasil diaktifkan kembali"));
             setIsActivateModalOpen(false);
         } catch (error) {
-            toast.error("Gagal mengaktifkan dompet");
+            toast.error(t("billing.wallet_detail.toasts.activate_error", "Gagal mengaktifkan dompet"));
         } finally {
             setIsProcessing(false);
         }
@@ -182,10 +184,10 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
         try {
             updateSimWallet(userId, { limits: parsedLimits });
             fetchData();
-            toast.success("Limit wallet berhasil diperbarui");
+            toast.success(t("billing.wallet_detail.toasts.limit_success", "Limit wallet berhasil diperbarui"));
             setIsLimitModalOpen(false);
         } catch (error) {
-            toast.error("Gagal memperbarui limit wallet");
+            toast.error(t("billing.wallet_detail.toasts.limit_error", "Gagal memperbarui limit wallet"));
         } finally {
             setIsProcessing(false);
         }
@@ -224,7 +226,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                 <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                     <AlertTriangle className="w-12 h-12 text-amber-400" />
                 </div>
-                <p className="text-base font-medium text-gray-600 dark:text-gray-400">Data Dompet User tidak ditemukan</p>
+                <p className="text-base font-medium text-gray-600 dark:text-gray-400">{t("billing.wallet_detail.title", "Data Dompet User tidak ditemukan")}</p>
             </div>
         );
     }
@@ -254,18 +256,20 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                     {/* Move Wallet ID & Status to top right */}
                     <div className="flex sm:flex-col items-center sm:items-end gap-1 text-right">
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Status:</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("billing.wallet_detail.status_label", "Status:")}</span>
                             <Badge variant="outline" className={`capitalize ${walletData.status?.toLowerCase() === 'suspended' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'}`}>
-                                {walletData.status || 'Active'}
+                                {walletData.status?.toLowerCase() === 'suspended'
+                                    ? t("billing.wallet_detail.status_suspended", "Suspended")
+                                    : t("billing.wallet_detail.status_active", "Active")}
                             </Badge>
                         </div>
                         {walletData.status?.toLowerCase() === 'suspended' && walletData.suspendReason && (
                             <span className="text-[10px] text-red-500 font-medium mb-1 max-w-[150px] truncate" title={walletData.suspendReason}>
-                                Alasan: {walletData.suspendReason}
+                                {t("billing.wallet_detail.reason_label", "Alasan:")} {walletData.suspendReason}
                             </span>
                         )}
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">ID:</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("billing.wallet_detail.id_label", "ID:")}</span>
                             <span className="font-mono text-sm font-bold text-gray-800 dark:text-gray-200">{walletData.id || `W-MOCK-${userId}`}</span>
                         </div>
                     </div>
@@ -277,7 +281,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div className="flex items-center gap-2">
                         <Wallet className="w-5 h-5 text-emerald-500" />
-                        <h3 className="font-bold text-gray-900 dark:text-white">Informasi Wallet</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white">{t("billing.wallet_detail.title", "Informasi Wallet")}</h3>
                     </div>
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
@@ -289,7 +293,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                 disabled={isProcessing}
                                 className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                             >
-                                Set Limit
+                                {t("billing.wallet_detail.set_limit", "Set Limit")}
                             </Button>
                         )}
                         {walletData.status?.toLowerCase() === 'suspended' ? (
@@ -300,7 +304,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                 onClick={() => setIsActivateModalOpen(true)}
                                 disabled={isProcessing}
                             >
-                                Aktifkan
+                                {t("billing.wallet_detail.activate", "Aktifkan")}
                             </Button>
                         ) : (
                             <Button 
@@ -311,7 +315,7 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                 disabled={isProcessing}
                             >
                                 {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                Suspend
+                                {t("billing.wallet_detail.suspend", "Suspend")}
                             </Button>
                         )}
                     </div>
@@ -319,21 +323,21 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">Saldo Aktif</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.active_balance", "Saldo Aktif")}</div>
                         <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(walletData?.activeBalance || walletData?.balance || 0)}
+                            {formatCurrency(walletData?.activeBalance || walletData?.balance || 0, locale)}
                         </div>
                     </div>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">Saldo Pending</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.pending_balance", "Saldo Pending")}</div>
                         <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                            {formatCurrency(walletData?.pendingBalance || 0)}
+                            {formatCurrency(walletData?.pendingBalance || 0, locale)}
                         </div>
                     </div>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col justify-center">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">Total Transaksi</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.total_transactions", "Total Transaksi")}</div>
                         <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                            {transactions.length} <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaksi</span>
+                            {transactions.length} <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("billing.wallet_detail.transactions", "Transaksi")}</span>
                         </div>
                     </div>
                 </div>
@@ -344,26 +348,26 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                 <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <History className="w-5 h-5 text-emerald-500" />
-                        <h3 className="font-bold text-gray-900 dark:text-white">Riwayat Transaksi</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white">{t("billing.wallet_detail.history_title", "Riwayat Transaksi")}</h3>
                     </div>
                 </div>
 
                 {transactions.length === 0 ? (
                     <div className="text-center py-12 px-4 text-gray-400">
                         <History className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                        <p className="font-medium text-gray-500">Belum ada riwayat transaksi</p>
+                        <p className="font-medium text-gray-500">{t("billing.wallet_detail.empty_history", "Belum ada riwayat transaksi")}</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left whitespace-nowrap">
                             <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
                                 <tr>
-                                    <th className="px-5 py-3.5">ID</th>
-                                    <th className="px-5 py-3.5">Kategori</th>
-                                    <th className="px-5 py-3.5">Nominal</th>
-                                    <th className="px-5 py-3.5">Status</th>
-                                    <th className="px-5 py-3.5">Tanggal</th>
-                                    <th className="px-5 py-3.5 text-center">Aksi</th>
+                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.id", "ID")}</th>
+                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.category", "Kategori")}</th>
+                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.amount", "Nominal")}</th>
+                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.status", "Status")}</th>
+                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.date", "Tanggal")}</th>
+                                    <th className="px-5 py-3.5 text-center">{t("billing.wallet_detail.table.action", "Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
@@ -377,44 +381,44 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                             {tx.referenceId ? (
                                                 <>
                                                     <div className="font-bold text-gray-900 dark:text-white text-sm font-mono">{tx.referenceId}</div>
-                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">Internal: #{tx.id}</div>
+                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">{t("billing.wallet_detail.internal_id", "Internal: #{{id}}", { id: tx.id })}</div>
                                                 </>
                                             ) : (
                                                 <>
                                                     <div className="font-bold text-gray-900 dark:text-white text-sm">#{tx.id}</div>
-                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">Transaksi Internal</div>
+                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">{t("billing.wallet_detail.internal_tx", "Transaksi Internal")}</div>
                                                 </>
                                             )}
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="flex flex-col items-start gap-1">
-                                                {getTxTypeBadge(tx.type)}
+                                                {getTxTypeBadge(tx.type, t)}
                                                 {tx.paymentMethod && (
                                                     <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
                                                         {tx.paymentMethod}
                                                     </span>
                                                 )}
-                                                <span className="text-[11px] text-gray-500 truncate max-w-[200px]">{tx.description || 'Transaksi'}</span>
+                                                <span className="text-[11px] text-gray-500 truncate max-w-[200px]">{tx.description || t("billing.wallet_detail.description_fallback", "Transaksi")}</span>
                                             </div>
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className={`font-black text-sm ${tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                                                {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount), locale)}
                                             </div>
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="bg-gray-50 dark:bg-gray-800/60 px-2.5 py-1 rounded border border-gray-100 dark:border-gray-700/50 inline-flex items-center">
-                                                {getStatusBadge(tx.status)}
+                                                {getStatusBadge(tx.status, t)}
                                             </div>
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                                {formatDate(tx.createdAt, 'relative', tz)}
+                                                {formatDate(tx.createdAt, 'relative', tz, locale, t)}
                                             </div>
                                         </td>
                                         <td className="px-5 py-4 text-center">
                                             <button className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-md transition-colors inline-flex items-center">
-                                                Detail
+                                                {t("billing.wallet_detail.detail", "Detail")}
                                             </button>
                                         </td>
                                     </tr>
@@ -429,65 +433,65 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
             <Dialog open={isLimitModalOpen} onOpenChange={setIsLimitModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Ubah Limit Wallet</DialogTitle>
+                        <DialogTitle>{t("billing.wallet_detail.limit_modal.title", "Ubah Limit Wallet")}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyTopupLimit" className="text-right text-xs">Daily Topup Limit</Label>
+                            <Label htmlFor="dailyTopupLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_topup", "Daily Topup Limit")}</Label>
                             <Input
                                 id="dailyTopupLimit"
                                 value={limits.dailyTopupLimit}
                                 onChange={(e) => setLimits({...limits, dailyTopupLimit: e.target.value})}
                                 className="col-span-3"
-                                placeholder="Opsional (mis: 10000000)"
+                                placeholder={t("billing.wallet_detail.limit_modal.optional_topup", "Opsional (mis: 10000000)")}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyWithdrawLimit" className="text-right text-xs">Daily Withdraw Limit</Label>
+                            <Label htmlFor="dailyWithdrawLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_withdraw", "Daily Withdraw Limit")}</Label>
                             <Input
                                 id="dailyWithdrawLimit"
                                 value={limits.dailyWithdrawLimit}
                                 onChange={(e) => setLimits({...limits, dailyWithdrawLimit: e.target.value})}
                                 className="col-span-3"
-                                placeholder="Opsional (mis: 5000000)"
+                                placeholder={t("billing.wallet_detail.limit_modal.optional_withdraw", "Opsional (mis: 5000000)")}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyTransferLimit" className="text-right text-xs">Daily Transfer Limit</Label>
+                            <Label htmlFor="dailyTransferLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_transfer", "Daily Transfer Limit")}</Label>
                             <Input
                                 id="dailyTransferLimit"
                                 value={limits.dailyTransferLimit}
                                 onChange={(e) => setLimits({...limits, dailyTransferLimit: e.target.value})}
                                 className="col-span-3"
-                                placeholder="Opsional (mis: 5000000)"
+                                placeholder={t("billing.wallet_detail.limit_modal.optional_transfer", "Opsional (mis: 5000000)")}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="minWithdrawAmount" className="text-right text-xs">Min Withdraw</Label>
+                            <Label htmlFor="minWithdrawAmount" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.min_withdraw", "Min Withdraw")}</Label>
                             <Input
                                 id="minWithdrawAmount"
                                 value={limits.minWithdrawAmount}
                                 onChange={(e) => setLimits({...limits, minWithdrawAmount: e.target.value})}
                                 className="col-span-3"
-                                placeholder="Opsional (mis: 50000)"
+                                placeholder={t("billing.wallet_detail.limit_modal.optional_min", "Opsional (mis: 50000)")}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="maxBalance" className="text-right text-xs">Max Balance</Label>
+                            <Label htmlFor="maxBalance" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.max_balance", "Max Balance")}</Label>
                             <Input
                                 id="maxBalance"
                                 value={limits.maxBalance}
                                 onChange={(e) => setLimits({...limits, maxBalance: e.target.value})}
                                 className="col-span-3"
-                                placeholder="Opsional (mis: 100000000)"
+                                placeholder={t("billing.wallet_detail.limit_modal.optional_max", "Opsional (mis: 100000000)")}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsLimitModalOpen(false)}>Batal</Button>
+                        <Button variant="outline" onClick={() => setIsLimitModalOpen(false)}>{t("billing.wallet_detail.limit_modal.cancel", "Batal")}</Button>
                         <Button onClick={handleSaveLimit} disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                            Simpan
+                            {t("billing.wallet_detail.limit_modal.save", "Simpan")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -497,24 +501,24 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
             <Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Suspend Wallet</DialogTitle>
+                        <DialogTitle>{t("billing.wallet_detail.suspend_modal.title", "Suspend Wallet")}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor="suspendReason">Alasan Penangguhan (Required)</Label>
+                            <Label htmlFor="suspendReason">{t("billing.wallet_detail.suspend_modal.reason_label", "Alasan Penangguhan (Wajib)")}</Label>
                             <Input
                                 id="suspendReason"
                                 value={suspendReason}
                                 onChange={(e) => setSuspendReason(e.target.value)}
-                                placeholder="Masukkan alasan wallet disuspend..."
+                                placeholder={t("billing.wallet_detail.suspend_modal.reason_placeholder", "Masukkan alasan wallet disuspend...")}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsSuspendModalOpen(false)}>Batal</Button>
+                        <Button variant="outline" onClick={() => setIsSuspendModalOpen(false)}>{t("billing.wallet_detail.suspend_modal.cancel", "Batal")}</Button>
                         <Button variant="destructive" onClick={handleSuspendWallet} disabled={isProcessing || !suspendReason.trim()}>
                             {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                            Suspend
+                            {t("billing.wallet_detail.suspend_modal.confirm", "Suspend")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -524,22 +528,22 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
             <Dialog open={isActivateModalOpen} onOpenChange={setIsActivateModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Aktifkan Wallet</DialogTitle>
+                        <DialogTitle>{t("billing.wallet_detail.activate_modal.title", "Aktifkan Wallet")}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="flex flex-col gap-2">
-                            <Label>Alasan Penangguhan Sebelumnya:</Label>
+                            <Label>{t("billing.wallet_detail.activate_modal.prev_reason_label", "Alasan Penangguhan Sebelumnya:")}</Label>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
-                                {walletData?.suspendReason || "Tidak ada alasan penangguhan yang tercatat."}
+                                {walletData?.suspendReason || t("billing.wallet_detail.no_reason", "Tidak ada alasan penangguhan yang tercatat.")}
                             </div>
-                            <p className="text-sm text-gray-500 mt-2">Apakah Anda yakin ingin mengaktifkan kembali wallet ini?</p>
+                            <p className="text-sm text-gray-500 mt-2">{t("billing.wallet_detail.activate_modal.confirm_text", "Apakah Anda yakin ingin mengaktifkan kembali wallet ini?")}</p>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsActivateModalOpen(false)}>Batal</Button>
+                        <Button variant="outline" onClick={() => setIsActivateModalOpen(false)}>{t("billing.wallet_detail.activate_modal.cancel", "Batal")}</Button>
                         <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleActivateWallet} disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                            Aktifkan
+                            {t("billing.wallet_detail.activate_modal.confirm", "Aktifkan")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -80,6 +80,66 @@ export function getSimTrainer(trainerId: number | string): SimTrainerProfile | n
     return SIM_TRAINERS[Number(trainerId)] ?? null
 }
 
+/** Ambil data trainer berdasarkan username */
+export function getSimTrainerByUsername(username: string): SimTrainerProfile | null {
+    return Object.values(SIM_TRAINERS).find(t => t.username === username) ?? null
+}
+
+/** Ambil data user berdasarkan username */
+export function getSimUserByUsername(username: string): SimUserProfile | null {
+    return Object.values(SIM_USERS).find(u => u.username === username) ?? null
+}
+
+/**
+ * Resolve URL slug (bisa berupa username string atau numeric ID string)
+ * ke trainer data. Return { id, simTrainer }.
+ * - Slug numerik → treat sebagai trainer ID (backward compat & real API)
+ * - Slug string → lookup di SIM_TRAINERS by username
+ */
+export function resolveTrainerSlug(slug: string): { id: number; simTrainer: SimTrainerProfile | null } {
+    if (/^\d+$/.test(slug)) {
+        const id = Number(slug)
+        return { id, simTrainer: SIM_TRAINERS[id] ?? null }
+    }
+    const simTrainer = getSimTrainerByUsername(slug)
+    return { id: simTrainer?.id ?? 0, simTrainer }
+}
+
+/**
+ * Resolve URL slug ke user data. Return { userId, simUser }.
+ * - Slug numerik → treat sebagai userId (backward compat & real API)
+ * - Slug string → lookup di SIM_USERS by username
+ */
+export function resolveUserSlug(slug: string): { userId: string; simUser: SimUserProfile | null } {
+    if (/^\d+$/.test(slug)) {
+        return { userId: slug, simUser: SIM_USERS[Number(slug)] ?? null }
+    }
+    const simUser = getSimUserByUsername(slug)
+    return { userId: simUser ? String(simUser.id) : "", simUser }
+}
+
+/**
+ * Ambil slug URL yang akan dipakai sebagai path segment untuk trainer.
+ * Prioritas: username sim data > string ID.
+ * Menerima undefined/null dan mengembalikan string kosong.
+ */
+export function getTrainerSlug(trainerId: number | string | undefined | null): string {
+    if (trainerId === undefined || trainerId === null || trainerId === "") return ""
+    const sim = SIM_TRAINERS[Number(trainerId)]
+    return sim?.username ?? String(trainerId)
+}
+
+/**
+ * Ambil slug URL yang akan dipakai sebagai path segment untuk user.
+ * Prioritas: username sim data > string userId.
+ * Menerima undefined/null dan mengembalikan string kosong.
+ */
+export function getUserSlug(userId: number | string | undefined | null): string {
+    if (userId === undefined || userId === null || userId === "") return ""
+    const sim = SIM_USERS[Number(userId)]
+    return sim?.username ?? String(userId)
+}
+
 /** Ambil user object ringkas untuk dipakai di transaksi/entries */
 export function getSimUserShort(userId: number | string) {
     const u = getSimUser(userId)

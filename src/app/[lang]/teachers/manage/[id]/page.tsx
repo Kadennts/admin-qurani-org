@@ -12,11 +12,14 @@ import {
     AlertTriangle, ShieldCheck, ShieldOff, Image as ImageIcon, MessageSquare,
     Info, Award, FileText, User, BadgeCheck, CircleDashed, X, ExternalLink,
     Loader2, Package, Quote, Mail, Coins, PlayCircle, Users, LinkIcon, Hourglass,
+    Copy, Check, Globe, Wifi, WifiOff, CalendarDays, ShoppingCart, Wallet
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import dummyData from "@/data/billing-dummy.json"
 import pendingDummies from "@/data/pending-trainers-list.json"
 import { SIM_TRAINERS } from "@/data/sim-dummy-users"
+import { TeacherOrdersTab } from "@/components/Teachers/TeacherOrdersTab"
+import { TeacherWalletTab } from "@/components/Teachers/TeacherWalletTab"
 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -29,7 +32,7 @@ function getClientToken(): string | null {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TrainerStatus = "verified" | "pending" | "suspended" | "rejected"
-type DetailTab = "informasi" | "paket" | "galeri" | "ulasan"
+type DetailTab = "informasi" | "paket" | "galeri" | "ulasan" | "pesanan" | "wallet"
 type RequirementKey = "profil_kontak" | "kualifikasi_metode" | "sertifikat" | "media_portofolio"
 
 type TrainerDetail = {
@@ -111,10 +114,10 @@ type CourseItem = {
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<TrainerStatus, { label: string; badge: string; dot: string }> = {
-    verified:  { label: "Terverifikasi",       badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" },
-    pending:   { label: "Menunggu Verifikasi", badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",         dot: "bg-amber-500"   },
-    suspended: { label: "Nonaktif",            badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",                 dot: "bg-red-500"     },
-    rejected:  { label: "Ditolak",             badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",             dot: "bg-rose-500"    },
+    verified: { label: "Terverifikasi", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" },
+    pending: { label: "Menunggu Verifikasi", badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", dot: "bg-amber-500" },
+    suspended: { label: "Nonaktif", badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", dot: "bg-red-500" },
+    rejected: { label: "Ditolak", badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400", dot: "bg-rose-500" },
 }
 
 // ── Qurani normalization ───────────────────────────────────────────────────────
@@ -196,19 +199,19 @@ function extractYoutubeId(url: string): string | null {
 
 function getMethodInfo(name: string): { color: string; description: string } {
     const methods: Record<string, { color: string; description: string }> = {
-        Iqro:         { color: "bg-emerald-500",  description: "Metode belajar Al-Qur'an bertahap mulai dari huruf hijaiyah." },
-        Ummi:         { color: "bg-blue-500",      description: "Metode pembelajaran berbasis irama khas dengan prinsip talaqqi musyafahah." },
-        Tilawati:     { color: "bg-violet-500",    description: "Belajar membaca Al-Qur'an dengan lagu yang khas dan menyenangkan." },
-        Qiroati:      { color: "bg-amber-500",     description: "Metode terstruktur dari pengenalan huruf hingga tajwid." },
-        "Yanbu'a":    { color: "bg-rose-500",      description: "Metode tahfidz dan tartil Al-Qur'an dari Kudus." },
-        "Al-Baghdadi":{ color: "bg-orange-500",    description: "Metode klasik pengajaran Al-Qur'an yang telah terbukti selama berabad-abad." },
-        Dirosa:       { color: "bg-cyan-500",      description: "Metode belajar membaca Al-Qur'an untuk orang dewasa." },
-        Wafa:         { color: "bg-lime-500",       description: "Metode pembelajaran Al-Qur'an berbasis otak kanan." },
-        "Grand PQ":   { color: "bg-pink-500",      description: "Metode menghafal Al-Qur'an dengan gerakan." },
-        "An-Nahdliyah":{ color: "bg-teal-500",    description: "Metode dari LPPTKA-BKPRMI Nahdlatul Ulama." },
-        Tartil:       { color: "bg-indigo-500",    description: "Membaca Al-Qur'an dengan pelan, jelas, dan benar makhraj-nya." },
-        Talaqqi:      { color: "bg-fuchsia-500",   description: "Menghafal langsung face-to-face dengan guru." },
-        Tafsir:       { color: "bg-sky-500",       description: "Pembelajaran makna dan tafsir ayat Al-Qur'an." },
+        Iqro: { color: "bg-emerald-500", description: "Metode belajar Al-Qur'an bertahap mulai dari huruf hijaiyah." },
+        Ummi: { color: "bg-blue-500", description: "Metode pembelajaran berbasis irama khas dengan prinsip talaqqi musyafahah." },
+        Tilawati: { color: "bg-violet-500", description: "Belajar membaca Al-Qur'an dengan lagu yang khas dan menyenangkan." },
+        Qiroati: { color: "bg-amber-500", description: "Metode terstruktur dari pengenalan huruf hingga tajwid." },
+        "Yanbu'a": { color: "bg-rose-500", description: "Metode tahfidz dan tartil Al-Qur'an dari Kudus." },
+        "Al-Baghdadi": { color: "bg-orange-500", description: "Metode klasik pengajaran Al-Qur'an yang telah terbukti selama berabad-abad." },
+        Dirosa: { color: "bg-cyan-500", description: "Metode belajar membaca Al-Qur'an untuk orang dewasa." },
+        Wafa: { color: "bg-lime-500", description: "Metode pembelajaran Al-Qur'an berbasis otak kanan." },
+        "Grand PQ": { color: "bg-pink-500", description: "Metode menghafal Al-Qur'an dengan gerakan." },
+        "An-Nahdliyah": { color: "bg-teal-500", description: "Metode dari LPPTKA-BKPRMI Nahdlatul Ulama." },
+        Tartil: { color: "bg-indigo-500", description: "Membaca Al-Qur'an dengan pelan, jelas, dan benar makhraj-nya." },
+        Talaqqi: { color: "bg-fuchsia-500", description: "Menghafal langsung face-to-face dengan guru." },
+        Tafsir: { color: "bg-sky-500", description: "Pembelajaran makna dan tafsir ayat Al-Qur'an." },
     }
     return methods[name] ?? { color: "bg-gray-500", description: "Metode pengajaran Al-Qur'an." }
 }
@@ -229,22 +232,22 @@ function buildRequirements(detail: TrainerDetail): RequirementItem[] {
     const profilOk = Boolean(detail.userName && detail.location)
     const profilEvidence = [
         { label: "Nama Lengkap & Gelar", value: detail.userName || "-" },
-        { label: "Domisili",             value: detail.location || "-" },
-        { label: "Pengalaman Mengajar",  value: `${detail.experienceYears || 0} Tahun` },
+        { label: "Domisili", value: detail.location || "-" },
+        { label: "Pengalaman Mengajar", value: `${detail.experienceYears || 0} Tahun` },
     ]
 
     // ─── 2. Kualifikasi & Metode ───────────────────────────────────────────────
     const modeString =
         detail.isOnline && detail.isOffline ? "Online & Offline"
-        : detail.isOnline                   ? "Online"
-        : detail.isOffline                  ? "Offline"
-        : "-"
+            : detail.isOnline ? "Online"
+                : detail.isOffline ? "Offline"
+                    : "-"
     const kualifikasiEvidence = [
-        { label: "Headline / Slogan",        value: detail.headline || "-" },
-        { label: "Biografi Singkat",         value: detail.bio || "-" },
-        { label: "Keahlian / Spesialisasi",  value: detail.expertise.join(", ") || "-" },
-        { label: "Mode Mengajar",            value: modeString },
-        { label: "Tarif Mengajar per Jam",   value: `${detail.currency || "IDR"} ${detail.hourlyRate || 0}` },
+        { label: "Headline / Slogan", value: detail.headline || "-" },
+        { label: "Biografi Singkat", value: detail.bio || "-" },
+        { label: "Keahlian / Spesialisasi", value: detail.expertise.join(", ") || "-" },
+        { label: "Mode Mengajar", value: modeString },
+        { label: "Tarif Mengajar per Jam", value: `${detail.currency || "IDR"} ${detail.hourlyRate || 0}` },
     ]
     const kualifikasiOk = detail.expertise.length > 0 || Boolean(detail.bio)
 
@@ -324,8 +327,8 @@ function RequirementModal({ item, onClose, onVerifyCredential, loadingCert }: { 
 
     const photoItems = item.evidence.filter(e => e.isPhoto)
     const videoItems = item.evidence.filter(e => e.isVideo)
-    const certItems  = item.evidence.filter(e => e.isCert)
-    const dataItems  = item.evidence.filter(e => !e.isPhoto && !e.isVideo && !e.isCert)
+    const certItems = item.evidence.filter(e => e.isCert)
+    const dataItems = item.evidence.filter(e => !e.isPhoto && !e.isVideo && !e.isCert)
 
     function getYoutubeThumbnail(url: string): string | null {
         const vid = extractYoutubeId(url)
@@ -377,7 +380,7 @@ function RequirementModal({ item, onClose, onVerifyCredential, loadingCert }: { 
                                     <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Media Verifikasi Hafalan</p>
                                     {videoItems.map((ev, idx) => {
                                         const thumb = ev.url ? getYoutubeThumbnail(ev.url) : null
-                                        const ytId  = ev.url ? extractYoutubeId(ev.url) : null
+                                        const ytId = ev.url ? extractYoutubeId(ev.url) : null
                                         return (
                                             <div key={`video-${idx}`} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800/40">
                                                 <div className="px-3 pt-3 pb-1">
@@ -451,7 +454,7 @@ function RequirementModal({ item, onClose, onVerifyCredential, loadingCert }: { 
                                             <div className="px-3 py-2.5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
                                                 <p className="text-xs font-bold text-gray-900 dark:text-white">{ev.label}</p>
                                                 {ev.value && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{ev.value}</p>}
-                                                
+
                                                 {onVerifyCredential && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); onVerifyCredential(ev); }}
@@ -550,7 +553,7 @@ function buildFallbackDetail(id: number): TrainerDetail {
     // Look up the name from dummyData to ensure consistency
     const found = dummyData.bookingDetails.map(bd => bd.trainer).find(t => t.id === Number(id))
     const simFound = SIM_TRAINERS[id as keyof typeof SIM_TRAINERS]
-    
+
     return {
         id,
         userId: simFound?.userId ?? id,
@@ -588,14 +591,14 @@ function GuruDetailContent() {
     const fromParam = searchParams?.get("from")
     const id = Number(params?.id)
 
-    const [loading, setLoading]         = useState(true)
-    const [error, setError]             = useState<string | null>(null)
-    const [detail, setDetail]           = useState<TrainerDetail | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [detail, setDetail] = useState<TrainerDetail | null>(null)
     const [actionLoading, setActionLoading] = useState<"approve" | "reject" | "suspend" | "unsuspend" | "bgcheck" | null>(null)
     const [certLoading, setCertLoading] = useState<string | null>(null)
     const router = useRouter()
     const defaultTab = (searchParams?.get("tab") as DetailTab) || "informasi"
-    const [tab, setTabState]            = useState<DetailTab>(defaultTab)
+    const [tab, setTabState] = useState<DetailTab>(defaultTab)
 
     useEffect(() => {
         const currentTab = searchParams?.get("tab") as DetailTab
@@ -610,15 +613,23 @@ function GuruDetailContent() {
     }
 
     const [activeRequirement, setActiveRequirement] = useState<RequirementItem | null>(null)
-    const [reviews, setReviews]         = useState<ReviewItem[]>([])
+    const [reviews, setReviews] = useState<ReviewItem[]>([])
     const [reviewsLoading, setReviewsLoading] = useState(false)
     const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
-    const [courses, setCourses]         = useState<CourseItem[]>([])
+    const [courses, setCourses] = useState<CourseItem[]>([])
     const [coursesLoading, setCoursesLoading] = useState(false)
-    const [coursesError, setCoursesError]   = useState<string | null>(null)
+    const [coursesError, setCoursesError] = useState<string | null>(null)
     const [selectedCourse, setSelectedCourse] = useState<CourseItem | null>(null)
     const [rejectModalOpen, setRejectModalOpen] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
+    const [copiedUserId, setCopiedUserId] = useState(false)
+
+    function copyUserId() {
+        if (!detail) return
+        navigator.clipboard.writeText(String(detail.userId)).catch(() => { })
+        setCopiedUserId(true)
+        setTimeout(() => setCopiedUserId(false), 2000)
+    }
 
     // ── Fetch detail ────────────────────────────────────────────────────────
     // ── Fetch detail ────────────────────────────────────────────────────────
@@ -640,10 +651,10 @@ function GuruDetailContent() {
                 const d = json?.data ?? json
                 const rawExpertise: string[] = d.expertise ?? d.subjects ?? []
                 const rawHeadline: string | null = d.headline ?? d.specialization ?? null
-                
+
                 const s = String(d.status ?? "pending").toLowerCase()
                 const validStatus: TrainerStatus = (s === "active" || s === "verified") ? "verified" : s === "suspended" ? "suspended" : s === "rejected" ? "rejected" : "pending"
-                
+
                 const uname = d.userName ?? d.name ?? `Guru #${id}`
                 setDetail({
                     id: d.id,
@@ -723,7 +734,7 @@ function GuruDetailContent() {
 
     useEffect(() => {
         if (!id || !detail?.userName) return
-        
+
         const token = getClientToken()
         const headers: HeadersInit = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 
@@ -806,10 +817,10 @@ function GuruDetailContent() {
             return
         }
         const endpoint =
-            action === "approve"   ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
-            : action === "reject"  ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
-            : action === "suspend" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/suspend`
-            :                        `${API_BASE_URL}/api/v1/Trainers/${detail.id}/unsuspend`
+            action === "approve" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
+                : action === "reject" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
+                    : action === "suspend" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/suspend`
+                        : `${API_BASE_URL}/api/v1/Trainers/${detail.id}/unsuspend`
 
         setActionLoading(action)
         try {
@@ -829,7 +840,7 @@ function GuruDetailContent() {
             } else {
                 await new Promise(resolve => setTimeout(resolve, 500))
             }
-            
+
             const titleMap: Record<typeof action, string> = {
                 approve: "Pendaftaran guru diterima", reject: "Pendaftaran guru ditolak",
                 suspend: "Guru dinonaktifkan", unsuspend: "Guru diaktifkan kembali",
@@ -884,7 +895,7 @@ function GuruDetailContent() {
                 }
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            
+
             showToast({
                 type: "success",
                 title: "Background Check Diminta",
@@ -920,7 +931,7 @@ function GuruDetailContent() {
                 const parts = ev.value.split(" | ")
                 if (parts[0]) issuer = parts[0].replace("Penerbit: ", "").trim()
             }
-            
+
             const payload = {
                 credentialType: "Certification",
                 credentialName: ev.label.replace("Sertifikat / Ijazah: ", "").trim(),
@@ -941,7 +952,7 @@ function GuruDetailContent() {
                 body: JSON.stringify(payload)
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            
+
             showToast({
                 type: "success",
                 title: "Dokumen Diverifikasi",
@@ -963,9 +974,9 @@ function GuruDetailContent() {
     return (
         <div className="bg-gray-50 dark:bg-gray-950 min-h-screen p-4">
             <ToastContainer />
-            <RequirementModal 
-                item={activeRequirement} 
-                onClose={() => setActiveRequirement(null)} 
+            <RequirementModal
+                item={activeRequirement}
+                onClose={() => setActiveRequirement(null)}
                 onVerifyCredential={handleVerifyCredential}
                 loadingCert={certLoading}
             />
@@ -983,7 +994,7 @@ function GuruDetailContent() {
                         </div>
                         <div className="mb-5">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Alasan Penolakan</label>
-                            <textarea 
+                            <textarea
                                 value={rejectReason}
                                 onChange={e => setRejectReason(e.target.value)}
                                 placeholder="Tulis alasan mengapa guru ini ditolak..."
@@ -993,11 +1004,11 @@ function GuruDetailContent() {
                         </div>
                         <div className="flex items-center gap-3 justify-end">
                             <button onClick={() => setRejectModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">Batal</button>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setRejectModalOpen(false)
                                     runAction("reject")
-                                }} 
+                                }}
                                 disabled={!rejectReason.trim()}
                                 className="px-4 py-2 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors inline-flex items-center gap-2"
                             >
@@ -1013,11 +1024,11 @@ function GuruDetailContent() {
                     <Link
                         href={
                             fromParam === "payments" ? `/${params?.lang}/billing/payments` :
-                            fromParam === "orders" ? `/${params?.lang}/billing/orders` :
-                            fromParam === "payout" ? `/${params?.lang}/billing/payout` :
-                            fromParam === "refund" ? `/${params?.lang}/billing/refund` :
-                            fromParam === "sertifikat" ? `/${params?.lang}/sertifikat` :
-                            `/${params?.lang}/teachers`
+                                fromParam === "orders" ? `/${params?.lang}/billing/orders` :
+                                    fromParam === "payout" ? `/${params?.lang}/billing/payout` :
+                                        fromParam === "refund" ? `/${params?.lang}/billing/refund` :
+                                            fromParam === "sertifikat" ? `/${params?.lang}/sertifikat` :
+                                                `/${params?.lang}/teachers`
                         }
                         className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all"
                     >
@@ -1049,59 +1060,185 @@ function GuruDetailContent() {
                     </div>
                 ) : (
                     <>
-                        <div className="flex items-center justify-end">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_CFG[detail.status]?.badge || "bg-gray-100 text-gray-700"}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_CFG[detail.status]?.dot || "bg-gray-500"}`} />
-                                {STATUS_CFG[detail.status]?.label || detail.status}
-                            </span>
-                        </div>
-
                         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
                             {/* ══ LEFT ══ */}
                             <div className="space-y-4 min-w-0">
-                                {/* Hero card */}
+
+                                {/* ── Hero card: Fungsional, compact, trust signals inline ── */}
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                    <div className="relative h-36 sm:h-40 bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500">
-                                        <div
-                                            className="absolute -bottom-10 left-5 rounded-2xl ring-4 ring-white dark:ring-gray-900 overflow-hidden w-20 h-20 cursor-pointer hover:opacity-90 transition-opacity bg-white dark:bg-gray-800 flex items-center justify-center"
-                                            onClick={() => detail.userImage && window.open(detail.userImage, "_blank")}
-                                        >
-                                            {detail.userImage ? (
-                                                <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
-                                            ) : (
-                                                <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{detail.userName.charAt(0).toUpperCase()}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="pt-12 px-5 pb-4">
-                                        <div className="flex justify-between items-start gap-4">
-                                            <div>
-                                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{detail.userName}</h2>
-                                                <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">{detail.headline || "Calon Pengajar"}</p>
+                                    {/* Accent bar — visual, bukan focal point */}
+                                    <div className="h-2 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400" />
+
+                                    <div className="p-5">
+                                        {/* Row 1: Avatar + Identity + Status badge */}
+                                        <div className="flex items-start gap-4">
+                                            {/* Avatar */}
+                                            <div
+                                                className="relative flex-shrink-0 rounded-2xl ring-4 ring-emerald-100 dark:ring-emerald-900/40 overflow-hidden w-16 h-16 cursor-pointer hover:opacity-90 transition-opacity bg-white dark:bg-gray-800 flex items-center justify-center shadow-md"
+                                                onClick={() => detail.userImage && window.open(detail.userImage, "_blank")}
+                                            >
+                                                {detail.userImage ? (
+                                                    <Image src={detail.userImage} alt={detail.userName} fill className="object-cover" unoptimized />
+                                                ) : (
+                                                    <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{detail.userName.charAt(0).toUpperCase()}</span>
+                                                )}
                                             </div>
-                                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700">ID User: {detail.userId}</span>
-                                                <Link href={`/${params?.lang || "en"}/users/manage/${detail.userId}`} className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5">
+
+                                            {/* Identity block */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center flex-wrap gap-2">
+                                                    <h2 className="text-xl font-extrabold text-gray-900 dark:text-white leading-tight">{detail.userName}</h2>
+                                                    {/* Status badge inline */}
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${STATUS_CFG[detail.status]?.badge || "bg-gray-100 text-gray-700"}`}>
+                                                        {detail.status === "verified" ? (
+                                                            <BadgeCheck className="w-3.5 h-3.5" />
+                                                        ) : detail.status === "pending" ? (
+                                                            <CircleDashed className="w-3.5 h-3.5" />
+                                                        ) : detail.status === "suspended" ? (
+                                                            <ShieldOff className="w-3.5 h-3.5" />
+                                                        ) : (
+                                                            <XCircle className="w-3.5 h-3.5" />
+                                                        )}
+                                                        {STATUS_CFG[detail.status]?.label || detail.status}
+                                                    </span>
+                                                </div>
+                                                {/* Headline — tagline profesional */}
+                                                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 leading-snug">
+                                                    {detail.headline || "Calon Pengajar Al-Qur'an"}
+                                                </p>
+                                                {/* Meta row: lokasi + pengalaman + mode */}
+                                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                                                        {detail.location || "—"}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock3 className="w-3.5 h-3.5 text-blue-500" />
+                                                        {detail.experienceYears} thn pengalaman
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        {detail.isOnline && detail.isOffline ? (
+                                                            <Globe className="w-3.5 h-3.5 text-teal-500" />
+                                                        ) : detail.isOnline ? (
+                                                            <Wifi className="w-3.5 h-3.5 text-sky-500" />
+                                                        ) : (
+                                                            <WifiOff className="w-3.5 h-3.5 text-gray-400" />
+                                                        )}
+                                                        {detail.isOnline && detail.isOffline ? "Online & Offline" : detail.isOnline ? "Online" : "Offline"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions: Lihat Profil User (right-aligned) */}
+                                            <div className="flex-shrink-0 hidden sm:block">
+                                                <Link
+                                                    href={`/${params?.lang || "en"}/users/manage/${detail.userId}`}
+                                                    className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                                                >
                                                     <User className="w-3.5 h-3.5" /> Lihat Profil User
                                                 </Link>
                                             </div>
                                         </div>
-                                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
-                                            <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-emerald-500" /> {detail.location || "-"}</span>
-                                            <span className="inline-flex items-center gap-1"><Clock3 className="w-3.5 h-3.5 text-blue-500" /> {detail.experienceYears} tahun pengalaman</span>
-                                            <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-violet-500" /> {detail.expertise.join(" • ") || "-"}</span>
+
+                                        {/* Row 2: Expertise multi-badge */}
+                                        {detail.expertise.length > 0 && (
+                                            <div className="mt-4 flex flex-wrap gap-1.5">
+                                                {detail.expertise.map(exp => {
+                                                    const info = getMethodInfo(exp)
+                                                    return (
+                                                        <span
+                                                            key={exp}
+                                                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white ${info.color}`}
+                                                            title={info.description}
+                                                        >
+                                                            <BookOpen className="w-3 h-3" />
+                                                            {exp}
+                                                        </span>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Row 3: ID User + copy */}
+                                        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">ID User</span>
+                                                <code className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                                                    {detail.userId}
+                                                </code>
+                                                <button
+                                                    onClick={copyUserId}
+                                                    title="Salin ID User"
+                                                    className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                                                >
+                                                    {copiedUserId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                                </button>
+                                                {copiedUserId && (
+                                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Tersalin!</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                                                <CalendarDays className="w-3.5 h-3.5" />
+                                                <span>Terdaftar {formatDate(detail.createdAt)}</span>
+                                            </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* ── Quick Stats Row: 4 stat cards horizontal ── */}
+                                <div className="grid grid-cols-4 gap-3">
+                                    {/* Kursus */}
+                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                            <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
+                                            Kursus
+                                        </div>
+                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{detail.totalCourses}</p>
+                                        <p className="text-[10px] text-gray-400">paket aktif</p>
+                                    </div>
+                                    {/* Murid */}
+                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                            <Users className="w-3.5 h-3.5 text-blue-500" />
+                                            Murid
+                                        </div>
+                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{detail.totalStudents}</p>
+                                        <p className="text-[10px] text-gray-400">terdaftar</p>
+                                    </div>
+                                    {/* Rating */}
+                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                            <Star className="w-3.5 h-3.5 text-amber-500" />
+                                            Rating
+                                        </div>
+                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">
+                                            {detail.averageRating > 0 ? detail.averageRating.toFixed(1) : "—"}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">{detail.totalReviews} ulasan</p>
+                                    </div>
+                                    {/* Tarif */}
+                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                            <Coins className="w-3.5 h-3.5 text-violet-500" />
+                                            Tarif/Jam
+                                        </div>
+                                        <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                                            {formatCurrency(detail.hourlyRate, detail.currency)}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">per jam</p>
                                     </div>
                                 </div>
 
                                 {/* Tabs */}
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                    <div className="grid grid-cols-4 border-b border-gray-100 dark:border-gray-800">
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 border-b border-gray-100 dark:border-gray-800">
                                         {[
                                             { key: "informasi" as const, label: "Informasi", icon: Info },
-                                            { key: "paket"     as const, label: "Paket",     icon: FileText },
-                                            { key: "galeri"    as const, label: "Galeri",    icon: ImageIcon },
-                                            { key: "ulasan"    as const, label: "Ulasan",    icon: MessageSquare },
+                                            { key: "paket" as const, label: "Paket", icon: FileText },
+                                            { key: "pesanan" as const, label: "Pesanan", icon: ShoppingCart },
+                                            { key: "wallet" as const, label: "Wallet", icon: Wallet },
+                                            { key: "galeri" as const, label: "Galeri", icon: ImageIcon },
+                                            { key: "ulasan" as const, label: "Ulasan", icon: MessageSquare },
                                         ].map(item => {
                                             const active = tab === item.key
                                             const Icon = item.icon
@@ -1109,11 +1246,10 @@ function GuruDetailContent() {
                                                 <button
                                                     key={item.key}
                                                     onClick={() => setTab(item.key)}
-                                                    className={`py-3 text-sm font-semibold inline-flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                                                        active
+                                                    className={`py-3 text-sm font-semibold inline-flex items-center justify-center gap-2 border-b-2 transition-colors ${active
                                                             ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/10"
                                                             : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <Icon className="w-4 h-4" />
                                                     {item.label}
@@ -1124,23 +1260,23 @@ function GuruDetailContent() {
 
                                     {/* Tab: Informasi */}
                                     {tab === "informasi" && (
-                                        <div className="p-4 sm:p-5 space-y-4">
-                                            <InfoCard icon={<Quote className="w-4 h-4 text-emerald-600" />} title="Tentang Pengajar" body={detail.bio || "Calon guru belum mengisi deskripsi diri."} />
-                                            <InfoCard
-                                                icon={<BookOpen className="w-4 h-4 text-blue-600" />}
-                                                title="Tentang Kursus"
-                                                body={`Kursus ini dirancang untuk membantu Anda menguasai ${detail.expertise.slice(0, 2).join(" dan ")} dengan bimbingan langsung. Setiap sesi berlangsung secara ${detail.isOnline ? "online" : ""}${detail.isOnline && detail.isOffline ? " atau " : ""}${detail.isOffline ? "offline" : ""}, dengan materi yang disesuaikan dengan kemampuan dan kebutuhan masing-masing santri.`}
-                                            />
-                                            {/* Metode Belajar */}
+                                        <div className="p-4 sm:p-5 space-y-5">
+
+                                            {/* ── Bio: Tentang Pengajar ── */}
+                                            <InfoCard icon={<Quote className="w-4 h-4 text-emerald-600" />} title="Tentang Pengajar" body={detail.bio || "Guru ini belum mengisi deskripsi diri."} />
+
+                                            {/* ── Keahlian & Metode Mengajar ── */}
                                             <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <BookOpen className="w-4 h-4 text-violet-600" />
-                                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">Metode Belajar</h3>
+                                                    <div className="w-7 h-7 rounded-lg bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                                                        <BookOpen className="w-4 h-4 text-violet-600" />
+                                                    </div>
+                                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">Keahlian & Metode Mengajar</h3>
                                                 </div>
                                                 {detail.expertise.length === 0 ? (
-                                                    <p className="text-sm text-gray-500">Belum ada metode yang disubmit.</p>
+                                                    <p className="text-sm text-gray-500">Belum ada keahlian yang disubmit.</p>
                                                 ) : (
-                                                    <div className="space-y-2">
+                                                    <div className="space-y-2.5">
                                                         {detail.expertise.map(method => {
                                                             const info = getMethodInfo(method)
                                                             const abbrev = getMethodAbbrev(method)
@@ -1151,58 +1287,183 @@ function GuruDetailContent() {
                                                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${info.color}`}>
                                                                         {abbrev}
                                                                     </div>
-                                                                    <div className="min-w-0">
+                                                                    <div className="min-w-0 flex-1">
                                                                         <p className="text-sm font-bold text-gray-900 dark:text-white">{method}</p>
                                                                         <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5 leading-snug">{desc}</p>
                                                                     </div>
+                                                                    {/* Badge expertise */}
+                                                                    <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${info.color}`}>
+                                                                        {method}
+                                                                    </span>
                                                                 </div>
                                                             )
                                                         })}
                                                     </div>
                                                 )}
                                             </div>
-                                            {/* Sertifikat */}
+
+                                            {/* ── Kredensial & Sertifikasi ── */}
                                             <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <Award className="w-4 h-4 text-amber-600" />
-                                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">Sertifikat</h3>
+                                                <div className="flex items-center justify-between gap-2 mb-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 rounded-lg bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                                                            <Award className="w-4 h-4 text-amber-600" />
+                                                        </div>
+                                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">Kredensial & Sertifikasi</h3>
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50">
+                                                        {detail.certifications.length} sertifikat
+                                                    </span>
                                                 </div>
+
                                                 {detail.certifications.length === 0 ? (
-                                                    <div className="text-center py-6 text-gray-400">
-                                                        <Award className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                                                        <p className="text-sm">Belum ada sertifikat yang diunggah.</p>
+                                                    <div className="text-center py-8 text-gray-400">
+                                                        <Award className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                                                        <p className="text-sm font-medium">Belum ada sertifikat yang diunggah.</p>
+                                                        <p className="text-xs mt-1 opacity-60">Guru perlu mengunggah ijazah/sertifikat untuk verifikasi.</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-2 gap-3">
+                                                    <div className="space-y-3">
                                                         {detail.certifications.map((cert, idx) => (
-                                                            <div key={`${cert.name}-${idx}`} className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
-                                                                {cert.url ? (
-                                                                    <div className="aspect-[4/3] relative">
-                                                                        <Image src={cert.url} alt={cert.name || "Sertifikat"} fill className="object-cover" unoptimized />
+                                                            <div
+                                                                key={`${cert.name}-${idx}`}
+                                                                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+                                                            >
+                                                                <div className="flex gap-4 p-4">
+                                                                    {/* Thumbnail sertifikat */}
+                                                                    {cert.url ? (
+                                                                        <a href={cert.url} target="_blank" rel="noreferrer" className="flex-shrink-0 group">
+                                                                            <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/20 relative">
+                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                                <img
+                                                                                    src={cert.url}
+                                                                                    alt={cert.name || "Sertifikat"}
+                                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                                                                                />
+                                                                            </div>
+                                                                        </a>
+                                                                    ) : (
+                                                                        <div className="flex-shrink-0 w-16 h-16 rounded-lg border border-dashed border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+                                                                            <Award className="w-7 h-7 text-amber-300 dark:text-amber-600" />
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Detail sertifikat */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                                                                            {cert.name || `Sertifikat ${idx + 1}`}
+                                                                        </p>
+                                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                                            {cert.issuer || "—"}
+                                                                        </p>
+                                                                        {/* Tanggal terbit & kadaluarsa */}
+                                                                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                                                                <CalendarDays className="w-3 h-3" />
+                                                                                Terbit: <span className="font-semibold text-gray-600 dark:text-gray-300">{formatDate(cert.issuedDate)}</span>
+                                                                            </span>
+                                                                            {cert.expiryDate && (
+                                                                                <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                                                                    <CalendarDays className="w-3 h-3" />
+                                                                                    Berlaku s/d: <span className="font-semibold text-gray-600 dark:text-gray-300">{formatDate(cert.expiryDate)}</span>
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {/* TODO: credentialId field not in current API schema — tambahkan saat endpoint update */}
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="aspect-[4/3] bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/20 flex flex-col items-center justify-center gap-1">
-                                                                        <Award className="w-8 h-8 text-amber-400 opacity-60" />
+                                                                </div>
+
+                                                                {/* Link verifikasi + tombol Tandai Valid */}
+                                                                {(cert.url) && (
+                                                                    <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 flex items-center justify-between gap-2 bg-gray-50/50 dark:bg-gray-800/30">
+                                                                        <a
+                                                                            href={cert.url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                                                                        >
+                                                                            <ExternalLink className="w-3.5 h-3.5" /> Buka Dokumen
+                                                                        </a>
+                                                                        <button
+                                                                            onClick={() => handleVerifyCredential({
+                                                                                label: `Sertifikat / Ijazah: ${cert.name || `Sertifikat ${idx + 1}`}`,
+                                                                                value: `Penerbit: ${cert.issuer || "—"} | Diterbitkan: ${formatDate(cert.issuedDate)}${cert.expiryDate ? ` | Berlaku hingga: ${formatDate(cert.expiryDate)}` : ""}`,
+                                                                                url: cert.url,
+                                                                                isCert: true,
+                                                                            })}
+                                                                            disabled={certLoading === cert.url}
+                                                                            className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {certLoading === cert.url ? (
+                                                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                                            ) : (
+                                                                                <ShieldCheck className="w-3 h-3" />
+                                                                            )}
+                                                                            Tandai Valid
+                                                                        </button>
                                                                     </div>
                                                                 )}
-                                                                <div className="p-2">
-                                                                    <p className="text-[11px] font-bold text-gray-900 dark:text-white leading-snug flex items-start gap-1">
-                                                                        <Award className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
-                                                                        {cert.name || `Sertifikat ${idx + 1}`}
-                                                                    </p>
-                                                                    <p className="text-[10px] text-gray-400 mt-0.5">{cert.issuer || "—"}</p>
-                                                                    <p className="text-[10px] text-gray-300 dark:text-gray-600">{formatDate(cert.issuedDate)}</p>
-                                                                    {cert.url && (
-                                                                        <a href={cert.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] text-emerald-600 hover:underline break-all">
-                                                                            <ExternalLink className="w-2.5 h-2.5" /> Buka
-                                                                        </a>
-                                                                    )}
-                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* ── Portofolio URLs ── */}
+                                            {detail.portfolioUrls.length > 0 && (
+                                                <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <div className="w-7 h-7 rounded-lg bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                                                            <LinkIcon className="w-4 h-4 text-sky-600" />
+                                                        </div>
+                                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">Portofolio & Media</h3>
+                                                        <span className="ml-auto text-[11px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800/50">
+                                                            {detail.portfolioUrls.length} item
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {detail.portfolioUrls.map((url, idx) => {
+                                                            const kind = detectMediaKind(url)
+                                                            const ytId = extractYoutubeId(url)
+                                                            return (
+                                                                <a
+                                                                    key={idx}
+                                                                    href={url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-600 transition-colors group"
+                                                                >
+                                                                    {/* Thumbnail / icon */}
+                                                                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                                                        {kind === "video" && ytId ? (
+                                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                                            <img
+                                                                                src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`}
+                                                                                alt="video thumbnail"
+                                                                                className="w-full h-full object-cover"
+                                                                            />
+                                                                        ) : kind === "image" ? (
+                                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                                            <img src={url} alt="portfolio" className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
+                                                                        ) : (
+                                                                            <LinkIcon className="w-5 h-5 text-gray-400" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                                                            {kind === "video" ? "📹 Video" : kind === "image" ? "🖼️ Gambar" : "🔗 Link"}{" "}
+                                                                            Portofolio #{idx + 1}
+                                                                        </p>
+                                                                        <p className="text-[10px] text-gray-400 truncate mt-0.5">{url}</p>
+                                                                    </div>
+                                                                    <ExternalLink className="w-4 h-4 text-gray-300 group-hover:text-sky-500 flex-shrink-0 transition-colors" />
+                                                                </a>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -1368,7 +1629,7 @@ function GuruDetailContent() {
                                                                 <div className="flex flex-col items-center flex-shrink-0">
                                                                     <p className="text-5xl font-black text-gray-900 dark:text-white leading-none">{avgRating.toFixed(1)}</p>
                                                                     <div className="flex items-center gap-0.5 my-2">
-                                                                        {[1,2,3,4,5].map(s => <Star key={s} className={`w-4 h-4 ${s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />)}
+                                                                        {[1, 2, 3, 4, 5].map(s => <Star key={s} className={`w-4 h-4 ${s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />)}
                                                                     </div>
                                                                     <p className="text-xs text-gray-400">{total} ulasan</p>
                                                                 </div>
@@ -1402,7 +1663,7 @@ function GuruDetailContent() {
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between gap-2 flex-wrap">
                                                                         <p className="text-xs font-bold text-gray-900 dark:text-white">{rev.reviewerName}</p>
-                                                                        <p 
+                                                                        <p
                                                                             className="text-[10px] text-gray-400 cursor-default relative group/date"
                                                                         >
                                                                             {formatDate(rev.createdAt)}
@@ -1416,7 +1677,7 @@ function GuruDetailContent() {
                                                                         </p>
                                                                     </div>
                                                                     <div className="flex items-center gap-0.5 mt-0.5 mb-2">
-                                                                        {[1,2,3,4,5].map(s => <Star key={s} className={`w-3 h-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />)}
+                                                                        {[1, 2, 3, 4, 5].map(s => <Star key={s} className={`w-3 h-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />)}
                                                                         <span className="text-[10px] text-gray-500 ml-1">{rev.rating}/5</span>
                                                                     </div>
                                                                     {rev.comment ? (
@@ -1432,86 +1693,219 @@ function GuruDetailContent() {
                                             )}
                                         </div>
                                     )}
+
+                                    {/* Tab: Pesanan */}
+                                    {tab === "pesanan" && (
+                                        <TeacherOrdersTab trainerId={detail.id} locale={(Array.isArray(params?.lang) ? params.lang[0] : params?.lang) || "id"} />
+                                    )}
+
+                                    {/* Tab: Wallet */}
+                                    {tab === "wallet" && (
+                                        <TeacherWalletTab trainerId={detail.id} />
+                                    )}
                                 </div>
                             </div>
 
                             {/* ══ RIGHT SIDEBAR ══ */}
-                            <div className="space-y-4">
-                                
-                                {/* Status Actions untuk non-pending */}
+                            <div className="space-y-3">
+
+                                {/* ── Card: Tindakan ── */}
                                 {detail.status !== "pending" && (
-                                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Tindakan</h3>
-                                        
-                                        {/* Background Check Button */}
-                                        <div className="mb-4 space-y-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-                                            {detail.bgCheckStatus === "completed" ? (
-                                                <div className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-semibold py-2">
-                                                    <CheckCircle2 className="w-4 h-4" /> Lolos Background Check
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        onClick={handleBackgroundCheck}
-                                                        disabled={!!actionLoading || detail.bgCheckStatus === "requested"}
-                                                        className={`w-full inline-flex items-center justify-center gap-2 rounded-lg disabled:opacity-80 text-white text-sm font-semibold py-2 ${detail.bgCheckStatus === "requested" ? "bg-indigo-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"}`}
-                                                    >
-                                                        {actionLoading === "bgcheck" ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                                                            detail.bgCheckStatus === "requested" ? <Hourglass className="w-4 h-4 animate-pulse" /> : <ShieldCheck className="w-4 h-4" />}
-                                                        {detail.bgCheckStatus === "requested" ? "Pemeriksaan Berjalan..." : "Minta Background Check"}
-                                                    </button>
-                                                    {detail.bgCheckStatus === "requested" && (
-                                                        <button
-                                                            onClick={() => setDetail(prev => prev ? { ...prev, bgCheckStatus: "completed" } : null)}
-                                                            className="w-full mt-1.5 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-semibold py-1.5 transition-colors"
-                                                        >
-                                                            [Testing] Selesaikan Pemeriksaan
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
+                                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        {/* Header dengan left accent */}
+                                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 dark:border-gray-800 border-l-4 border-l-blue-500">
+                                            <ShieldCheck className="w-4 h-4 text-blue-500" />
+                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Tindakan Admin</h3>
                                         </div>
 
-                                        {detail.status === "verified" && (
-                                            <button
-                                                onClick={() => runAction("suspend")}
-                                                disabled={!!actionLoading}
-                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                            >
-                                                {actionLoading === "suspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldOff className="w-4 h-4" />} Nonaktifkan
-                                            </button>
-                                        )}
-                                        {detail.status === "suspended" && (
-                                            <button
-                                                onClick={() => runAction("unsuspend")}
-                                                disabled={!!actionLoading}
-                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                            >
-                                                {actionLoading === "unsuspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Aktifkan Kembali
-                                            </button>
-                                        )}
-                                        {detail.status === "rejected" && (
-                                            <button
-                                                onClick={() => runAction("approve")}
-                                                disabled={!!actionLoading || !allRequiredOk}
-                                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-semibold py-2"
-                                            >
-                                                {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Terima Sekarang
-                                            </button>
-                                        )}
+                                        <div className="p-4 space-y-2.5">
+                                            {/* Background Check */}
+                                            <div className="pb-3 border-b border-gray-100 dark:border-gray-800 space-y-2">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Verifikasi Latar Belakang</p>
+                                                {detail.bgCheckStatus === "completed" ? (
+                                                    <div className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-bold py-2.5">
+                                                        <CheckCircle2 className="w-4 h-4" /> Lolos Background Check
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={handleBackgroundCheck}
+                                                            disabled={!!actionLoading || detail.bgCheckStatus === "requested"}
+                                                            className={`w-full inline-flex items-center justify-center gap-2 rounded-xl disabled:opacity-80 text-white text-sm font-semibold py-2.5 transition-colors ${detail.bgCheckStatus === "requested"
+                                                                    ? "bg-indigo-400 cursor-not-allowed"
+                                                                    : "bg-blue-500 hover:bg-blue-600"
+                                                                }`}
+                                                        >
+                                                            {actionLoading === "bgcheck" ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : detail.bgCheckStatus === "requested" ? (
+                                                                <Hourglass className="w-4 h-4 animate-pulse" />
+                                                            ) : (
+                                                                <ShieldCheck className="w-4 h-4" />
+                                                            )}
+                                                            {detail.bgCheckStatus === "requested" ? "Pemeriksaan Berjalan..." : "Minta Background Check"}
+                                                        </button>
+                                                        {detail.bgCheckStatus === "requested" && (
+                                                            <button
+                                                                onClick={() => setDetail(prev => prev ? { ...prev, bgCheckStatus: "completed" } : null)}
+                                                                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold py-1.5 transition-colors"
+                                                            >
+                                                                [Testing] Selesaikan Pemeriksaan
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Status-dependent actions */}
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Status Guru</p>
+                                                {detail.status === "verified" && (
+                                                    <button
+                                                        onClick={() => runAction("suspend")}
+                                                        disabled={!!actionLoading}
+                                                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 hover:border-red-500 text-red-600 dark:text-red-400 hover:text-white text-sm font-bold py-2.5 transition-all disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === "suspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldOff className="w-4 h-4" />}
+                                                        Nonaktifkan Guru
+                                                    </button>
+                                                )}
+                                                {detail.status === "suspended" && (
+                                                    <button
+                                                        onClick={() => runAction("unsuspend")}
+                                                        disabled={!!actionLoading}
+                                                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-sm font-bold py-2.5 transition-colors"
+                                                    >
+                                                        {actionLoading === "unsuspend" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                                                        Aktifkan Kembali
+                                                    </button>
+                                                )}
+                                                {detail.status === "rejected" && (
+                                                    <button
+                                                        onClick={() => runAction("approve")}
+                                                        disabled={!!actionLoading || !allRequiredOk}
+                                                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-sm font-bold py-2.5 transition-colors"
+                                                    >
+                                                        {actionLoading === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
+                                                        Terima Sekarang
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
-                                {/* Statistik */}
-                                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
-                                    <StatRow icon={<BookOpen className="w-3.5 h-3.5" />} label="Kursus"  value={`${detail.totalCourses}`} />
-                                    <StatRow icon={<User className="w-3.5 h-3.5" />}     label="Murid"   value={`${detail.totalStudents}`} />
-                                    <StatRow icon={<BadgeCheck className="w-3.5 h-3.5" />} label="Rating" value={`${detail.averageRating.toFixed(1)} (${detail.totalReviews} ulasan)`} />
-                                    <StatRow icon={<Clock3 className="w-3.5 h-3.5" />}   label="Daftar"  value={formatDate(detail.createdAt)} />
-                                    <StatRow icon={<Coins className="w-3.5 h-3.5" />}    label="Tarif"   value={`${formatCurrency(detail.hourlyRate, detail.currency)} / jam`} />
-                                    <StatRow icon={<Mail className="w-3.5 h-3.5" />}     label="ID User" value={`${detail.userId}`} />
-                                    <StatRow icon={<PlayCircle className="w-3.5 h-3.5" />} label="Mode"  value={`${detail.isOnline ? "Online" : "-"}${detail.isOnline && detail.isOffline ? " / " : ""}${detail.isOffline ? "Offline" : ""}`} />
+                                {/* ── Card: Info Akun ── */}
+                                <div className="bg-slate-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                                        <User className="w-4 h-4 text-gray-500" />
+                                        <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">Info Akun</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        {/* ID User + copy */}
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">ID User</p>
+                                            <div className="flex items-center gap-1.5">
+                                                <code className="flex-1 text-xs font-mono text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-lg truncate">
+                                                    {detail.userId}
+                                                </code>
+                                                <button
+                                                    onClick={copyUserId}
+                                                    title="Salin ID User"
+                                                    className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all flex-shrink-0 ${copiedUserId
+                                                            ? "bg-emerald-50 border-emerald-300 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400"
+                                                            : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-emerald-600 hover:border-emerald-400"
+                                                        }`}
+                                                >
+                                                    {copiedUserId
+                                                        ? <Check className="w-3.5 h-3.5" />
+                                                        : <Copy className="w-3.5 h-3.5" />
+                                                    }
+                                                </button>
+                                            </div>
+                                            {copiedUserId && (
+                                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">✓ Tersalin ke clipboard</p>
+                                            )}
+                                        </div>
+
+                                        {/* Tgl Daftar */}
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                                                <CalendarDays className="w-3.5 h-3.5" />
+                                                Tgl Daftar
+                                            </span>
+                                            <span className="font-semibold text-gray-800 dark:text-gray-200">{formatDate(detail.createdAt)}</span>
+                                        </div>
+
+                                        {/* Mode Mengajar */}
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                                                {detail.isOnline && detail.isOffline ? (
+                                                    <Globe className="w-3.5 h-3.5" />
+                                                ) : detail.isOnline ? (
+                                                    <Wifi className="w-3.5 h-3.5" />
+                                                ) : (
+                                                    <WifiOff className="w-3.5 h-3.5" />
+                                                )}
+                                                Mode
+                                            </span>
+                                            <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                                {detail.isOnline && detail.isOffline ? "Online & Offline"
+                                                    : detail.isOnline ? "Online"
+                                                        : "Offline"}
+                                            </span>
+                                        </div>
+
+                                        {/* Tarif */}
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                                                <Coins className="w-3.5 h-3.5" />
+                                                Tarif/Jam
+                                            </span>
+                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                {formatCurrency(detail.hourlyRate, detail.currency)}
+                                            </span>
+                                        </div>
+
+                                        {/* Link Profil User */}
+                                        <Link
+                                            href={`/${params?.lang || "en"}/users/manage/${detail.userId}`}
+                                            className="mt-1 w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-2 rounded-xl transition-colors"
+                                        >
+                                            <User className="w-3.5 h-3.5" />
+                                            Lihat Profil User
+                                        </Link>
+                                    </div>
                                 </div>
+
+                                {/* ── Card: Statistik Pengajaran ── */}
+                                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                                        <Star className="w-4 h-4 text-amber-500" />
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Statistik Pengajaran</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        {/* Rating besar */}
+                                        {detail.averageRating > 0 && (
+                                            <div className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+                                                <p className="text-4xl font-black text-gray-900 dark:text-white leading-none">{detail.averageRating.toFixed(1)}</p>
+                                                <div>
+                                                    <div className="flex items-center gap-0.5">
+                                                        {[1, 2, 3, 4, 5].map(s => (
+                                                            <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(detail.averageRating) ? "fill-amber-400 text-amber-400" : "text-gray-200 dark:text-gray-700"}`} />
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">{detail.totalReviews} ulasan</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <StatRow icon={<BookOpen className="w-3.5 h-3.5 text-emerald-500" />} label="Total Kursus" value={`${detail.totalCourses}`} />
+                                        <StatRow icon={<Users className="w-3.5 h-3.5 text-blue-500" />} label="Total Murid" value={`${detail.totalStudents}`} />
+                                        <StatRow icon={<Award className="w-3.5 h-3.5 text-amber-500" />} label="Sertifikat" value={`${detail.certifications.length}`} />
+                                        <StatRow icon={<LinkIcon className="w-3.5 h-3.5 text-sky-500" />} label="Portfolio" value={`${detail.portfolioUrls.length} item`} />
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </>
@@ -1534,11 +1928,10 @@ function GuruDetailContent() {
                         </div>
                         <div className="overflow-y-auto p-5 space-y-4">
                             <div className="flex flex-wrap gap-2">
-                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                                    selectedCourse.isPublished
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${selectedCourse.isPublished
                                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                                         : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                                }`}>
+                                    }`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${selectedCourse.isPublished ? "bg-emerald-500" : "bg-gray-400"}`} />
                                     {selectedCourse.isPublished ? "Published" : "Unpublished"}
                                 </span>

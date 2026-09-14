@@ -61,5 +61,130 @@
     "previous": "السابق",
     "next": "التالي",
     "showing": "عرض {start} - {end} من {total} مستخدمين"
+  },
+  "user_detail": {
+    "back": "رجوع",
+    "title": "تفاصيل المستخدم",
+    "subtitle": "الملف والنشاط والسجل",
+    "not_found": "لم يتم العثور على بيانات المستخدم",
+    "member_badge": "عضو",
+    "stats": {
+      "orders": "إجمالي الطلبات",
+      "spent": "إجمالي الإنفاق",
+      "setoran": "إجمالي الإيداعات",
+      "last_activity": "آخر نشاط"
+    },
+    "tabs": {
+      "overview": "نظرة عامة",
+      "kyc": "التحقق من الهوية",
+      "wallet": "المحفظة",
+      "orders": "الطلبات",
+      "setoran": "الإيداعات",
+      "log": "السجل"
+    },
+    "overview": {
+      "personal_title": "تفاصيل المعلومات الشخصية",
+      "account_title": "تفاصيل الحساب",
+      "location_title": "الموقع والأجهزة",
+      "full_name": "الاسم الكامل",
+      "username": "اسم المستخدم",
+      "email": "البريد الإلكتروني",
+      "phone": "رقم الهاتف",
+      "gender": "الجنس",
+      "male": "ذكر",
+      "female": "أنثى",
+      "birth_date": "تاريخ الميلاد",
+      "bio": "نبذة",
+      "not_filled": "غير مكتمل",
+      "role": "الدور",
+      "role_member": "عضو",
+      "status": "الحالة",
+      "status_active": "نشط",
+      "status_blocked": "محظور",
+      "joined": "تاريخ الانضمام",
+      "balance": "رصيد قرآني",
+      "device": "آخر جهاز",
+      "os_version": "النظام / الإصدار",
+      "unknown": "غير معروف"
+    },
+    "kyc": {
+      "title": "التحقق من الهوية",
+      "subtitle": "اكتمال مستندات KYC",
+      "verified": "موثّق",
+      "pending": "قيد الانتظار",
+      "unverified": "غير موثّق",
+      "rejected": "مرفوض",
+      "review": "قيد المراجعة",
+      "submitted": "تم الإرسال",
+      "identity_title": "الهوية",
+      "ktp_label": "رقم الهوية",
+      "ktp_photo": "صورة الهوية",
+      "face_photo": "صورة الوجه / سيلفي",
+      "available": "متاح",
+      "not_available": "غير متاح",
+      "view_document": "عرض المستند",
+      "print_label": "طباعة الملصق",
+      "copy_id": "نسخ المعرّف",
+      "resubmit": "طلب إعادة الإرسال",
+      "resubmit_hint": "أشعر المستخدم لإعادة إرسال KYC.",
+      "loading": "جاري تحميل بيانات KYC..."
+    },
+    "setoran": {
+      "title": "إجمالي الإيداعات",
+      "loading": "جاري تحميل بيانات الإيداع...",
+      "empty": "لا توجد إيداعات من هذا المستخدم بعد.",
+      "approval_warning": "يتطلب الإيداع موافقة البنك الافتراضي قبل التفعيل.",
+      "user_districts": "المناطق",
+      "user_regencies": "المحافظات",
+      "results_header": "نتائج الإيداع",
+      "conclusion": "الخلاصة",
+      "score": "النتيجة",
+      "penyetor": "المودِع",
+      "penerima": "المستلم",
+      "region": "المنطقة",
+      "bank": "البنك",
+      "no_name_match": "الاسم غير مطابق",
+      "lulus": "ناجح",
+      "tidak_lulus": "راسب",
+      "approve_tooltip": "الموافقة على هذا الإيداع",
+      "reject_tooltip": "رفض هذا الإيداع",
+      "pagination": "عرض {{from}}-{{to}} من {{total}} إيداع"
+    },
+    "orders": {
+      "title": "سجل الطلبات",
+      "loading": "جاري تحميل بيانات الطلبات...",
+      "empty": "لم يتم العثور على طلبات.",
+      "columns": {
+        "order_id": "معرّف الطلب",
+        "package": "الباقة",
+        "trainer": "المعلم",
+        "mode": "الوضع",
+        "sessions": "الجلسات",
+        "price": "السعر",
+        "status": "الحالة",
+        "date": "التاريخ"
+      },
+      "status": {
+        "pending": "قيد الانتظار",
+        "active": "نشط",
+        "cancelled": "ملغي",
+        "completed": "مكتمل",
+        "waiting_teacher": "بانتظار المعلم"
+      },
+      "session_label": "جلسات",
+      "detail": "تفاصيل",
+      "no_details": "لا توجد تفاصيل بعد."
+    },
+    "log": {
+      "title": "سجل النشاط",
+      "loading": "جاري تحميل سجل النشاط...",
+      "empty": "لا يوجد سجل نشاط بعد."
+    },
+    "toasts": {
+      "copied": "تم النسخ إلى الحافظة!",
+      "copy_failed": "فشل النسخ",
+      "resubmit": "تم إرسال طلب إعادة إرسال KYC بنجاح",
+      "resubmit_error": "فشل إرسال الطلب"
+    }
   }
 }

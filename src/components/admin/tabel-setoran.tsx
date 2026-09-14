@@ -41,6 +41,7 @@ import {
 import { getRecapAllAdmin } from "@/utils/api/recaps/fetch"
 import { toast } from "sonner"
 import { IRecap } from "@/types/recap"
+import { SIM_SETORANS } from "@/data/sim-setoran"
 import { useRouter } from "next/navigation"
 import { useI18n } from "../providers/i18n-provider"
 import Link from "next/link"
@@ -240,8 +241,9 @@ export function HasilSetoranTableContent() {
 
     // Aggregate all pages data
     const recapsData = useMemo(() => {
-        if (!data) return []
-        return data.flatMap(page => page?.data || [])
+        if (!data) return [...SIM_SETORANS]
+        const apiRows = data.flatMap(page => page?.data || [])
+        return [...apiRows, ...SIM_SETORANS]
     }, [data])
 
     // Check if there's more data

@@ -271,6 +271,97 @@
       },
       "empty": "لم يتم العثور على مدفوعات.",
       "loading": "جاري تحميل بيانات الدفع..."
+    },
+    "wallet_page": {
+      "title": "إدارة محفظة المستخدم",
+      "subtitle": "عرض تفاصيل الملف ومعلومات المحفظة وسجل المعاملات"
+    },
+    "wallet_detail": {
+      "title": "معلومات المحفظة",
+      "status_label": "الحالة:",
+      "status_active": "نشط",
+      "status_suspended": "موقوف",
+      "reason_label": "السبب:",
+      "id_label": "المعرّف:",
+      "set_limit": "تعيين الحد",
+      "activate": "تفعيل",
+      "suspend": "إيقاف",
+      "active_balance": "الرصيد النشط",
+      "pending_balance": "الرصيد المعلّق",
+      "total_transactions": "إجمالي المعاملات",
+      "transactions": "معاملة",
+      "history_title": "سجل المعاملات",
+      "empty_history": "لا يوجد سجل معاملات بعد",
+      "no_reason": "لا يوجد سبب إيقاف مسجل.",
+      "internal_id": "داخلي: #{{id}}",
+      "internal_tx": "معاملة داخلية",
+      "description_fallback": "معاملة",
+      "detail": "تفاصيل",
+      "tx_types": {
+        "topup": "شحن",
+        "withdraw": "سحب",
+        "transfer": "تحويل",
+        "payment": "دفع",
+        "other": "أخرى"
+      },
+      "tx_status": {
+        "success": "ناجح",
+        "pending": "قيد الانتظار",
+        "failed": "فشل"
+      },
+      "rel": {
+        "just_now": "الآن",
+        "minutes": "قبل {{count}} دقيقة",
+        "hours": "قبل {{count}} ساعة",
+        "days": "قبل {{count}} يوم"
+      },
+      "table": {
+        "id": "المعرّف",
+        "category": "الفئة",
+        "amount": "المبلغ",
+        "status": "الحالة",
+        "date": "التاريخ",
+        "action": "الإجراء"
+      },
+      "limit_modal": {
+        "title": "تعديل حد المحفظة",
+        "daily_topup": "حد الشحن اليومي",
+        "daily_withdraw": "حد السحب اليومي",
+        "daily_transfer": "حد التحويل اليومي",
+        "min_withdraw": "الحد الأدنى للسحب",
+        "max_balance": "الحد الأقصى للرصيد",
+        "optional_topup": "اختياري (مثل: 10000000)",
+        "optional_withdraw": "اختياري (مثل: 5000000)",
+        "optional_transfer": "اختياري (مثل: 5000000)",
+        "optional_min": "اختياري (مثل: 50000)",
+        "optional_max": "اختياري (مثل: 100000000)",
+        "cancel": "إلغاء",
+        "save": "حفظ"
+      },
+      "suspend_modal": {
+        "title": "إيقاف المحفظة",
+        "reason_label": "سبب الإيقاف (إجباري)",
+        "reason_placeholder": "أدخل سبب إيقاف المحفظة...",
+        "cancel": "إلغاء",
+        "confirm": "إيقاف"
+      },
+      "activate_modal": {
+        "title": "تفعيل المحفظة",
+        "prev_reason_label": "سبب الإيقاف السابق:",
+        "confirm_text": "هل أنت متأكد أنك تريد إعادة تفعيل هذه المحفظة؟",
+        "cancel": "إلغاء",
+        "confirm": "تفعيل"
+      },
+      "toasts": {
+        "load_error": "فشل تحميل بيانات المحفظة",
+        "suspend_reason_required": "سبب الإيقاف مطلوب",
+        "suspend_success": "تم تغيير حالة المحفظة إلى موقوف",
+        "suspend_error": "فشل إيقاف المحفظة",
+        "activate_success": "تمت إعادة تفعيل حالة المحفظة بنجاح",
+        "activate_error": "فشل تفعيل المحفظة",
+        "limit_success": "تم تحديث حد المحفظة بنجاح",
+        "limit_error": "فشل تحديث حد المحفظة"
+      }
     }
   }
 }

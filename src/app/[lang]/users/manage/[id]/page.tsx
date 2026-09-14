@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,18 +10,24 @@ import { SkeletonDetailPage } from "@/components/ui/skeletons"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-    Mail, Phone, MapPin, Shield, CreditCard, 
-    Clock, Activity, Calendar, ArrowLeft, Loader2, User as UserIcon
+import {
+    Mail, Phone, MapPin, Shield,
+    Clock, Activity, Calendar, ArrowLeft, Loader2, User as UserIcon,
+    TrendingUp
 } from "lucide-react"
+import { BookOpen } from "lucide-react"
 
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { walletApi, auditApi, API_BASE } from "@/lib/api"
 import { getKycAll } from "@/utils/api/kyc/fetch"
 import { toast } from "sonner"
+import { getSimWalletBalances, getSimTransactions } from "@/lib/sim-wallet-store"
+import { getSimSetoransByUser } from "@/data/sim-setoran"
+import dummyBillingData from "@/data/billing-dummy.json"
 import { UserWalletDetail } from "@/components/Wallet/UserWalletDetail"
+import { UserOrders } from "@/components/admin/user-orders"
+import { UserSetoran } from "@/components/admin/user-setoran"
 import { SIM_TRAINERS } from "@/data/sim-dummy-users"
-import { BookOpen } from "lucide-react"
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("id-ID", {
@@ -78,12 +84,12 @@ export default function UserDetailPage() {
     const params = useParams()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const userId = params?.id as string
-    const lang = params?.lang as string || "en"
+    const userId = (params as any)?.id as string
+    const lang = (params as any)?.lang as string || "en"
 
     const { profile, loading: loadingProfile, isMock } = useUserProfile(userId)
     const user = profile as any
-    
+
     const defaultTab = searchParams?.get("tab") || "overview"
     const [activeTab, setActiveTab] = useState(defaultTab)
 
@@ -103,14 +109,33 @@ export default function UserDetailPage() {
     const [kycData, setKycData] = useState<any | null>(null)
     const [walletData, setWalletData] = useState<any | null>(null)
     const [activityLogs, setActivityLogs] = useState<any[]>([])
-    
+
     const [loadingKyc, setLoadingKyc] = useState(false)
     const [loadingWallet, setLoadingWallet] = useState(false)
     const [loadingLogs, setLoadingLogs] = useState(false)
 
+    // Mock user computed metrics
+    const [simBalance, setSimBalance] = useState<{ activeBalance: number; pendingBalance: number } | null>(null)
+    const [simOrderCount, setSimOrderCount] = useState<number>(0)
+    const [simSetoranCount, setSimSetoranCount] = useState<number>(0)
+    const [simTxCount, setSimTxCount] = useState<number>(0)
+
     const [walletForbidden, setWalletForbidden] = useState(false)
     const [logsForbidden, setLogsForbidden] = useState(false)
     const [isProcessingWallet, setIsProcessingWallet] = useState(false)
+
+    // Cek apakah user terdaftar sebagai guru/trainer
+    const trainerInfo = useMemo(() => {
+        if (isMock) {
+            return Object.values(SIM_TRAINERS).find(t => String(t.userId) === String(userId)) || null
+        }
+        const roleLower = String(user?.role || '').toLowerCase()
+        const isTeacher = roleLower === 'trainer' || roleLower === 'guru' || roleLower === 'teacher'
+        if (isTeacher) {
+            return { id: user?.trainer_id || user?.teacher_id || userId }
+        }
+        return null
+    }, [isMock, userId, user?.role, user?.trainer_id, user?.teacher_id])
 
     // We now manage wallet entirely via UserWalletDetail in mock mode.
     // The previous state 'walletData' etc. for fetching wallet are kept as-is 
@@ -127,6 +152,31 @@ export default function UserDetailPage() {
             }
         }
     }, [user?.id, userId, isMock])
+
+    // Hitung metrics dari sim store untuk mock users
+    useEffect(() => {
+        if (!isMock || !userId) return
+
+        // Saldo aktif dari transaksi wallet
+        const balances = getSimWalletBalances(userId)
+        setSimBalance(balances)
+
+        // Jumlah pesanan dari billing-dummy.json
+        const orders = (dummyBillingData.bookings as any[]).filter(
+            (b: any) => String(b.userId) === String(userId)
+        )
+        setSimOrderCount(orders.length)
+
+        // Jumlah setoran dari sim-setoran
+        const setorans = getSimSetoransByUser(userId)
+        setSimSetoranCount(setorans.length)
+
+        // Total transaksi wallet
+        const txs = getSimTransactions().filter(
+            (tx: any) => String(tx.userId) === String(userId)
+        )
+        setSimTxCount(txs.length)
+    }, [isMock, userId])
 
     const fetchKyc = async () => {
         if (!user) return
@@ -181,7 +231,7 @@ export default function UserDetailPage() {
             else if (Array.isArray(res?.data?.data)) logs = res.data.data
             else if (Array.isArray(res?.data)) logs = res.data
             else if (Array.isArray(res)) logs = res
-            
+
             setActivityLogs(logs.slice(0, 50))
         } catch (error) {
             console.error("Failed to fetch logs", error)
@@ -219,161 +269,247 @@ export default function UserDetailPage() {
     return (
         <DashboardLayout>
             <div className="max-w-5xl mx-auto space-y-6">
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-xl border-gray-200 dark:border-gray-800">
-                        <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Kelola Data Lengkap</h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Menampilkan profil detail untuk pengguna #{userId}</p>
+                {/* Header Compact */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <Avatar className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-full border-2 border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                            <AvatarImage src={getAvatarSrc(user) || undefined} className="object-cover" />
+                            <AvatarFallback className="bg-emerald-50 text-emerald-600 text-lg sm:text-xl font-bold">
+                                {user.name ? user.name.charAt(0) : user.username?.charAt(1) || 'U'}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white leading-tight truncate">
+                                    {user.name || user.username}
+                                </h1>
+                                <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] px-2 py-0 shrink-0">
+                                    #{userId}
+                                </Badge>
+                                {user.isVerify && (
+                                    <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] px-2 py-0 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                        Verified
+                                    </Badge>
+                                )}
+                            </div>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1 truncate">
+                                @{user.username?.replace('@', '')} • <span className="text-xs uppercase">{user.role || 'MEMBER'}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
+                        <Button
+                            variant="outline"
+                            onClick={() => router.back()}
+                            className="bg-white dark:bg-gray-900 flex-1 sm:flex-initial"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+                        </Button>
+                        {trainerInfo && (
+                            <Button
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex-1 sm:flex-initial"
+                                onClick={() => {
+                                    router.push(`/${lang}/teachers/manage/${trainerInfo.id}`)
+                                }}
+                            >
+                                <BookOpen className="w-4 h-4 mr-2" /> Lihat Profil Guru
+                            </Button>
+                        )}
                     </div>
                 </div>
 
-                <Card className="rounded-2xl border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                    <div className="h-32 bg-gradient-to-r from-emerald-500 to-teal-600"></div>
-                    <div className="px-6 pb-6">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5 -mt-12 mb-6">
-                            <Avatar className="w-24 h-24 rounded-2xl border-4 border-white dark:border-gray-900 shadow-md bg-white dark:bg-gray-900">
-                                <AvatarImage src={getAvatarSrc(user) || undefined} className="object-cover" />
-                                <AvatarFallback className="bg-emerald-50 text-emerald-600 text-3xl font-bold rounded-2xl">
-                                    {user.name ? user.name.charAt(0) : user.username?.charAt(1) || 'U'}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 pb-1">
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">
-                                    {user.name || user.username}
-                                </h2>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                                    @{user.username?.replace('@', '')}
-                                </p>
+                {/* Key Metrics Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {/* Card 1: Total Saldo */}
+                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                        <CardContent className="p-4 sm:p-5">
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Saldo</p>
+                                <div className="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg shrink-0">
+                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </div>
                             </div>
-                            <div className="flex gap-2 pb-1">
-                                <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                                    {user.role?.toUpperCase() || 'MEMBER'}
-                                </Badge>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 px-2">
-                                    <Calendar className="w-3.5 h-3.5" /> Bergabung {formatDate(user.created_at || user.createdAt || new Date().toISOString())}
-                                </span>
-                                <Button 
-                                    size="sm" 
-                                    className="ml-auto h-7 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 rounded-lg transition-colors inline-flex items-center gap-1.5 px-3 py-1.5 font-bold" 
-                                    onClick={() => {
-                                        const trainer = Object.values(SIM_TRAINERS).find(t => String(t.userId) === String(userId))
-                                        if (trainer) {
-                                            router.push(`/${lang}/teachers/manage/${trainer.id}`)
-                                        } else {
-                                            toast.error(`User ${user.name || user.username} tidak menjadi guru`)
-                                        }
-                                    }}
-                                >
-                                    <BookOpen className="w-3.5 h-3.5" /> Lihat Profil Guru
-                                </Button>
-                            </div>
-                        </div>
+                            <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                                {isMock
+                                    ? formatCurrency(simBalance?.activeBalance ?? 0)
+                                    : (walletData?.balance ? formatCurrency(walletData.balance) : 'Rp 0')}
+                            </h3>
+                        </CardContent>
+                    </Card>
 
+                    {/* Card 2: Total Pesanan */}
+                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                        <CardContent className="p-4 sm:p-5">
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Pesanan</p>
+                                <div className="p-1.5 sm:p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg shrink-0">
+                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </div>
+                            </div>
+                            <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                                {isMock ? simOrderCount : (activityLogs?.length || 0)}
+                            </h3>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 3: Total Setoran (menggantikan Status KYC) */}
+                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                        <CardContent className="p-4 sm:p-5">
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Setoran</p>
+                                <div className="p-1.5 sm:p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg shrink-0">
+                                    <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </div>
+                            </div>
+                            <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                                {isMock ? simSetoranCount : 0}
+                            </h3>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 4: Total Transaksi (menggantikan Aktivitas Terakhir) */}
+                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                        <CardContent className="p-4 sm:p-5">
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Transaksi</p>
+                                <div className="p-1.5 sm:p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-lg shrink-0">
+                                    <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </div>
+                            </div>
+                            <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                                {isMock ? simTxCount : (walletData?.totalTransactions || walletData?.transactions?.length || 0)}
+                            </h3>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Tabs & Content */}
+                <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+                    <div className="px-4 sm:px-6 pt-2">
                         <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange} className="w-full">
-                            <TabsList className="w-full justify-start border-b border-gray-100 dark:border-gray-800 rounded-none bg-transparent h-auto p-0 space-x-6">
-                                <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-0 py-3 data-[state=active]:shadow-none text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                    Overview
-                                </TabsTrigger>
-                                <TabsTrigger value="kyc" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-0 py-3 data-[state=active]:shadow-none text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                    KYC Member
-                                </TabsTrigger>
-                                <TabsTrigger value="wallet" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-0 py-3 data-[state=active]:shadow-none text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                    Dompet User
-                                </TabsTrigger>
-                                <TabsTrigger value="aktivitas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-0 py-3 data-[state=active]:shadow-none text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                    Log Aktivitas
-                                </TabsTrigger>
-                            </TabsList>
+                            <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+                                <TabsList className="w-max min-w-full justify-start border-b border-gray-100 dark:border-gray-800 rounded-none bg-transparent h-auto p-0 space-x-4 sm:space-x-6 flex-nowrap">
+                                    <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        Overview
+                                    </TabsTrigger>
+                                    <TabsTrigger value="kyc" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        KYC Member
+                                    </TabsTrigger>
+                                    <TabsTrigger value="wallet" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        Dompet User
+                                    </TabsTrigger>
+                                    <TabsTrigger value="pesanan" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        Pesanan
+                                    </TabsTrigger>
+                                    <TabsTrigger value="setoran" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        Setoran
+                                    </TabsTrigger>
+                                    <TabsTrigger value="aktivitas" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
+                                        Log Aktivitas
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                            <div className="mt-8">
-                                {/* OVERVIEW TAB */}
-                                <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Mail className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white break-all">{user.email || '-'}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Phone className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nomor Telepon</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.hp || user.noHp || user.phone || '-'}</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <UserIcon className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Jenis Kelamin</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.gender === 'm' ? 'Laki-laki' : user.gender === 'f' ? 'Perempuan' : '-'}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Calendar className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal Lahir</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.dob ? formatDate(user.dob) : '-'}</p>
-                                        </div>
-                                    </div>
+                            <div className="py-6">
+                                {/* OVERVIEW TAB (60:40 Layout) */}
+                                <TabsContent value="overview" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pekerjaan</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.job || '-'}</p>
+                                        {/* Kiri (60%) */}
+                                        <div className="lg:col-span-7">
+                                            <Card className="border border-gray-100 dark:border-gray-800 shadow-none h-full bg-gray-50/50 dark:bg-gray-800/20">
+                                                <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Detail Informasi Pribadi</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="pt-6 space-y-6">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Email</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white break-all">{user.email || '-'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">No. Telepon</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.hp || user.noHp || user.phone || '-'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Jenis Kelamin</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.gender === 'm' ? 'Laki-laki' : user.gender === 'f' ? 'Perempuan' : '-'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Tanggal Lahir</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.dob ? formatDate(user.dob) : '-'}</p>
+                                                        </div>
+                                                        <div className="sm:col-span-2">
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Pekerjaan</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.job || '-'}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                                                        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Bio</p>
+                                                        <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                                                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                                {user.bio || 'Tidak ada bio yang dituliskan oleh pengguna.'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
                                         </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Clock className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Timezone</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.timezone || '-'}</p>
+
+                                        {/* Kanan (40%) */}
+                                        <div className="lg:col-span-5 space-y-6">
+                                            {/* Kartu 1: Detail Akun */}
+                                            <Card className="border border-gray-100 dark:border-gray-800 shadow-none bg-gray-50/50 dark:bg-gray-800/20">
+                                                <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Detail Akun</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="pt-6 space-y-4">
+                                                    <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800/50">
+                                                        <span className="text-sm font-medium text-gray-500">Tanggal Gabung</span>
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">{formatDate(user.created_at || user.createdAt || new Date().toISOString())}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800/50">
+                                                        <span className="text-sm font-medium text-gray-500">Timezone</span>
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">{user.timezone || '-'}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm font-medium text-gray-500">Status Akun</span>
+                                                        <div className="flex gap-2">
+                                                            {user.isBlocked ? (
+                                                                <Badge variant="destructive" className="text-[10px]">Terblokir</Badge>
+                                                            ) : (
+                                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px]">Aktif</Badge>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Kartu 2: Lokasi & Perangkat */}
+                                            <Card className="border border-gray-100 dark:border-gray-800 shadow-none bg-gray-50/50 dark:bg-gray-800/20">
+                                                <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Lokasi & Perangkat</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="pt-6 space-y-4">
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Alamat Lengkap</p>
+                                                        <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                                            {[user.cityName || user.city_name, user.stateName || user.state_name, user.countryName || user.country_name].filter(Boolean).join(', ') || 'Lokasi belum diatur'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="pt-3 border-t border-gray-100 dark:border-gray-800/50">
+                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Info Login Terakhir (IP)</p>
+                                                        <p className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                                            {activityLogs && activityLogs.length > 0 && activityLogs[0].ipAddress
+                                                                ? activityLogs[0].ipAddress
+                                                                : '127.0.0.1'}
+                                                        </p>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
                                         </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Shield className="w-4 h-4 text-gray-400" />
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status Akun</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                                {user.isBlocked ? (
-                                                    <span className="text-red-500 font-bold">Terblokir</span>
-                                                ) : (
-                                                    <span className="text-emerald-500 font-bold">Aktif</span>
-                                                )}
-                                                {user.isVerify ? (
-                                                    <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Verified</span>
-                                                ) : (
-                                                    <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Unverified</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <MapPin className="w-4 h-4 text-gray-400" />
-                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lokasi / Alamat</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                            {[user.cityName || user.city_name, user.stateName || user.state_name, user.countryName || user.country_name].filter(Boolean).join(', ') || 'Lokasi belum diatur'}
-                                        </p>
-                                    </div>
-                                    <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Shield className="w-4 h-4 text-gray-400" />
-                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bio</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                            {user.bio || 'Tidak ada bio'}
-                                        </p>
+
                                     </div>
                                 </TabsContent>
 
@@ -387,12 +523,11 @@ export default function UserDetailPage() {
                                         </div>
                                     ) : kycData ? (
                                         <div className="space-y-4 max-w-2xl">
-                                            <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                                                kycData.status === 2 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800' :
+                                            <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${kycData.status === 2 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800' :
                                                 kycData.status === 3 ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800' :
-                                                kycData.status === 1 ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800' :
-                                                'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800'
-                                            }`}>
+                                                    kycData.status === 1 ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800' :
+                                                        'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800'
+                                                }`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-3 bg-white/50 dark:bg-black/20 rounded-full">
                                                         <Shield className="w-6 h-6" />
@@ -400,8 +535,8 @@ export default function UserDetailPage() {
                                                     <div>
                                                         <p className="text-base font-bold">
                                                             {kycData.status === 2 ? 'KYC Disetujui' :
-                                                             kycData.status === 3 ? 'KYC Ditolak' :
-                                                             kycData.status === 1 ? 'Sedang Direview' : 'Menunggu Review'}
+                                                                kycData.status === 3 ? 'KYC Ditolak' :
+                                                                    kycData.status === 1 ? 'Sedang Direview' : 'Menunggu Review'}
                                                         </p>
                                                         <p className="text-sm opacity-80 mt-1">
                                                             {kycData.reviewedAt ? `Direview pada ${formatDate(kycData.reviewedAt)}` : `Disubmit pada ${formatDate(kycData.createdAt)}`}
@@ -412,13 +547,13 @@ export default function UserDetailPage() {
                                                     Lihat Detail KYC
                                                 </Button>
                                             </div>
-                                            
+
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900/50">
+                                                <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-800/20">
                                                     <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Tipe Dokumen</p>
                                                     <p className="text-base font-bold text-gray-900 dark:text-white">{kycData.documentType || '-'}</p>
                                                 </div>
-                                                <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900/50">
+                                                <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-800/20">
                                                     <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Nomor Dokumen</p>
                                                     <p className="text-base font-bold text-gray-900 dark:text-white">{kycData.documentNumber || '-'}</p>
                                                 </div>
@@ -437,6 +572,16 @@ export default function UserDetailPage() {
                                 {/* WALLET TAB */}
                                 <TabsContent value="wallet" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <UserWalletDetail userId={userId} userData={user} hideProfileCard={true} />
+                                </TabsContent>
+
+                                {/* ORDERS TAB */}
+                                <TabsContent value="pesanan" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <UserOrders userId={userId} />
+                                </TabsContent>
+
+                                {/* SETORAN TAB */}
+                                <TabsContent value="setoran" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <UserSetoran userId={userId} isMock={isMock} />
                                 </TabsContent>
 
                                 {/* ACTIVITY TAB */}

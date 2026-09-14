@@ -6,7 +6,7 @@ const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
 const STORE_VERSION_KEY = "qurani_sim_wallet_version"
-const STORE_VERSION = "v11-teacher-wallets"
+const STORE_VERSION = "v12-fix-balances"
 
 const DUMMY_TRANSACTIONS = [
     // ─── RIWAYAT TOPUP (dari Wallet/Riwayat Topup) ───────────────────────────
@@ -129,13 +129,13 @@ const DUMMY_TRANSACTIONS = [
         type: 2,
         typeName: "Withdraw",
         description: "Penarikan ke Bank BCA — 1234567890",
-        amount: -1000000,
-        balanceBefore: 1000000,
-        balanceAfter: 0,
+        amount: -200000,
+        balanceBefore: 300000,
+        balanceAfter: 100000,
         status: "completed",
         paymentMethod: "Bank BCA",
         referenceId: "WD-REF-001",
-        createdAt: new Date(Date.now() - 345600000).toISOString()
+        createdAt: new Date(Date.now() - 172800000).toISOString()
     },
     {
         id: "178572300270200000",

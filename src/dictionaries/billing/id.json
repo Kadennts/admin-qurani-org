@@ -271,6 +271,97 @@
       },
       "empty": "Tidak ada pembayaran yang ditemukan.",
       "loading": "Memuat data pembayaran..."
+    },
+    "wallet_page": {
+      "title": "Kelola Wallet Pengguna",
+      "subtitle": "Menampilkan detail profil, informasi wallet, dan riwayat transaksi"
+    },
+    "wallet_detail": {
+      "title": "Informasi Wallet",
+      "status_label": "Status:",
+      "status_active": "Aktif",
+      "status_suspended": "Suspended",
+      "reason_label": "Alasan:",
+      "id_label": "ID:",
+      "set_limit": "Set Limit",
+      "activate": "Aktifkan",
+      "suspend": "Suspend",
+      "active_balance": "Saldo Aktif",
+      "pending_balance": "Saldo Pending",
+      "total_transactions": "Total Transaksi",
+      "transactions": "Transaksi",
+      "history_title": "Riwayat Transaksi",
+      "empty_history": "Belum ada riwayat transaksi",
+      "no_reason": "Tidak ada alasan penangguhan yang tercatat.",
+      "internal_id": "Internal: #{{id}}",
+      "internal_tx": "Transaksi Internal",
+      "description_fallback": "Transaksi",
+      "detail": "Detail",
+      "tx_types": {
+        "topup": "TopUp",
+        "withdraw": "Withdraw",
+        "transfer": "Transfer",
+        "payment": "Payment",
+        "other": "Lainnya"
+      },
+      "tx_status": {
+        "success": "Berhasil",
+        "pending": "Pending",
+        "failed": "Gagal"
+      },
+      "rel": {
+        "just_now": "Baru saja",
+        "minutes": "{{count}} menit lalu",
+        "hours": "{{count}} jam lalu",
+        "days": "{{count}} hari lalu"
+      },
+      "table": {
+        "id": "ID",
+        "category": "Kategori",
+        "amount": "Nominal",
+        "status": "Status",
+        "date": "Tanggal",
+        "action": "Aksi"
+      },
+      "limit_modal": {
+        "title": "Ubah Limit Wallet",
+        "daily_topup": "Daily Topup Limit",
+        "daily_withdraw": "Daily Withdraw Limit",
+        "daily_transfer": "Daily Transfer Limit",
+        "min_withdraw": "Min Withdraw",
+        "max_balance": "Max Balance",
+        "optional_topup": "Opsional (mis: 10000000)",
+        "optional_withdraw": "Opsional (mis: 5000000)",
+        "optional_transfer": "Opsional (mis: 5000000)",
+        "optional_min": "Opsional (mis: 50000)",
+        "optional_max": "Opsional (mis: 100000000)",
+        "cancel": "Batal",
+        "save": "Simpan"
+      },
+      "suspend_modal": {
+        "title": "Suspend Wallet",
+        "reason_label": "Alasan Penangguhan (Wajib)",
+        "reason_placeholder": "Masukkan alasan wallet disuspend...",
+        "cancel": "Batal",
+        "confirm": "Suspend"
+      },
+      "activate_modal": {
+        "title": "Aktifkan Wallet",
+        "prev_reason_label": "Alasan Penangguhan Sebelumnya:",
+        "confirm_text": "Apakah Anda yakin ingin mengaktifkan kembali wallet ini?",
+        "cancel": "Batal",
+        "confirm": "Aktifkan"
+      },
+      "toasts": {
+        "load_error": "Gagal memuat data wallet",
+        "suspend_reason_required": "Alasan penangguhan wajib diisi",
+        "suspend_success": "Status dompet berhasil diubah menjadi Suspended",
+        "suspend_error": "Gagal melakukan suspend dompet",
+        "activate_success": "Status dompet berhasil diaktifkan kembali",
+        "activate_error": "Gagal mengaktifkan dompet",
+        "limit_success": "Limit wallet berhasil diperbarui",
+        "limit_error": "Gagal memperbarui limit wallet"
+      }
     }
   }
 }

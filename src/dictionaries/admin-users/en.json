@@ -83,5 +83,130 @@
       "active": "Active",
       "blocked": "Blocked"
     }
+  },
+  "user_detail": {
+    "back": "Back",
+    "title": "User Detail",
+    "subtitle": "Profile, activity, and history",
+    "not_found": "User data not found",
+    "member_badge": "Member",
+    "stats": {
+      "orders": "Total Orders",
+      "spent": "Total Spent",
+      "setoran": "Total Setoran",
+      "last_activity": "Last Active"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "kyc": "KYC",
+      "wallet": "Wallet",
+      "orders": "Orders",
+      "setoran": "Setoran",
+      "log": "Log"
+    },
+    "overview": {
+      "personal_title": "Personal Info Details",
+      "account_title": "Account Details",
+      "location_title": "Location & Devices",
+      "full_name": "Full Name",
+      "username": "Username",
+      "email": "Email",
+      "phone": "Phone Number",
+      "gender": "Gender",
+      "male": "Male",
+      "female": "Female",
+      "birth_date": "Birth Date",
+      "bio": "Bio",
+      "not_filled": "Not filled",
+      "role": "Role",
+      "role_member": "Member",
+      "status": "Status",
+      "status_active": "Active",
+      "status_blocked": "Blocked",
+      "joined": "Joined",
+      "balance": "Qurani Credit Balance",
+      "device": "Last Device",
+      "os_version": "OS / Version",
+      "unknown": "Unknown"
+    },
+    "kyc": {
+      "title": "Identity Verification",
+      "subtitle": "KYC document completeness",
+      "verified": "Verified",
+      "pending": "Pending",
+      "unverified": "Unverified",
+      "rejected": "Rejected",
+      "review": "Under Review",
+      "submitted": "submitted",
+      "identity_title": "Identity",
+      "ktp_label": "KTP Number",
+      "ktp_photo": "KTP Photo",
+      "face_photo": "Face / Selfie Photo",
+      "available": "Available",
+      "not_available": "Not available",
+      "view_document": "View Document",
+      "print_label": "Print Label",
+      "copy_id": "Copy ID",
+      "resubmit": "Request Resubmit",
+      "resubmit_hint": "Notify the user to resubmit KYC.",
+      "loading": "Loading KYC data..."
+    },
+    "setoran": {
+      "title": "Total Setoran",
+      "loading": "Loading setoran data...",
+      "empty": "No setoran yet from this user.",
+      "approval_warning": "Setoran requires virtual bank approval before activation.",
+      "user_districts": "Districts",
+      "user_regencies": "Regencies",
+      "results_header": "Setoran Results",
+      "conclusion": "Conclusion",
+      "score": "Score",
+      "penyetor": "Depositor",
+      "penerima": "Receiver",
+      "region": "Region",
+      "bank": "Bank",
+      "no_name_match": "Name doesn't match",
+      "lulus": "PASS",
+      "tidak_lulus": "FAIL",
+      "approve_tooltip": "Approve this setoran",
+      "reject_tooltip": "Reject this setoran",
+      "pagination": "Showing {{from}}-{{to}} of {{total}} setoran"
+    },
+    "orders": {
+      "title": "Order History",
+      "loading": "Loading order data...",
+      "empty": "No orders found.",
+      "columns": {
+        "order_id": "Order ID",
+        "package": "Package",
+        "trainer": "Teacher",
+        "mode": "Mode",
+        "sessions": "Sessions",
+        "price": "Price",
+        "status": "Status",
+        "date": "Date"
+      },
+      "status": {
+        "pending": "Pending",
+        "active": "Active",
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "waiting_teacher": "Waiting Teacher"
+      },
+      "session_label": "sessions",
+      "detail": "Detail",
+      "no_details": "No details yet."
+    },
+    "log": {
+      "title": "Activity Log",
+      "loading": "Loading activity log...",
+      "empty": "No activity log yet."
+    },
+    "toasts": {
+      "copied": "Copied to clipboard!",
+      "copy_failed": "Copy failed",
+      "resubmit": "KYC resubmit request sent successfully",
+      "resubmit_error": "Failed to send request"
+    }
   }
 }

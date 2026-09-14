@@ -83,5 +83,130 @@
       "active": "Aktif",
       "blocked": "Diblokir"
     }     
+  },
+  "user_detail": {
+    "back": "Kembali",
+    "title": "Detail Pengguna",
+    "subtitle": "Profil, aktivitas, dan riwayat",
+    "not_found": "Data pengguna tidak ditemukan",
+    "member_badge": "Member",
+    "stats": {
+      "orders": "Total Pesanan",
+      "spent": "Total Pengeluaran",
+      "setoran": "Total Setoran",
+      "last_activity": "Terakhir Aktif"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "kyc": "KYC",
+      "wallet": "Wallet",
+      "orders": "Pesanan",
+      "setoran": "Setoran",
+      "log": "Log"
+    },
+    "overview": {
+      "personal_title": "Detail Informasi Pribadi",
+      "account_title": "Detail Akun",
+      "location_title": "Lokasi & Perangkat",
+      "full_name": "Nama Lengkap",
+      "username": "Username",
+      "email": "Email",
+      "phone": "Nomor HP",
+      "gender": "Jenis Kelamin",
+      "male": "Laki-laki",
+      "female": "Perempuan",
+      "birth_date": "Tanggal Lahir",
+      "bio": "Bio",
+      "not_filled": "Belum diisi",
+      "role": "Role",
+      "role_member": "Member",
+      "status": "Status",
+      "status_active": "Aktif",
+      "status_blocked": "Diblokir",
+      "joined": "Bergabung",
+      "balance": "Saldo Kredit Qurani",
+      "device": "Perangkat Terakhir",
+      "os_version": "OS / Versi",
+      "unknown": "Tidak diketahui"
+    },
+    "kyc": {
+      "title": "Verifikasi Identitas",
+      "subtitle": "Kelengkapan dokumen KYC pengguna",
+      "verified": "Terverifikasi",
+      "pending": "Menunggu",
+      "unverified": "Belum Verifikasi",
+      "rejected": "Ditolak",
+      "review": "Sedang Direview",
+      "submitted": "sudah disubmit",
+      "identity_title": "Identitas Diri",
+      "ktp_label": "Nomor NIK",
+      "ktp_photo": "Foto KTP",
+      "face_photo": "Foto Wajah / Selfie",
+      "available": "Tersedia",
+      "not_available": "Belum tersedia",
+      "view_document": "Lihat Dokumen",
+      "print_label": "Cetak Label",
+      "copy_id": "Salin ID",
+      "resubmit": "Minta Submit Ulang",
+      "resubmit_hint": "Kirim notifikasi ke user untuk submit ulang KYC.",
+      "loading": "Memuat data KYC..."
+    },
+    "setoran": {
+      "title": "Total Setoran",
+      "loading": "Memuat data setoran...",
+      "empty": "Belum ada setoran dari user ini.",
+      "approval_warning": "Setoran membutuhkan persetujuan bank virtual sebelum aktivasi.",
+      "user_districts": "Sekecamatan",
+      "user_regencies": "Sekabupaten",
+      "results_header": "Hasil Setoran",
+      "conclusion": "Kesimpulan",
+      "score": "Skor",
+      "penyetor": "Penyetor",
+      "penerima": "Penerima",
+      "region": "Wilayah",
+      "bank": "Bank",
+      "no_name_match": "Nama tidak cocok",
+      "lulus": "LULUS",
+      "tidak_lulus": "TIDAK LULUS",
+      "approve_tooltip": "Setujui setoran ini",
+      "reject_tooltip": "Tolak setoran ini",
+      "pagination": "Menampilkan {{from}}-{{to}} dari {{total}} setoran"
+    },
+    "orders": {
+      "title": "Riwayat Pesanan",
+      "loading": "Memuat data pesanan...",
+      "empty": "Tidak ada pesanan ditemukan.",
+      "columns": {
+        "order_id": "ID Pesanan",
+        "package": "Paket",
+        "trainer": "Guru",
+        "mode": "Mode",
+        "sessions": "Sesi",
+        "price": "Harga",
+        "status": "Status",
+        "date": "Tanggal"
+      },
+      "status": {
+        "pending": "Pending",
+        "active": "Aktif",
+        "cancelled": "Batal",
+        "completed": "Selesai",
+        "waiting_teacher": "Menunggu Guru"
+      },
+      "session_label": "sesi",
+      "detail": "Detail",
+      "no_details": "Belum ada detail."
+    },
+    "log": {
+      "title": "Log Aktivitas",
+      "loading": "Memuat log aktivitas...",
+      "empty": "Belum ada log aktivitas."
+    },
+    "toasts": {
+      "copied": "Tersalin ke clipboard!",
+      "copy_failed": "Gagal menyalin",
+      "resubmit": "Permintaan submit ulang KYC berhasil dikirim",
+      "resubmit_error": "Gagal mengirim permintaan"
+    }
   }
 }

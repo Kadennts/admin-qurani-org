@@ -271,6 +271,97 @@
       },
       "empty": "No payments found.",
       "loading": "Loading payment data..."
+    },
+    "wallet_page": {
+      "title": "Manage User Wallet",
+      "subtitle": "Showing profile details, wallet information, and transaction history"
+    },
+    "wallet_detail": {
+      "title": "Wallet Information",
+      "status_label": "Status:",
+      "status_active": "Active",
+      "status_suspended": "Suspended",
+      "reason_label": "Reason:",
+      "id_label": "ID:",
+      "set_limit": "Set Limit",
+      "activate": "Activate",
+      "suspend": "Suspend",
+      "active_balance": "Active Balance",
+      "pending_balance": "Pending Balance",
+      "total_transactions": "Total Transactions",
+      "transactions": "transactions",
+      "history_title": "Transaction History",
+      "empty_history": "No transaction history yet",
+      "no_reason": "No suspension reason recorded.",
+      "internal_id": "Internal: #{{id}}",
+      "internal_tx": "Internal Transaction",
+      "description_fallback": "Transaction",
+      "detail": "Detail",
+      "tx_types": {
+        "topup": "TopUp",
+        "withdraw": "Withdraw",
+        "transfer": "Transfer",
+        "payment": "Payment",
+        "other": "Other"
+      },
+      "tx_status": {
+        "success": "Successful",
+        "pending": "Pending",
+        "failed": "Failed"
+      },
+      "rel": {
+        "just_now": "Just now",
+        "minutes": "{{count}} minutes ago",
+        "hours": "{{count}} hours ago",
+        "days": "{{count}} days ago"
+      },
+      "table": {
+        "id": "ID",
+        "category": "Category",
+        "amount": "Amount",
+        "status": "Status",
+        "date": "Date",
+        "action": "Action"
+      },
+      "limit_modal": {
+        "title": "Edit Wallet Limit",
+        "daily_topup": "Daily Topup Limit",
+        "daily_withdraw": "Daily Withdraw Limit",
+        "daily_transfer": "Daily Transfer Limit",
+        "min_withdraw": "Min Withdraw",
+        "max_balance": "Max Balance",
+        "optional_topup": "Optional (e.g. 10000000)",
+        "optional_withdraw": "Optional (e.g. 5000000)",
+        "optional_transfer": "Optional (e.g. 5000000)",
+        "optional_min": "Optional (e.g. 50000)",
+        "optional_max": "Optional (e.g. 100000000)",
+        "cancel": "Cancel",
+        "save": "Save"
+      },
+      "suspend_modal": {
+        "title": "Suspend Wallet",
+        "reason_label": "Suspension Reason (Required)",
+        "reason_placeholder": "Enter the reason the wallet is suspended...",
+        "cancel": "Cancel",
+        "confirm": "Suspend"
+      },
+      "activate_modal": {
+        "title": "Activate Wallet",
+        "prev_reason_label": "Previous Suspension Reason:",
+        "confirm_text": "Are you sure you want to reactivate this wallet?",
+        "cancel": "Cancel",
+        "confirm": "Activate"
+      },
+      "toasts": {
+        "load_error": "Failed to load wallet data",
+        "suspend_reason_required": "Suspension reason is required",
+        "suspend_success": "Wallet status successfully changed to Suspended",
+        "suspend_error": "Failed to suspend wallet",
+        "activate_success": "Wallet status successfully reactivated",
+        "activate_error": "Failed to activate wallet",
+        "limit_success": "Wallet limit updated successfully",
+        "limit_error": "Failed to update wallet limit"
+      }
     }
   }
 }
