@@ -24,7 +24,8 @@
       "view_user_profile": "Lihat Profil User",
       "title": "Profil Guru",
       "rejection_default": "Ditolak oleh admin",
-      "verified_by_admin": "Diverifikasi oleh Admin"
+      "verified_by_admin": "Diverifikasi oleh Admin",
+      "related_institution": "Lembaga Terkait"
     },
     "modal": {
       "reject_title": "Tolak Pendaftaran Guru",
@@ -302,17 +303,25 @@
     "orders_tab": {
       "search": "Cari pesanan, nama murid, atau paket...",
       "filter": "Filter",
+      "filter_label": "Filter Status",
       "loading": "Memuat data pesanan...",
       "empty": "Tidak ada pesanan ditemukan.",
+      "empty_all": "Belum ada pesanan untuk guru ini.",
+      "empty_filter": "Tidak ada pesanan dengan filter ini.",
+      "show_all": "Tampilkan semua ({{count}})",
+      "session_count": "{{count}} sesi",
+      "footer": "Menampilkan {{shown}} dari {{total}} pesanan",
       "columns": {
         "id": "ID Pesanan",
         "member": "Murid",
         "package": "Paket",
+        "mode": "Mode",
         "amount": "Nominal",
         "status": "Status",
         "date": "Tanggal"
       },
       "status": {
+        "all": "Semua",
         "pending": "Pending",
         "active": "Aktif",
         "cancelled": "Batal",

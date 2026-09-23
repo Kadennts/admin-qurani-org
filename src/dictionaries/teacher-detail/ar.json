@@ -24,7 +24,8 @@
       "view_user_profile": "عرض ملف المستخدم",
       "title": "ملف المعلم",
       "rejection_default": "مرفوض بواسطة المسؤول",
-      "verified_by_admin": "تم التحقق من قبل المسؤول"
+      "verified_by_admin": "تم التحقق من قبل المسؤول",
+      "related_institution": "الجهة ذات الصلة"
     },
     "modal": {
       "reject_title": "رفض طلب المعلم",
@@ -302,17 +303,25 @@
     "orders_tab": {
       "search": "ابحث عن طلب أو اسم طالب أو باقة...",
       "filter": "تصفية",
+      "filter_label": "تصفية الحالة",
       "loading": "جاري تحميل بيانات الطلبات...",
       "empty": "لم يتم العثور على طلبات.",
+      "empty_all": "لا توجد طلبات لهذا المعلم بعد.",
+      "empty_filter": "لا توجد طلبات تطابق هذا التصفية.",
+      "show_all": "عرض الكل ({{count}})",
+      "session_count": "{{count}} جلسات",
+      "footer": "عرض {{shown}} من أصل {{total}} طلبات",
       "columns": {
         "id": "معرّف الطلب",
         "member": "الطالب",
         "package": "الباقة",
+        "mode": "الوضع",
         "amount": "المبلغ",
         "status": "الحالة",
         "date": "التاريخ"
       },
       "status": {
+        "all": "الكل",
         "pending": "قيد الانتظار",
         "active": "نشط",
         "cancelled": "ملغي",

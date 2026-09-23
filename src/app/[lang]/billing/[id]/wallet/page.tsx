@@ -1,14 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { UserWalletDetail } from "@/components/Wallet/UserWalletDetail";
+import { I18nProvider, useI18n } from "@/components/providers/i18n-provider";
 import { getSimTransactions } from "@/lib/sim-wallet-store";
 
-export default function UserWalletPage() {
+function WalletPageContent() {
+    const { t } = useI18n();
     const params = useParams();
     const userId = params?.id as string;
     const lang = params?.lang as string;
@@ -36,28 +38,36 @@ export default function UserWalletPage() {
     }, [userId]);
 
     return (
-        <DashboardLayout>
-            <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900/50 min-h-screen">
-                <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
-                    
-                    {/* Header */}
-                    <div className="flex items-center gap-3">
-                        <Link 
-                            href={`/${lang}/billing/transaction`}
-                            className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        >
-                            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                        </Link>
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Kelola Wallet Pengguna</h1>
-                            <p className="text-xs sm:text-sm text-gray-500">Menampilkan detail profil, informasi wallet, dan riwayat transaksi</p>
-                        </div>
+        <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900/50 min-h-screen">
+            <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+                
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                    <Link 
+                        href={`/${lang}/billing/transaction`}
+                        className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                    </Link>
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{t("billing.wallet_page.title", "Kelola Wallet Pengguna")}</h1>
+                        <p className="text-xs sm:text-sm text-gray-500">{t("billing.wallet_page.subtitle", "Menampilkan detail profil, informasi wallet, dan riwayat transaksi")}</p>
                     </div>
-
-                    <UserWalletDetail userId={userId} userData={userData} />
-
                 </div>
+
+                <UserWalletDetail userId={userId} userData={userData} />
+
             </div>
+        </div>
+    );
+}
+
+export default function UserWalletPage() {
+    return (
+        <DashboardLayout>
+            <I18nProvider namespaces={["billing", "common"]}>
+                <WalletPageContent />
+            </I18nProvider>
         </DashboardLayout>
     );
 }

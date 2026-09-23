@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Wallet, History, CreditCard, Loader2, AlertTriangle } from "lucide-react";
+import {
+    Wallet, History, Loader2, AlertTriangle, FileText,
+    ChevronDown, SlidersHorizontal, X, Printer
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { 
-    getSimWallet, 
-    updateSimWallet, 
-    getSimWalletBalances, 
-    getSimTransactions 
+import {
+    getSimWallet,
+    updateSimWallet,
+    getSimWalletBalances,
+    getSimTransactions
 } from "@/lib/sim-wallet-store";
 import {
     Dialog,
@@ -24,106 +27,237 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/components/providers/i18n-provider";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatCurrency(amount: number, locale: string) {
     return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: "IDR",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-    }).format(amount).replace("IDR", "Rp")
+    }).format(amount).replace("IDR", "Rp");
 }
 
-function formatDate(dateString: string | undefined, format: 'relative' | 'long' | 'short' = 'long', tz: string = 'UTC', locale: string = 'id-ID', t?: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
+function formatDate(
+    dateString: string | undefined,
+    format: "relative" | "long" | "short" = "long",
+    tz: string = "UTC",
+    locale: string = "id-ID",
+    t?: (key: string, fallback?: string, params?: Record<string, string | number>) => string
+) {
     if (!dateString) return "—";
     try {
         const date = new Date(dateString);
-        if (format === 'long') return new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(date);
-        
-        // relative
+        if (format === "long")
+            return new Intl.DateTimeFormat(locale, {
+                dateStyle: "full",
+                timeStyle: "short",
+                timeZone: tz,
+            }).format(date);
+
         const now = new Date();
         const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-        if (diffInSeconds < 60) return t ? t("billing.wallet_detail.rel.just_now", "Baru saja") : "Baru saja";
-        if (diffInSeconds < 3600) return t ? t("billing.wallet_detail.rel.minutes", "{{count}} menit lalu", { count: Math.floor(diffInSeconds / 60) }) : `${Math.floor(diffInSeconds / 60)} menit lalu`;
-        if (diffInSeconds < 86400) return t ? t("billing.wallet_detail.rel.hours", "{{count}} jam lalu", { count: Math.floor(diffInSeconds / 3600) }) : `${Math.floor(diffInSeconds / 3600)} jam lalu`;
-        if (diffInSeconds < 2592000) return t ? t("billing.wallet_detail.rel.days", "{{count}} hari lalu", { count: Math.floor(diffInSeconds / 86400) }) : `${Math.floor(diffInSeconds / 86400)} hari lalu`;
-        return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: tz }).format(date);
+        if (diffInSeconds < 60)
+            return t ? t("billing.wallet_detail.rel.just_now", "Baru saja") : "Baru saja";
+        if (diffInSeconds < 3600)
+            return t
+                ? t("billing.wallet_detail.rel.minutes", "{{count}} menit lalu", {
+                    count: Math.floor(diffInSeconds / 60),
+                })
+                : `${Math.floor(diffInSeconds / 60)} menit lalu`;
+        if (diffInSeconds < 86400)
+            return t
+                ? t("billing.wallet_detail.rel.hours", "{{count}} jam lalu", {
+                    count: Math.floor(diffInSeconds / 3600),
+                })
+                : `${Math.floor(diffInSeconds / 3600)} jam lalu`;
+        if (diffInSeconds < 2592000)
+            return t
+                ? t("billing.wallet_detail.rel.days", "{{count}} hari lalu", {
+                    count: Math.floor(diffInSeconds / 86400),
+                })
+                : `${Math.floor(diffInSeconds / 86400)} hari lalu`;
+        return new Intl.DateTimeFormat(locale, {
+            dateStyle: "medium",
+            timeZone: tz,
+        }).format(date);
     } catch {
         return dateString;
     }
 }
 
-function getTxTypeBadge(type: number | undefined, t: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
-    if (type === 1) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{t("billing.wallet_detail.tx_types.topup", "TopUp")}</span>;
-    if (type === 2) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">{t("billing.wallet_detail.tx_types.withdraw", "Withdraw")}</span>;
-    if (type === 3) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">{t("billing.wallet_detail.tx_types.transfer", "Transfer")}</span>;
-    if (type === 4) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">{t("billing.wallet_detail.tx_types.payment", "Payment")}</span>;
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{t("billing.wallet_detail.tx_types.other", "Lainnya")}</span>;
+function formatDateShort(dateString: string | undefined, locale: string = "id-ID") {
+    if (!dateString) return "—";
+    try {
+        const date = new Date(dateString);
+        return new Intl.DateTimeFormat(locale, {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        }).format(date);
+    } catch {
+        return dateString;
+    }
 }
 
-function getStatusBadge(status: string | undefined, t: (key: string, fallback?: string, params?: Record<string, string | number>) => string) {
+function formatDateInput(dateString: string | undefined) {
+    if (!dateString) return "";
+    try {
+        const d = new Date(dateString);
+        return d.toISOString().slice(0, 10);
+    } catch {
+        return "";
+    }
+}
+
+function getTxTypeBadge(
+    type: number | undefined,
+    t: (key: string, fallback?: string, params?: Record<string, string | number>) => string
+) {
+    if (type === 1)
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                {t("billing.wallet_detail.tx_types.topup", "TopUp")}
+            </span>
+        );
+    if (type === 2)
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                {t("billing.wallet_detail.tx_types.withdraw", "Withdraw")}
+            </span>
+        );
+    if (type === 3)
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                {t("billing.wallet_detail.tx_types.transfer", "Transfer")}
+            </span>
+        );
+    if (type === 4)
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                {t("billing.wallet_detail.tx_types.payment", "Payment")}
+            </span>
+        );
+    return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+            {t("billing.wallet_detail.tx_types.other", "Lainnya")}
+        </span>
+    );
+}
+
+function getStatusBadge(
+    status: string | undefined,
+    t: (key: string, fallback?: string, params?: Record<string, string | number>) => string
+) {
     const s = (status || "").toLowerCase();
     if (s === "success" || s === "completed" || s === "approved") {
-        return <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{t("billing.wallet_detail.tx_status.success", "Berhasil")}</span>;
+        return (
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                {t("billing.wallet_detail.tx_status.success", "Berhasil")}
+            </span>
+        );
     }
     if (s === "pending" || s === "waiting") {
-        return <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{t("billing.wallet_detail.tx_status.pending", "Pending")}</span>;
+        return (
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                {t("billing.wallet_detail.tx_status.pending", "Pending")}
+            </span>
+        );
     }
     if (s === "failed" || s === "rejected" || s === "cancelled") {
-        return <span className="text-[10px] font-bold text-red-600 dark:text-red-400">{t("billing.wallet_detail.tx_status.failed", "Gagal")}</span>;
+        return (
+            <span className="text-[10px] font-bold text-red-600 dark:text-red-400">
+                {t("billing.wallet_detail.tx_status.failed", "Gagal")}
+            </span>
+        );
     }
-    return <span className="text-[10px] font-bold text-gray-500">{status || "—"}</span>;
+    return (
+        <span className="text-[10px] font-bold text-gray-500">{status || "—"}</span>
+    );
 }
+
+function getTxTypeName(
+    type: number | undefined,
+    t: (key: string, fallback?: string) => string
+): string {
+    if (type === 1) return t("billing.wallet_detail.tx_types.topup", "TopUp");
+    if (type === 2) return t("billing.wallet_detail.tx_types.withdraw", "Withdraw");
+    if (type === 3) return t("billing.wallet_detail.tx_types.transfer", "Transfer");
+    if (type === 4) return t("billing.wallet_detail.tx_types.payment", "Payment");
+    return t("billing.wallet_detail.tx_types.other", "Lainnya");
+}
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface UserWalletDetailProps {
     userId: string;
-    userData?: any; // To display profile info if needed
-    hideProfileCard?: boolean; // Option to hide the profile card if rendered inside a page that already has one
-    hideLimitFeature?: boolean; // Option to hide the "Set Limit" feature entirely
+    userData?: any;
+    hideProfileCard?: boolean;
+    hideLimitFeature?: boolean;
 }
 
-export function UserWalletDetail({ userId, userData, hideProfileCard = false, hideLimitFeature = false }: UserWalletDetailProps) {
+type ViewMode = "list" | "mutasi";
+
+// ─── Main Component ────────────────────────────────────────────────────────────
+
+export function UserWalletDetail({
+    userId,
+    userData,
+    hideProfileCard = false,
+    hideLimitFeature = false,
+}: UserWalletDetailProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const lang = pathname?.split('/')[1] || 'en';
+    const lang = pathname?.split("/")[1] || "en";
     const { t, locale } = useI18n();
+    const isRTL = locale === "ar";
 
     const [loading, setLoading] = useState(true);
     const [walletData, setWalletData] = useState<any>(null);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
-    
-    // Edit Limit Modal State
+
+    // ─── View Mode ──────────────────────────────────────────────────────────
+    const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+    // ─── Filters ────────────────────────────────────────────────────────────
+    const [filterDateFrom, setFilterDateFrom] = useState("");
+    const [filterDateTo, setFilterDateTo] = useState("");
+    const [filterType, setFilterType] = useState<string>("all");
+    const [filterOpen, setFilterOpen] = useState(false);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // ─── Modals ─────────────────────────────────────────────────────────────
     const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
     const [limits, setLimits] = useState({
         dailyTopupLimit: "",
         dailyWithdrawLimit: "",
         dailyTransferLimit: "",
         minWithdrawAmount: "",
-        maxBalance: ""
+        maxBalance: "",
     });
-
-    // Suspend Modal State
     const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
     const [suspendReason, setSuspendReason] = useState("");
-
-    // Activate Modal State
     const [isActivateModalOpen, setIsActivateModalOpen] = useState(false);
 
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+    // ─── Print ref ──────────────────────────────────────────────────────────
+    const printRef = useRef<HTMLDivElement>(null);
+
+    // ─── Data Fetching ───────────────────────────────────────────────────────
     const fetchData = () => {
         setLoading(true);
         try {
-            // Mock Data Integration
             const wInfo = getSimWallet(userId);
             const wBalances = getSimWalletBalances(userId);
             const allTxs = getSimTransactions();
-            const txData = allTxs.filter((tx: any) => String(tx.userId) === String(userId));
-            
-            setWalletData({
-                ...wInfo,
-                ...wBalances,
-            });
+            const txData = allTxs.filter(
+                (tx: any) => String(tx.userId) === String(userId)
+            );
+            setWalletData({ ...wInfo, ...wBalances });
             setTransactions(txData);
         } catch (err) {
             console.error("Error fetching wallet data:", err);
@@ -134,23 +268,85 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
     };
 
     useEffect(() => {
-        if (userId) {
-            fetchData();
-        }
+        if (userId) fetchData();
     }, [userId]);
 
+    // Close filter popover on outside click
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                setFilterOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // ─── Filtered Transactions ────────────────────────────────────────────────
+    const filteredTransactions = useMemo(() => {
+        let txs = [...transactions];
+        if (filterDateFrom) {
+            const from = new Date(filterDateFrom);
+            from.setHours(0, 0, 0, 0);
+            txs = txs.filter((tx) => new Date(tx.createdAt) >= from);
+        }
+        if (filterDateTo) {
+            const to = new Date(filterDateTo);
+            to.setHours(23, 59, 59, 999);
+            txs = txs.filter((tx) => new Date(tx.createdAt) <= to);
+        }
+        if (filterType !== "all") {
+            const typeNum = parseInt(filterType, 10);
+            txs = txs.filter((tx) => tx.type === typeNum);
+        }
+        return txs;
+    }, [transactions, filterDateFrom, filterDateTo, filterType]);
+
+    // ─── Mutasi Bank: running balance (baris terbaru = activeBalance) ──────────
+    const mutasiRows = useMemo(() => {
+        if (!walletData) return [];
+        // Sort ascending (oldest first) to compute running balance
+        const ascending = [...filteredTransactions].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+
+        let running = 0;
+        const withBalance = ascending.map((tx) => {
+            running += tx.amount;
+            return { ...tx, runningBalance: Math.max(0, running) };
+        });
+
+        // Adjust so the latest row's balance = activeBalance
+        // The actual activeBalance is authoritative, so we compute the delta
+        const activeBalance: number = walletData.activeBalance ?? walletData.balance ?? 0;
+        if (withBalance.length > 0) {
+            const lastComputedBalance = withBalance[withBalance.length - 1].runningBalance;
+            const delta = activeBalance - lastComputedBalance;
+            return withBalance.map((tx) => ({
+                ...tx,
+                runningBalance: Math.max(0, tx.runningBalance + delta),
+            })).reverse(); // descending for display
+        }
+        return [];
+    }, [filteredTransactions, walletData]);
+
+    // ─── Handlers ────────────────────────────────────────────────────────────
     const handleSuspendWallet = () => {
         if (!suspendReason.trim()) {
-            toast.error(t("billing.wallet_detail.toasts.suspend_reason_required", "Alasan penangguhan wajib diisi"));
+            toast.error(
+                t("billing.wallet_detail.toasts.suspend_reason_required", "Alasan penangguhan wajib diisi")
+            );
             return;
         }
         setIsProcessing(true);
         try {
-            updateSimWallet(userId, { status: "suspended", suspendReason: suspendReason });
+            updateSimWallet(userId, { status: "suspended", suspendReason });
             fetchData();
-            toast.success(t("billing.wallet_detail.toasts.suspend_success", "Status dompet berhasil diubah menjadi Suspended"));
+            toast.success(
+                t("billing.wallet_detail.toasts.suspend_success", "Status dompet berhasil diubah menjadi Suspended")
+            );
             setIsSuspendModalOpen(false);
-        } catch (error) {
+        } catch {
             toast.error(t("billing.wallet_detail.toasts.suspend_error", "Gagal melakukan suspend dompet"));
         } finally {
             setIsProcessing(false);
@@ -162,9 +358,11 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
         try {
             updateSimWallet(userId, { status: "active", suspendReason: null });
             fetchData();
-            toast.success(t("billing.wallet_detail.toasts.activate_success", "Status dompet berhasil diaktifkan kembali"));
+            toast.success(
+                t("billing.wallet_detail.toasts.activate_success", "Status dompet berhasil diaktifkan kembali")
+            );
             setIsActivateModalOpen(false);
-        } catch (error) {
+        } catch {
             toast.error(t("billing.wallet_detail.toasts.activate_error", "Gagal mengaktifkan dompet"));
         } finally {
             setIsProcessing(false);
@@ -173,20 +371,21 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
 
     const handleSaveLimit = () => {
         const parsedLimits = {
-            dailyTopupLimit: parseInt(limits.dailyTopupLimit.replace(/\D/g, ''), 10) || null,
-            dailyWithdrawLimit: parseInt(limits.dailyWithdrawLimit.replace(/\D/g, ''), 10) || null,
-            dailyTransferLimit: parseInt(limits.dailyTransferLimit.replace(/\D/g, ''), 10) || null,
-            minWithdrawAmount: parseInt(limits.minWithdrawAmount.replace(/\D/g, ''), 10) || null,
-            maxBalance: parseInt(limits.maxBalance.replace(/\D/g, ''), 10) || null,
+            dailyTopupLimit: parseInt(limits.dailyTopupLimit.replace(/\D/g, ""), 10) || null,
+            dailyWithdrawLimit: parseInt(limits.dailyWithdrawLimit.replace(/\D/g, ""), 10) || null,
+            dailyTransferLimit: parseInt(limits.dailyTransferLimit.replace(/\D/g, ""), 10) || null,
+            minWithdrawAmount: parseInt(limits.minWithdrawAmount.replace(/\D/g, ""), 10) || null,
+            maxBalance: parseInt(limits.maxBalance.replace(/\D/g, ""), 10) || null,
         };
-        
         setIsProcessing(true);
         try {
             updateSimWallet(userId, { limits: parsedLimits });
             fetchData();
-            toast.success(t("billing.wallet_detail.toasts.limit_success", "Limit wallet berhasil diperbarui"));
+            toast.success(
+                t("billing.wallet_detail.toasts.limit_success", "Limit wallet berhasil diperbarui")
+            );
             setIsLimitModalOpen(false);
-        } catch (error) {
+        } catch {
             toast.error(t("billing.wallet_detail.toasts.limit_error", "Gagal memperbarui limit wallet"));
         } finally {
             setIsProcessing(false);
@@ -200,16 +399,106 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
             dailyWithdrawLimit: currentLimits.dailyWithdrawLimit?.toString() || "",
             dailyTransferLimit: currentLimits.dailyTransferLimit?.toString() || "",
             minWithdrawAmount: currentLimits.minWithdrawAmount?.toString() || "",
-            maxBalance: currentLimits.maxBalance?.toString() || ""
+            maxBalance: currentLimits.maxBalance?.toString() || "",
         });
         setIsLimitModalOpen(true);
     };
 
-    const openSuspendModal = () => {
-        setSuspendReason("");
-        setIsSuspendModalOpen(true);
+    const handleExportPDF = () => {
+        const userName = userData?.name || userData?.username || userId;
+        const fromLabel = filterDateFrom || "—";
+        const toLabel = filterDateTo || "—";
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+            toast.error("Popup diblokir browser. Izinkan popup untuk ekspor PDF.");
+            return;
+        }
+
+        const rows = mutasiRows
+            .map(
+                (tx) => `
+          <tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap;font-size:12px;color:#374151">
+              ${formatDateShort(tx.createdAt, locale)}
+            </td>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151">
+              <div style="font-weight:600">${getTxTypeName(tx.type, t)}</div>
+              <div style="color:#9ca3af;font-size:11px">${tx.referenceId || `#${tx.id}`}</div>
+              <div style="color:#6b7280;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tx.description || ""}</div>
+            </td>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:${tx.amount < 0 ? "#dc2626" : "#d1fae5"}">
+              ${tx.amount < 0 ? formatCurrency(Math.abs(tx.amount), locale) : ""}
+            </td>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:${tx.amount >= 0 ? "#059669" : "#d1fae5"}">
+              ${tx.amount >= 0 ? formatCurrency(tx.amount, locale) : ""}
+            </td>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:#111827">
+              ${formatCurrency(tx.runningBalance, locale)}
+            </td>
+          </tr>`
+            )
+            .join("");
+
+        printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="${isRTL ? "rtl" : "ltr"}" lang="${locale}">
+      <head>
+        <meta charset="UTF-8"/>
+        <title>${t("user_detail.wallet_statement.print_title", "Mutasi Rekening")} — ${userName}</title>
+        <style>
+          body{font-family:Arial,sans-serif;color:#111827;margin:0;padding:32px;background:#fff}
+          h1{font-size:20px;margin-bottom:4px;color:#065f46}
+          .meta{font-size:12px;color:#6b7280;margin-bottom:24px}
+          table{width:100%;border-collapse:collapse;font-size:12px}
+          thead tr{background:#f0fdf4}
+          th{padding:10px 12px;text-align:left;font-size:11px;color:#374151;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1fae5}
+          th.num,td.num{text-align:right}
+          tr:nth-child(even){background:#f9fafb}
+          tfoot tr{background:#ecfdf5}
+          tfoot td{font-weight:700;border-top:2px solid #6ee7b7;padding:10px 12px;font-size:12px}
+          @media print{body{padding:16px}}
+        </style>
+      </head>
+      <body>
+        <h1>🕌 Qurani — ${t("user_detail.wallet_statement.print_title", "Mutasi Rekening")}</h1>
+        <div class="meta">
+          ${t("user_detail.wallet_statement.print_user", "Pengguna")}: <strong>${userName}</strong> &nbsp;|&nbsp;
+          ${t("user_detail.wallet_statement.print_period", "Periode")}: <strong>${fromLabel} → ${toLabel}</strong> &nbsp;|&nbsp;
+          ${t("user_detail.wallet_statement.print_generated", "Dicetak pada")}: <strong>${new Date().toLocaleString(locale)}</strong>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>${t("user_detail.wallet_statement.col_date", "Tanggal")}</th>
+              <th>${t("user_detail.wallet_statement.col_desc", "Keterangan")}</th>
+              <th class="num">${t("user_detail.wallet_statement.col_debit", "Debit")}</th>
+              <th class="num">${t("user_detail.wallet_statement.col_credit", "Kredit")}</th>
+              <th class="num">${t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">${t("billing.wallet_detail.active_balance", "Saldo Aktif")}</td>
+              <td class="num">${formatCurrency(walletData?.activeBalance ?? 0, locale)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <script>window.onload=function(){window.print();window.close()}<\/script>
+      </body>
+      </html>`);
+        printWindow.document.close();
     };
 
+    const hasActiveFilters = filterDateFrom || filterDateTo || filterType !== "all";
+
+    const clearFilters = () => {
+        setFilterDateFrom("");
+        setFilterDateTo("");
+        setFilterType("all");
+    };
+
+    // ─── Loading / Empty states ───────────────────────────────────────────────
     if (loading) {
         return (
             <div className="space-y-6">
@@ -226,51 +515,72 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                 <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                     <AlertTriangle className="w-12 h-12 text-amber-400" />
                 </div>
-                <p className="text-base font-medium text-gray-600 dark:text-gray-400">{t("billing.wallet_detail.title", "Data Dompet User tidak ditemukan")}</p>
+                <p className="text-base font-medium text-gray-600 dark:text-gray-400">
+                    {t("billing.wallet_detail.title", "Data Dompet User tidak ditemukan")}
+                </p>
             </div>
         );
     }
 
+    // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300" dir={isRTL ? "rtl" : "ltr"}>
+
             {/* Profile Card with Wallet Status & ID */}
             {!hideProfileCard && userData && (
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800/50 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-2xl shrink-0 shadow-sm">
-                            {userData?.name?.[0]?.toUpperCase() || 'U'}
+                            {userData?.name?.[0]?.toUpperCase() || "U"}
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{userData?.name}</h2>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
                                 {userData?.username && (
-                                    <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">@{userData.username.replace('@', '')}</span>
+                                    <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                                        @{userData.username.replace("@", "")}
+                                    </span>
                                 )}
                                 {userData?.email && (
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">{userData.email}</span>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                                        {userData.email}
+                                    </span>
                                 )}
                             </div>
                         </div>
                     </div>
-                    {/* Move Wallet ID & Status to top right */}
                     <div className="flex sm:flex-col items-center sm:items-end gap-1 text-right">
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("billing.wallet_detail.status_label", "Status:")}</span>
-                            <Badge variant="outline" className={`capitalize ${walletData.status?.toLowerCase() === 'suspended' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'}`}>
-                                {walletData.status?.toLowerCase() === 'suspended'
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                {t("billing.wallet_detail.status_label", "Status:")}
+                            </span>
+                            <Badge
+                                variant="outline"
+                                className={`capitalize ${walletData.status?.toLowerCase() === "suspended"
+                                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+                                    : "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+                                    }`}
+                            >
+                                {walletData.status?.toLowerCase() === "suspended"
                                     ? t("billing.wallet_detail.status_suspended", "Suspended")
                                     : t("billing.wallet_detail.status_active", "Active")}
                             </Badge>
                         </div>
-                        {walletData.status?.toLowerCase() === 'suspended' && walletData.suspendReason && (
-                            <span className="text-[10px] text-red-500 font-medium mb-1 max-w-[150px] truncate" title={walletData.suspendReason}>
+                        {walletData.status?.toLowerCase() === "suspended" && walletData.suspendReason && (
+                            <span
+                                className="text-[10px] text-red-500 font-medium mb-1 max-w-[150px] truncate"
+                                title={walletData.suspendReason}
+                            >
                                 {t("billing.wallet_detail.reason_label", "Alasan:")} {walletData.suspendReason}
                             </span>
                         )}
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("billing.wallet_detail.id_label", "ID:")}</span>
-                            <span className="font-mono text-sm font-bold text-gray-800 dark:text-gray-200">{walletData.id || `W-MOCK-${userId}`}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                {t("billing.wallet_detail.id_label", "ID:")}
+                            </span>
+                            <span className="font-mono text-sm font-bold text-gray-800 dark:text-gray-200">
+                                {walletData.id || `W-MOCK-${userId}`}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -281,14 +591,15 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div className="flex items-center gap-2">
                         <Wallet className="w-5 h-5 text-emerald-500" />
-                        <h3 className="font-bold text-gray-900 dark:text-white">{t("billing.wallet_detail.title", "Informasi Wallet")}</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white">
+                            {t("billing.wallet_detail.title", "Informasi Wallet")}
+                        </h3>
                     </div>
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {!hideLimitFeature && (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={openLimitModal}
                                 disabled={isProcessing}
                                 className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
@@ -296,9 +607,9 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                 {t("billing.wallet_detail.set_limit", "Set Limit")}
                             </Button>
                         )}
-                        {walletData.status?.toLowerCase() === 'suspended' ? (
-                            <Button 
-                                variant="outline" 
+                        {walletData.status?.toLowerCase() === "suspended" ? (
+                            <Button
+                                variant="outline"
                                 size="sm"
                                 className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-900/20"
                                 onClick={() => setIsActivateModalOpen(true)}
@@ -307,14 +618,14 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                                 {t("billing.wallet_detail.activate", "Aktifkan")}
                             </Button>
                         ) : (
-                            <Button 
-                                variant="destructive" 
+                            <Button
+                                variant="destructive"
                                 size="sm"
                                 className="bg-red-500 hover:bg-red-600 text-white"
-                                onClick={openSuspendModal}
+                                onClick={() => { setSuspendReason(""); setIsSuspendModalOpen(true); }}
                                 disabled={isProcessing}
                             >
-                                {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                 {t("billing.wallet_detail.suspend", "Suspend")}
                             </Button>
                         )}
@@ -323,111 +634,482 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.active_balance", "Saldo Aktif")}</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
+                            {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
+                        </div>
                         <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(walletData?.activeBalance || walletData?.balance || 0, locale)}
                         </div>
                     </div>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.pending_balance", "Saldo Pending")}</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
+                            {t("billing.wallet_detail.pending_balance", "Saldo Pending")}
+                        </div>
                         <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                             {formatCurrency(walletData?.pendingBalance || 0, locale)}
                         </div>
                     </div>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col justify-center">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">{t("billing.wallet_detail.total_transactions", "Total Transaksi")}</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
+                            {t("billing.wallet_detail.total_transactions", "Total Transaksi")}
+                        </div>
                         <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                            {transactions.length} <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("billing.wallet_detail.transactions", "Transaksi")}</span>
+                            {transactions.length}{" "}
+                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                {t("billing.wallet_detail.transactions", "Transaksi")}
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Transaction History */}
+            {/* Transaction History / Mutasi Bank */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <History className="w-5 h-5 text-emerald-500" />
-                        <h3 className="font-bold text-gray-900 dark:text-white">{t("billing.wallet_detail.history_title", "Riwayat Transaksi")}</h3>
+
+                {/* Section Header */}
+                <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800">
+                    {/* Top row: title + toggle + export */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <History className="w-5 h-5 text-emerald-500 shrink-0" />
+                            <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
+                                {t("billing.wallet_detail.history_title", "Riwayat Transaksi")}
+                            </h3>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Segmented control: List / Mutasi Bank */}
+                            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 gap-0.5">
+                                <button
+                                    onClick={() => setViewMode("list")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${viewMode === "list"
+                                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                        }`}
+                                >
+                                    {t("user_detail.wallet_statement.view_list", "Daftar")}
+                                </button>
+                                <button
+                                    onClick={() => setViewMode("mutasi")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${viewMode === "mutasi"
+                                        ? "bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                        }`}
+                                >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    {t("user_detail.wallet_statement.view_mutasi", "Mutasi Bank")}
+                                </button>
+                            </div>
+
+                            {/* Export PDF — only in mutasi mode */}
+                            {viewMode === "mutasi" && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExportPDF}
+                                    className="gap-1.5 text-xs h-8 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-emerald-400 hover:text-emerald-600 transition-colors"
+                                >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    {t("user_detail.wallet_statement.export_pdf", "Ekspor PDF")}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Filter bar (shared both modes) */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {/* Filter popover trigger */}
+                        <div className="relative" ref={filterRef}>
+                            <button
+                                onClick={() => setFilterOpen((v) => !v)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${hasActiveFilters
+                                    ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-300"
+                                    }`}
+                            >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                                {t("user_detail.wallet_statement.filter_type", "Filter")}
+                                {hasActiveFilters && (
+                                    <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                )}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+                            </button>
+
+                            {filterOpen && (
+                                <div className="absolute top-full mt-2 z-30 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl p-4 space-y-3"
+                                    style={{ [isRTL ? "right" : "left"]: 0 }}>
+                                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                        {t("user_detail.wallet_statement.filter_type", "Filter Transaksi")}
+                                    </p>
+
+                                    {/* Date range */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                                                {t("user_detail.wallet_statement.filter_from", "Dari")}
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={filterDateFrom}
+                                                onChange={(e) => setFilterDateFrom(e.target.value)}
+                                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                                                {t("user_detail.wallet_statement.filter_to", "Sampai")}
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={filterDateTo}
+                                                onChange={(e) => setFilterDateTo(e.target.value)}
+                                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Transaction type */}
+                                    <div>
+                                        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                                            {t("user_detail.wallet_statement.filter_type", "Jenis Transaksi")}
+                                        </label>
+                                        <select
+                                            value={filterType}
+                                            onChange={(e) => setFilterType(e.target.value)}
+                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        >
+                                            <option value="all">{t("user_detail.wallet_statement.filter_type_all", "Semua")}</option>
+                                            <option value="1">{t("user_detail.wallet_statement.filter_topup", "TopUp")}</option>
+                                            <option value="2">{t("user_detail.wallet_statement.filter_withdraw", "Withdraw")}</option>
+                                            <option value="3">{t("user_detail.wallet_statement.filter_transfer", "Transfer")}</option>
+                                            <option value="4">{t("user_detail.wallet_statement.filter_payment", "Pembayaran")}</option>
+                                        </select>
+                                    </div>
+
+                                    {hasActiveFilters && (
+                                        <button
+                                            onClick={clearFilters}
+                                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold transition-colors"
+                                        >
+                                            <X className="w-3 h-3" />
+                                            Reset Filter
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Active filter chips */}
+                        {filterDateFrom && (
+                            <span className="flex items-center gap-1 text-[10px] bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-1 rounded-full font-semibold">
+                                {t("user_detail.wallet_statement.filter_from", "Dari")} {filterDateFrom}
+                                <button onClick={() => setFilterDateFrom("")}><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {filterDateTo && (
+                            <span className="flex items-center gap-1 text-[10px] bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-1 rounded-full font-semibold">
+                                {t("user_detail.wallet_statement.filter_to", "Sampai")} {filterDateTo}
+                                <button onClick={() => setFilterDateTo("")}><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {filterType !== "all" && (
+                            <span className="flex items-center gap-1 text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-2 py-1 rounded-full font-semibold">
+                                {getTxTypeName(parseInt(filterType), t)}
+                                <button onClick={() => setFilterType("all")}><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+
+                        {/* Result count */}
+                        {hasActiveFilters && (
+                            <span className="text-[10px] text-gray-400 font-medium ml-1">
+                                {filteredTransactions.length} {t("billing.wallet_detail.transactions", "transaksi")}
+                            </span>
+                        )}
                     </div>
                 </div>
 
-                {transactions.length === 0 ? (
-                    <div className="text-center py-12 px-4 text-gray-400">
-                        <History className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                        <p className="font-medium text-gray-500">{t("billing.wallet_detail.empty_history", "Belum ada riwayat transaksi")}</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left whitespace-nowrap">
-                            <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
-                                <tr>
-                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.id", "ID")}</th>
-                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.category", "Kategori")}</th>
-                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.amount", "Nominal")}</th>
-                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.status", "Status")}</th>
-                                    <th className="px-5 py-3.5">{t("billing.wallet_detail.table.date", "Tanggal")}</th>
-                                    <th className="px-5 py-3.5 text-center">{t("billing.wallet_detail.table.action", "Aksi")}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
-                                {transactions.map((tx: any) => (
-                                    <tr 
-                                        key={tx.id} 
-                                        onClick={() => router.push(`/${lang}/billing/${tx.id}/transaction`)}
-                                        className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors cursor-pointer group"
-                                    >
-                                        <td className="px-5 py-4">
-                                            {tx.referenceId ? (
-                                                <>
-                                                    <div className="font-bold text-gray-900 dark:text-white text-sm font-mono">{tx.referenceId}</div>
-                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">{t("billing.wallet_detail.internal_id", "Internal: #{{id}}", { id: tx.id })}</div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="font-bold text-gray-900 dark:text-white text-sm">#{tx.id}</div>
-                                                    <div className="text-[10px] text-gray-400 uppercase mt-0.5">{t("billing.wallet_detail.internal_tx", "Transaksi Internal")}</div>
-                                                </>
-                                            )}
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex flex-col items-start gap-1">
-                                                {getTxTypeBadge(tx.type, t)}
-                                                {tx.paymentMethod && (
-                                                    <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                                                        {tx.paymentMethod}
+                {/* ── LIST MODE ─────────────────────────────────────────────────────── */}
+                {viewMode === "list" && (
+                    <>
+                        {filteredTransactions.length === 0 ? (
+                            <div className="text-center py-12 px-4 text-gray-400">
+                                <History className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                                <p className="font-medium text-gray-500">
+                                    {t("billing.wallet_detail.empty_history", "Belum ada riwayat transaksi")}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left whitespace-nowrap">
+                                    <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
+                                        <tr>
+                                            <th className="px-5 py-3.5">{t("billing.wallet_detail.table.id", "ID")}</th>
+                                            <th className="px-5 py-3.5">{t("billing.wallet_detail.table.category", "Kategori")}</th>
+                                            <th className="px-5 py-3.5">{t("billing.wallet_detail.table.amount", "Nominal")}</th>
+                                            <th className="px-5 py-3.5">{t("billing.wallet_detail.table.status", "Status")}</th>
+                                            <th className="px-5 py-3.5">{t("billing.wallet_detail.table.date", "Tanggal")}</th>
+                                            <th className="px-5 py-3.5 text-center">{t("billing.wallet_detail.table.action", "Aksi")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
+                                        {filteredTransactions.map((tx: any) => (
+                                            <tr
+                                                key={tx.id}
+                                                onClick={() => router.push(`/${lang}/billing/${tx.id}/transaction`)}
+                                                className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors cursor-pointer group"
+                                            >
+                                                <td className="px-5 py-4">
+                                                    {tx.referenceId ? (
+                                                        <>
+                                                            <div className="font-bold text-gray-900 dark:text-white text-sm font-mono">{tx.referenceId}</div>
+                                                            <div className="text-[10px] text-gray-400 uppercase mt-0.5">
+                                                                {t("billing.wallet_detail.internal_id", "Internal: #{{id}}", { id: tx.id })}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="font-bold text-gray-900 dark:text-white text-sm">#{tx.id}</div>
+                                                            <div className="text-[10px] text-gray-400 uppercase mt-0.5">
+                                                                {t("billing.wallet_detail.internal_tx", "Transaksi Internal")}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        {getTxTypeBadge(tx.type, t)}
+                                                        {tx.paymentMethod && (
+                                                            <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                                                {tx.paymentMethod}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[11px] text-gray-500 truncate max-w-[200px]">
+                                                            {tx.description || t("billing.wallet_detail.description_fallback", "Transaksi")}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className={`font-black text-sm ${tx.amount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                                        {tx.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(tx.amount), locale)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="bg-gray-50 dark:bg-gray-800/60 px-2.5 py-1 rounded border border-gray-100 dark:border-gray-700/50 inline-flex items-center">
+                                                        {getStatusBadge(tx.status, t)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                                        {formatDate(tx.createdAt, "relative", tz, locale, t)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4 text-center">
+                                                    <button className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-md transition-colors inline-flex items-center">
+                                                        {t("billing.wallet_detail.detail", "Detail")}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* ── MUTASI BANK MODE ──────────────────────────────────────────────── */}
+                {viewMode === "mutasi" && (
+                    <div ref={printRef}>
+                        {mutasiRows.length === 0 ? (
+                            <div className="text-center py-12 px-4 text-gray-400">
+                                <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                                <p className="font-medium text-gray-500">
+                                    {t("user_detail.wallet_statement.empty", "Tidak ada transaksi ditemukan")}
+                                </p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* ── Desktop table ── */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full text-sm whitespace-nowrap" dir={isRTL ? "rtl" : "ltr"}>
+                                        <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
+                                            <tr>
+                                                <th className={`px-5 py-3.5 ${isRTL ? "text-right" : "text-left"}`}>
+                                                    {t("user_detail.wallet_statement.col_date", "Tanggal")}
+                                                </th>
+                                                <th className={`px-5 py-3.5 ${isRTL ? "text-right" : "text-left"}`}>
+                                                    {t("user_detail.wallet_statement.col_desc", "Keterangan")}
+                                                </th>
+                                                <th className="px-5 py-3.5 text-right">
+                                                    {t("user_detail.wallet_statement.col_debit", "Debit")}
+                                                </th>
+                                                <th className="px-5 py-3.5 text-right">
+                                                    {t("user_detail.wallet_statement.col_credit", "Kredit")}
+                                                </th>
+                                                <th className="px-5 py-3.5 text-right">
+                                                    {t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
+                                            {mutasiRows.map((tx: any, idx: number) => {
+                                                const isDebit = tx.amount < 0;
+                                                const isFirst = idx === 0;
+                                                return (
+                                                    <tr
+                                                        key={`${tx.id}-${idx}`}
+                                                        className={`transition-colors ${isFirst
+                                                            ? "bg-emerald-50/60 dark:bg-emerald-900/10"
+                                                            : "hover:bg-gray-50/60 dark:hover:bg-gray-800/30"
+                                                            }`}
+                                                    >
+                                                        <td className="px-5 py-3.5">
+                                                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                                {formatDateShort(tx.createdAt, locale)}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-3.5 max-w-[280px]">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {getTxTypeBadge(tx.type, t)}
+                                                                    <span className="text-[10px] font-mono text-gray-400">
+                                                                        {tx.referenceId || `#${tx.id}`}
+                                                                    </span>
+                                                                </div>
+                                                                {tx.description && (
+                                                                    <span className="text-[11px] text-gray-500 truncate">
+                                                                        {tx.description}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-3.5 text-right">
+                                                            {isDebit ? (
+                                                                <span className="font-bold text-sm text-red-600 dark:text-red-400">
+                                                                    {formatCurrency(Math.abs(tx.amount), locale)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 dark:text-gray-700 text-sm">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-5 py-3.5 text-right">
+                                                            {!isDebit ? (
+                                                                <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                                                                    {formatCurrency(tx.amount, locale)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 dark:text-gray-700 text-sm">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-5 py-3.5 text-right">
+                                                            <span className={`font-black text-sm ${isFirst
+                                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                                : "text-gray-800 dark:text-gray-200"
+                                                                }`}>
+                                                                {formatCurrency(tx.runningBalance, locale)}
+                                                            </span>
+                                                            {isFirst && (
+                                                                <div className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider mt-0.5">
+                                                                    ● {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        {/* Footer: active balance confirmation */}
+                                        <tfoot>
+                                            <tr className="bg-emerald-50 dark:bg-emerald-900/20 border-t-2 border-emerald-200 dark:border-emerald-800">
+                                                <td colSpan={4} className="px-5 py-3 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                                                    {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
+                                                </td>
+                                                <td className="px-5 py-3 text-right font-black text-base text-emerald-700 dark:text-emerald-400">
+                                                    {formatCurrency(walletData?.activeBalance ?? 0, locale)}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                {/* ── Mobile card layout ── */}
+                                <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-800">
+                                    {mutasiRows.map((tx: any, idx: number) => {
+                                        const isDebit = tx.amount < 0;
+                                        const isFirst = idx === 0;
+                                        return (
+                                            <div
+                                                key={`mob-${tx.id}-${idx}`}
+                                                className={`px-4 py-3.5 ${isFirst ? "bg-emerald-50/60 dark:bg-emerald-900/10" : ""}`}
+                                            >
+                                                {/* Row 1: date + type */}
+                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        {getTxTypeBadge(tx.type, t)}
+                                                        <span className="text-[10px] font-mono text-gray-400">
+                                                            {tx.referenceId || `#${tx.id}`}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">
+                                                        {formatDateShort(tx.createdAt, locale)}
                                                     </span>
+                                                </div>
+                                                {/* Description */}
+                                                {tx.description && (
+                                                    <p className="text-[11px] text-gray-500 mb-2 leading-snug">{tx.description}</p>
                                                 )}
-                                                <span className="text-[11px] text-gray-500 truncate max-w-[200px]">{tx.description || t("billing.wallet_detail.description_fallback", "Transaksi")}</span>
+                                                {/* Row 2: Debit / Kredit / Saldo */}
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
+                                                            {t("user_detail.wallet_statement.col_debit", "Debit")}
+                                                        </p>
+                                                        <p className={`text-sm font-bold ${isDebit ? "text-red-600 dark:text-red-400" : "text-gray-300 dark:text-gray-700"}`}>
+                                                            {isDebit ? formatCurrency(Math.abs(tx.amount), locale) : "—"}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
+                                                            {t("user_detail.wallet_statement.col_credit", "Kredit")}
+                                                        </p>
+                                                        <p className={`text-sm font-bold ${!isDebit ? "text-emerald-600 dark:text-emerald-400" : "text-gray-300 dark:text-gray-700"}`}>
+                                                            {!isDebit ? formatCurrency(tx.amount, locale) : "—"}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 text-right">
+                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
+                                                            {t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}
+                                                        </p>
+                                                        <p className={`text-sm font-black ${isFirst ? "text-emerald-600 dark:text-emerald-400" : "text-gray-800 dark:text-gray-200"}`}>
+                                                            {formatCurrency(tx.runningBalance, locale)}
+                                                        </p>
+                                                        {isFirst && (
+                                                            <p className="text-[8px] text-emerald-500 font-bold uppercase">
+                                                                ● {t("billing.wallet_detail.active_balance", "Aktif")}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className={`font-black text-sm ${tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount), locale)}
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="bg-gray-50 dark:bg-gray-800/60 px-2.5 py-1 rounded border border-gray-100 dark:border-gray-700/50 inline-flex items-center">
-                                                {getStatusBadge(tx.status, t)}
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                                {formatDate(tx.createdAt, 'relative', tz, locale, t)}
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <button className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-md transition-colors inline-flex items-center">
-                                                {t("billing.wallet_detail.detail", "Detail")}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        );
+                                    })}
+                                    {/* Mobile footer */}
+                                    <div className="px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-between border-t-2 border-emerald-200 dark:border-emerald-800">
+                                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                                            {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
+                                        </span>
+                                        <span className="font-black text-base text-emerald-700 dark:text-emerald-400">
+                                            {formatCurrency(walletData?.activeBalance ?? 0, locale)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>
+
+            {/* ── Modals ──────────────────────────────────────────────────────────── */}
 
             {/* Edit Limit Modal */}
             <Dialog open={isLimitModalOpen} onOpenChange={setIsLimitModalOpen}>
@@ -436,68 +1118,38 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                         <DialogTitle>{t("billing.wallet_detail.limit_modal.title", "Ubah Limit Wallet")}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyTopupLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_topup", "Daily Topup Limit")}</Label>
-                            <Input
-                                id="dailyTopupLimit"
-                                value={limits.dailyTopupLimit}
-                                onChange={(e) => setLimits({...limits, dailyTopupLimit: e.target.value})}
-                                className="col-span-3"
-                                placeholder={t("billing.wallet_detail.limit_modal.optional_topup", "Opsional (mis: 10000000)")}
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyWithdrawLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_withdraw", "Daily Withdraw Limit")}</Label>
-                            <Input
-                                id="dailyWithdrawLimit"
-                                value={limits.dailyWithdrawLimit}
-                                onChange={(e) => setLimits({...limits, dailyWithdrawLimit: e.target.value})}
-                                className="col-span-3"
-                                placeholder={t("billing.wallet_detail.limit_modal.optional_withdraw", "Opsional (mis: 5000000)")}
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dailyTransferLimit" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.daily_transfer", "Daily Transfer Limit")}</Label>
-                            <Input
-                                id="dailyTransferLimit"
-                                value={limits.dailyTransferLimit}
-                                onChange={(e) => setLimits({...limits, dailyTransferLimit: e.target.value})}
-                                className="col-span-3"
-                                placeholder={t("billing.wallet_detail.limit_modal.optional_transfer", "Opsional (mis: 5000000)")}
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="minWithdrawAmount" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.min_withdraw", "Min Withdraw")}</Label>
-                            <Input
-                                id="minWithdrawAmount"
-                                value={limits.minWithdrawAmount}
-                                onChange={(e) => setLimits({...limits, minWithdrawAmount: e.target.value})}
-                                className="col-span-3"
-                                placeholder={t("billing.wallet_detail.limit_modal.optional_min", "Opsional (mis: 50000)")}
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="maxBalance" className="text-right text-xs">{t("billing.wallet_detail.limit_modal.max_balance", "Max Balance")}</Label>
-                            <Input
-                                id="maxBalance"
-                                value={limits.maxBalance}
-                                onChange={(e) => setLimits({...limits, maxBalance: e.target.value})}
-                                className="col-span-3"
-                                placeholder={t("billing.wallet_detail.limit_modal.optional_max", "Opsional (mis: 100000000)")}
-                            />
-                        </div>
+                        {[
+                            { id: "dailyTopupLimit", label: t("billing.wallet_detail.limit_modal.daily_topup", "Daily Topup Limit"), placeholder: t("billing.wallet_detail.limit_modal.optional_topup", "Opsional (mis: 10000000)") },
+                            { id: "dailyWithdrawLimit", label: t("billing.wallet_detail.limit_modal.daily_withdraw", "Daily Withdraw Limit"), placeholder: t("billing.wallet_detail.limit_modal.optional_withdraw", "Opsional (mis: 5000000)") },
+                            { id: "dailyTransferLimit", label: t("billing.wallet_detail.limit_modal.daily_transfer", "Daily Transfer Limit"), placeholder: t("billing.wallet_detail.limit_modal.optional_transfer", "Opsional (mis: 5000000)") },
+                            { id: "minWithdrawAmount", label: t("billing.wallet_detail.limit_modal.min_withdraw", "Min Withdraw"), placeholder: t("billing.wallet_detail.limit_modal.optional_min", "Opsional (mis: 50000)") },
+                            { id: "maxBalance", label: t("billing.wallet_detail.limit_modal.max_balance", "Max Balance"), placeholder: t("billing.wallet_detail.limit_modal.optional_max", "Opsional (mis: 100000000)") },
+                        ].map(({ id, label, placeholder }) => (
+                            <div key={id} className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor={id} className="text-right text-xs">{label}</Label>
+                                <Input
+                                    id={id}
+                                    value={(limits as any)[id]}
+                                    onChange={(e) => setLimits({ ...limits, [id]: e.target.value })}
+                                    className="col-span-3"
+                                    placeholder={placeholder}
+                                />
+                            </div>
+                        ))}
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsLimitModalOpen(false)}>{t("billing.wallet_detail.limit_modal.cancel", "Batal")}</Button>
+                        <Button variant="outline" onClick={() => setIsLimitModalOpen(false)}>
+                            {t("billing.wallet_detail.limit_modal.cancel", "Batal")}
+                        </Button>
                         <Button onClick={handleSaveLimit} disabled={isProcessing}>
-                            {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                            {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             {t("billing.wallet_detail.limit_modal.save", "Simpan")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Suspend Wallet Modal */}
+            {/* Suspend Modal */}
             <Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -505,7 +1157,9 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor="suspendReason">{t("billing.wallet_detail.suspend_modal.reason_label", "Alasan Penangguhan (Wajib)")}</Label>
+                            <Label htmlFor="suspendReason">
+                                {t("billing.wallet_detail.suspend_modal.reason_label", "Alasan Penangguhan (Wajib)")}
+                            </Label>
                             <Input
                                 id="suspendReason"
                                 value={suspendReason}
@@ -515,16 +1169,22 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsSuspendModalOpen(false)}>{t("billing.wallet_detail.suspend_modal.cancel", "Batal")}</Button>
-                        <Button variant="destructive" onClick={handleSuspendWallet} disabled={isProcessing || !suspendReason.trim()}>
-                            {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        <Button variant="outline" onClick={() => setIsSuspendModalOpen(false)}>
+                            {t("billing.wallet_detail.suspend_modal.cancel", "Batal")}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleSuspendWallet}
+                            disabled={isProcessing || !suspendReason.trim()}
+                        >
+                            {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             {t("billing.wallet_detail.suspend_modal.confirm", "Suspend")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Activate Wallet Modal */}
+            {/* Activate Modal */}
             <Dialog open={isActivateModalOpen} onOpenChange={setIsActivateModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -536,13 +1196,21 @@ export function UserWalletDetail({ userId, userData, hideProfileCard = false, hi
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
                                 {walletData?.suspendReason || t("billing.wallet_detail.no_reason", "Tidak ada alasan penangguhan yang tercatat.")}
                             </div>
-                            <p className="text-sm text-gray-500 mt-2">{t("billing.wallet_detail.activate_modal.confirm_text", "Apakah Anda yakin ingin mengaktifkan kembali wallet ini?")}</p>
+                            <p className="text-sm text-gray-500 mt-2">
+                                {t("billing.wallet_detail.activate_modal.confirm_text", "Apakah Anda yakin ingin mengaktifkan kembali wallet ini?")}
+                            </p>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsActivateModalOpen(false)}>{t("billing.wallet_detail.activate_modal.cancel", "Batal")}</Button>
-                        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleActivateWallet} disabled={isProcessing}>
-                            {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        <Button variant="outline" onClick={() => setIsActivateModalOpen(false)}>
+                            {t("billing.wallet_detail.activate_modal.cancel", "Batal")}
+                        </Button>
+                        <Button
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={handleActivateWallet}
+                            disabled={isProcessing}
+                        >
+                            {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             {t("billing.wallet_detail.activate_modal.confirm", "Aktifkan")}
                         </Button>
                     </DialogFooter>

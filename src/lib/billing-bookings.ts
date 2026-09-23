@@ -23,6 +23,8 @@ export type BillingPipelineOrder = {
     status: BillingPipelineStatus
     isPendingPayment?: boolean
     isSim?: boolean
+    userId?: string | number
+    trainerId?: string | number
     isApi?: boolean
     apiStatus?: number | string | null
 }

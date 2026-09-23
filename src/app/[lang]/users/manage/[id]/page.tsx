@@ -16,6 +16,7 @@ import {
     TrendingUp
 } from "lucide-react"
 import { BookOpen } from "lucide-react"
+import { I18nProvider, useI18n } from "@/components/providers/i18n-provider"
 
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { walletApi, auditApi, API_BASE } from "@/lib/api"
@@ -29,8 +30,8 @@ import { UserOrders } from "@/components/admin/user-orders"
 import { UserSetoran } from "@/components/admin/user-setoran"
 import { SIM_TRAINERS } from "@/data/sim-dummy-users"
 
-function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("id-ID", {
+function formatCurrency(amount: number, locale: string) {
+    return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: "IDR",
         minimumFractionDigits: 0,
@@ -38,11 +39,11 @@ function formatCurrency(amount: number) {
     }).format(amount).replace("IDR", "Rp")
 }
 
-function formatDate(dateString: string) {
+function formatDate(dateString: string, locale: string = "id-ID") {
     try {
         const date = new Date(dateString)
         if (isNaN(date.getTime())) return dateString
-        return date.toLocaleDateString('id-ID', {
+        return date.toLocaleDateString(locale, {
             day: '2-digit', month: 'long', year: 'numeric'
         })
     } catch {
@@ -50,11 +51,11 @@ function formatDate(dateString: string) {
     }
 }
 
-function formatDateTime(dateString: string) {
+function formatDateTime(dateString: string, locale: string = "id-ID") {
     try {
         const date = new Date(dateString)
         if (isNaN(date.getTime())) return dateString
-        return date.toLocaleDateString('id-ID', {
+        return date.toLocaleDateString(locale, {
             day: '2-digit', month: 'short', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         })
@@ -80,10 +81,11 @@ const getAvatarSrc = (user: any): string | null => {
     return null;
 }
 
-export default function UserDetailPage() {
+function UserDetailContent() {
     const params = useParams()
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { t, locale } = useI18n()
     const userId = (params as any)?.id as string
     const lang = (params as any)?.lang as string || "en"
 
@@ -257,9 +259,9 @@ export default function UserDetailPage() {
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <Activity className="w-12 h-12 text-gray-300 mb-4" />
-                    <p className="text-gray-500">Pengguna tidak ditemukan.</p>
+                    <p className="text-gray-500">{t("user_detail.not_found", "Pengguna tidak ditemukan.")}</p>
                     <Button variant="outline" className="mt-4" onClick={() => router.back()}>
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+                        <ArrowLeft className="w-4 h-4 mr-2" /> {t("user_detail.back", "Kembali")}
                     </Button>
                 </div>
             </DashboardLayout>
@@ -269,6 +271,18 @@ export default function UserDetailPage() {
     return (
         <DashboardLayout>
             <div className="max-w-5xl mx-auto space-y-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all shadow-sm"
+                    >
+                        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+                    </button>
+                    <div>
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t("user_detail.title", "Profil User")}</h1>
+                    </div>
+                </div>
+
                 {/* Header Compact */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -287,7 +301,7 @@ export default function UserDetailPage() {
                                     #{userId}
                                 </Badge>
                                 {user.isVerify && (
-                                    <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] px-2 py-0 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                    <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] px-2 h-5 inline-flex items-center justify-center leading-none border border-emerald-200 dark:border-emerald-800 shrink-0">
                                         Verified
                                     </Badge>
                                 )}
@@ -298,13 +312,6 @@ export default function UserDetailPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
-                        <Button
-                            variant="outline"
-                            onClick={() => router.back()}
-                            className="bg-white dark:bg-gray-900 flex-1 sm:flex-initial"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
-                        </Button>
                         {trainerInfo && (
                             <Button
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex-1 sm:flex-initial"
@@ -312,36 +319,42 @@ export default function UserDetailPage() {
                                     router.push(`/${lang}/teachers/manage/${trainerInfo.id}`)
                                 }}
                             >
-                                <BookOpen className="w-4 h-4 mr-2" /> Lihat Profil Guru
+                                <BookOpen className="w-4 h-4 mr-2" /> {t("user_detail.view_teacher_profile", "Lihat Profil Guru")}
                             </Button>
                         )}
                     </div>
                 </div>
 
-                {/* Key Metrics Cards */}
+                {/* Key Metrics Cards — clickable, navigate to corresponding tab */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {/* Card 1: Total Saldo */}
-                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    {/* Card 1: Total Saldo → tab Dompet User */}
+                    <Card
+                        onClick={() => handleTabChange('wallet')}
+                        className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-200"
+                    >
                         <CardContent className="p-4 sm:p-5">
                             <div className="flex justify-between items-start mb-2">
-                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Saldo</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">{t("user_detail.stats.balance", "Total Saldo")}</p>
                                 <div className="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg shrink-0">
                                     <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </div>
                             </div>
                             <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
                                 {isMock
-                                    ? formatCurrency(simBalance?.activeBalance ?? 0)
-                                    : (walletData?.balance ? formatCurrency(walletData.balance) : 'Rp 0')}
+                                    ? formatCurrency(simBalance?.activeBalance ?? 0, locale)
+                                    : (walletData?.balance ? formatCurrency(walletData.balance, locale) : formatCurrency(0, locale))}
                             </h3>
                         </CardContent>
                     </Card>
 
-                    {/* Card 2: Total Pesanan */}
-                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    {/* Card 2: Total Pesanan → tab Pesanan */}
+                    <Card
+                        onClick={() => handleTabChange('pesanan')}
+                        className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 cursor-pointer hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200"
+                    >
                         <CardContent className="p-4 sm:p-5">
                             <div className="flex justify-between items-start mb-2">
-                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Pesanan</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">{t("user_detail.stats.orders", "Total Pesanan")}</p>
                                 <div className="p-1.5 sm:p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg shrink-0">
                                     <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </div>
@@ -352,11 +365,14 @@ export default function UserDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Card 3: Total Setoran (menggantikan Status KYC) */}
-                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    {/* Card 3: Total Setoran → tab Setoran */}
+                    <Card
+                        onClick={() => handleTabChange('setoran')}
+                        className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-200"
+                    >
                         <CardContent className="p-4 sm:p-5">
                             <div className="flex justify-between items-start mb-2">
-                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Setoran</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">{t("user_detail.stats.setoran", "Total Setoran")}</p>
                                 <div className="p-1.5 sm:p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg shrink-0">
                                     <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </div>
@@ -367,11 +383,14 @@ export default function UserDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Card 4: Total Transaksi (menggantikan Aktivitas Terakhir) */}
-                    <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    {/* Card 4: Total Transaksi → tab Dompet User */}
+                    <Card
+                        onClick={() => handleTabChange('wallet')}
+                        className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 cursor-pointer hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-200"
+                    >
                         <CardContent className="p-4 sm:p-5">
                             <div className="flex justify-between items-start mb-2">
-                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">Total Transaksi</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">{t("user_detail.stats.transactions", "Total Transaksi")}</p>
                                 <div className="p-1.5 sm:p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-lg shrink-0">
                                     <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </div>
@@ -390,22 +409,22 @@ export default function UserDetailPage() {
                             <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
                                 <TabsList className="w-max min-w-full justify-start border-b border-gray-100 dark:border-gray-800 rounded-none bg-transparent h-auto p-0 space-x-4 sm:space-x-6 flex-nowrap">
                                     <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        Overview
+                                        {t("user_detail.tabs.overview", "Overview")}
                                     </TabsTrigger>
                                     <TabsTrigger value="kyc" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        KYC Member
+                                        {t("user_detail.tabs.kyc", "KYC Member")}
                                     </TabsTrigger>
                                     <TabsTrigger value="wallet" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        Dompet User
+                                        {t("user_detail.tabs.wallet", "Dompet User")}
                                     </TabsTrigger>
                                     <TabsTrigger value="pesanan" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        Pesanan
+                                        {t("user_detail.tabs.orders", "Pesanan")}
                                     </TabsTrigger>
                                     <TabsTrigger value="setoran" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        Setoran
+                                        {t("user_detail.tabs.setoran", "Setoran")}
                                     </TabsTrigger>
                                     <TabsTrigger value="aktivitas" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        Log Aktivitas
+                                        {t("user_detail.tabs.log", "Log Aktivitas")}
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
@@ -419,37 +438,37 @@ export default function UserDetailPage() {
                                         <div className="lg:col-span-7">
                                             <Card className="border border-gray-100 dark:border-gray-800 shadow-none h-full bg-gray-50/50 dark:bg-gray-800/20">
                                                 <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
-                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Detail Informasi Pribadi</CardTitle>
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">{t("user_detail.overview.personal_title", "Detail Informasi Pribadi")}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="pt-6 space-y-6">
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
                                                         <div>
-                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Email</p>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.email", "Email")}</p>
                                                             <p className="text-sm font-bold text-gray-900 dark:text-white break-all">{user.email || '-'}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">No. Telepon</p>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.phone", "No. Telepon")}</p>
                                                             <p className="text-sm font-bold text-gray-900 dark:text-white">{user.hp || user.noHp || user.phone || '-'}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Jenis Kelamin</p>
-                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.gender === 'm' ? 'Laki-laki' : user.gender === 'f' ? 'Perempuan' : '-'}</p>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.gender", "Jenis Kelamin")}</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.gender === 'm' ? t("user_detail.overview.male", "Laki-laki") : user.gender === 'f' ? t("user_detail.overview.female", "Perempuan") : '-'}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Tanggal Lahir</p>
-                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.dob ? formatDate(user.dob) : '-'}</p>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.birth_date", "Tanggal Lahir")}</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.dob ? formatDate(user.dob, locale) : '-'}</p>
                                                         </div>
                                                         <div className="sm:col-span-2">
-                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Pekerjaan</p>
+                                                            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.job", "Pekerjaan")}</p>
                                                             <p className="text-sm font-bold text-gray-900 dark:text-white">{user.job || '-'}</p>
                                                         </div>
                                                     </div>
 
                                                     <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                                                        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Bio</p>
+                                                        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">{t("user_detail.overview.bio", "Bio")}</p>
                                                         <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
                                                             <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                                {user.bio || 'Tidak ada bio yang dituliskan oleh pengguna.'}
+                                                                {user.bio || t("user_detail.overview.bio_empty", "Tidak ada bio yang dituliskan oleh pengguna.")}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -462,24 +481,24 @@ export default function UserDetailPage() {
                                             {/* Kartu 1: Detail Akun */}
                                             <Card className="border border-gray-100 dark:border-gray-800 shadow-none bg-gray-50/50 dark:bg-gray-800/20">
                                                 <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
-                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Detail Akun</CardTitle>
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">{t("user_detail.overview.account_title", "Detail Akun")}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="pt-6 space-y-4">
                                                     <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800/50">
-                                                        <span className="text-sm font-medium text-gray-500">Tanggal Gabung</span>
-                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">{formatDate(user.created_at || user.createdAt || new Date().toISOString())}</span>
+                                                        <span className="text-sm font-medium text-gray-500">{t("user_detail.overview.joined", "Tanggal Gabung")}</span>
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">{formatDate(user.created_at || user.createdAt || new Date().toISOString(), locale)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800/50">
-                                                        <span className="text-sm font-medium text-gray-500">Timezone</span>
+                                                        <span className="text-sm font-medium text-gray-500">{t("user_detail.overview.timezone", "Timezone")}</span>
                                                         <span className="text-sm font-bold text-gray-900 dark:text-white">{user.timezone || '-'}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-sm font-medium text-gray-500">Status Akun</span>
+                                                        <span className="text-sm font-medium text-gray-500">{t("user_detail.overview.status", "Status Akun")}</span>
                                                         <div className="flex gap-2">
                                                             {user.isBlocked ? (
-                                                                <Badge variant="destructive" className="text-[10px]">Terblokir</Badge>
+                                                                <Badge variant="destructive" className="text-[10px]">{t("user_detail.overview.status_blocked_badge", "Terblokir")}</Badge>
                                                             ) : (
-                                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px]">Aktif</Badge>
+                                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px]">{t("user_detail.overview.status_active", "Aktif")}</Badge>
                                                             )}
                                                         </div>
                                                     </div>
@@ -489,17 +508,17 @@ export default function UserDetailPage() {
                                             {/* Kartu 2: Lokasi & Perangkat */}
                                             <Card className="border border-gray-100 dark:border-gray-800 shadow-none bg-gray-50/50 dark:bg-gray-800/20">
                                                 <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
-                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">Lokasi & Perangkat</CardTitle>
+                                                    <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">{t("user_detail.overview.location_title", "Lokasi & Perangkat")}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="pt-6 space-y-4">
                                                     <div>
-                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Alamat Lengkap</p>
+                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.address_title", "Alamat Lengkap")}</p>
                                                         <p className="text-sm font-bold text-gray-900 dark:text-white">
-                                                            {[user.cityName || user.city_name, user.stateName || user.state_name, user.countryName || user.country_name].filter(Boolean).join(', ') || 'Lokasi belum diatur'}
+                                                            {[user.cityName || user.city_name, user.stateName || user.state_name, user.countryName || user.country_name].filter(Boolean).join(', ') || t("user_detail.overview.address_empty", "Lokasi belum diatur")}
                                                         </p>
                                                     </div>
                                                     <div className="pt-3 border-t border-gray-100 dark:border-gray-800/50">
-                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Info Login Terakhir (IP)</p>
+                                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">{t("user_detail.overview.login_ip", "Info Login Terakhir (IP)")}</p>
                                                         <p className="text-sm font-bold text-gray-900 dark:text-white font-mono">
                                                             {activityLogs && activityLogs.length > 0 && activityLogs[0].ipAddress
                                                                 ? activityLogs[0].ipAddress
@@ -524,9 +543,9 @@ export default function UserDetailPage() {
                                     ) : kycData ? (
                                         <div className="space-y-4 max-w-2xl">
                                             <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${kycData.status === 2 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800' :
-                                                kycData.status === 3 ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800' :
-                                                    kycData.status === 1 ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800' :
-                                                        'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800'
+                                                    kycData.status === 3 ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800' :
+                                                        kycData.status === 1 ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800' :
+                                                            'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800'
                                                 }`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-3 bg-white/50 dark:bg-black/20 rounded-full">
@@ -534,27 +553,27 @@ export default function UserDetailPage() {
                                                     </div>
                                                     <div>
                                                         <p className="text-base font-bold">
-                                                            {kycData.status === 2 ? 'KYC Disetujui' :
-                                                                kycData.status === 3 ? 'KYC Ditolak' :
-                                                                    kycData.status === 1 ? 'Sedang Direview' : 'Menunggu Review'}
+                                                            {kycData.status === 2 ? t("user_detail.kyc.approved_title", "KYC Disetujui") :
+                                                                kycData.status === 3 ? t("user_detail.kyc.rejected_title", "KYC Ditolak") :
+                                                                    kycData.status === 1 ? t("user_detail.kyc.under_review", "Sedang Direview") : t("user_detail.kyc.waiting_review", "Menunggu Review")}
                                                         </p>
                                                         <p className="text-sm opacity-80 mt-1">
-                                                            {kycData.reviewedAt ? `Direview pada ${formatDate(kycData.reviewedAt)}` : `Disubmit pada ${formatDate(kycData.createdAt)}`}
+                                                            {kycData.reviewedAt ? t("user_detail.kyc.reviewed_on", "Direview pada {{date}}", { date: formatDate(kycData.reviewedAt, locale) }) : t("user_detail.kyc.submitted_on", "Disubmit pada {{date}}", { date: formatDate(kycData.createdAt, locale) })}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <Button variant="outline" onClick={() => router.push('/support/kyc-member')} className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-current border-opacity-20 hover:bg-white/80 dark:hover:bg-gray-900/80 rounded-xl w-full sm:w-auto">
-                                                    Lihat Detail KYC
+                                                    {t("user_detail.kyc.view_detail", "Lihat Detail KYC")}
                                                 </Button>
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-800/20">
-                                                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Tipe Dokumen</p>
+                                                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">{t("user_detail.kyc.doc_type", "Tipe Dokumen")}</p>
                                                     <p className="text-base font-bold text-gray-900 dark:text-white">{kycData.documentType || '-'}</p>
                                                 </div>
                                                 <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-800/20">
-                                                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Nomor Dokumen</p>
+                                                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">{t("user_detail.kyc.doc_number", "Nomor Dokumen")}</p>
                                                     <p className="text-base font-bold text-gray-900 dark:text-white">{kycData.documentNumber || '-'}</p>
                                                 </div>
                                             </div>
@@ -564,7 +583,7 @@ export default function UserDetailPage() {
                                             <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                                                 <Shield className="w-12 h-12 text-gray-300 dark:text-gray-600" />
                                             </div>
-                                            <p className="text-base font-medium text-gray-600 dark:text-gray-400">Pengguna belum mengajukan verifikasi KYC</p>
+                                            <p className="text-base font-medium text-gray-600 dark:text-gray-400">{t("user_detail.kyc.empty", "Pengguna belum mengajukan verifikasi KYC")}</p>
                                         </div>
                                     )}
                                 </TabsContent>
@@ -604,11 +623,11 @@ export default function UserDetailPage() {
                                                         <div className="flex flex-col gap-1.5 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
                                                             <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
                                                                 <Badge variant="secondary" className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm font-semibold px-2.5 py-0.5">
-                                                                    {log.action || log.event || 'Activity'}
+                                                                    {log.action || log.event || t("user_detail.log.activity", "Aktivitas")}
                                                                 </Badge>
                                                                 <span className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
                                                                     <Clock className="w-3.5 h-3.5" />
-                                                                    {formatDateTime(log.createdAt || log.timestamp || new Date().toISOString())}
+                                                                    {formatDateTime(log.createdAt || log.timestamp || new Date().toISOString(), locale)}
                                                                 </span>
                                                             </div>
                                                             <p className="text-base text-gray-900 dark:text-gray-100 mt-1">
@@ -629,7 +648,7 @@ export default function UserDetailPage() {
                                             <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                                                 <Activity className="w-12 h-12 text-gray-300 dark:text-gray-600" />
                                             </div>
-                                            <p className="text-base font-medium text-gray-600 dark:text-gray-400">Belum ada riwayat aktivitas untuk pengguna ini</p>
+                                            <p className="text-base font-medium text-gray-600 dark:text-gray-400">{t("user_detail.log.empty", "Belum ada riwayat aktivitas untuk pengguna ini")}</p>
                                         </div>
                                     )}
                                 </TabsContent>
@@ -639,5 +658,13 @@ export default function UserDetailPage() {
                 </Card>
             </div>
         </DashboardLayout>
+    )
+}
+
+export default function UserDetailPage() {
+    return (
+        <I18nProvider namespaces={['common', 'admin-users', 'billing']}>
+            <UserDetailContent />
+        </I18nProvider>
     )
 }

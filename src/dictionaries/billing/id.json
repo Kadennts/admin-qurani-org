@@ -277,7 +277,7 @@
       "subtitle": "Menampilkan detail profil, informasi wallet, dan riwayat transaksi"
     },
     "wallet_detail": {
-      "title": "Informasi Wallet",
+      "title": "Wallet Qurani",
       "status_label": "Status:",
       "status_active": "Aktif",
       "status_suspended": "Suspended",

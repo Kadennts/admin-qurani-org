@@ -12,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { useI18n } from "@/components/providers/i18n-provider"
 import { getRecapAllAdmin } from "@/utils/api/recaps/fetch"
 import { IRecap } from "@/types/recap"
 import { getSimSetoransByUser } from "@/data/sim-setoran"
@@ -30,18 +31,16 @@ function getClientToken(): string | null {
     }
 }
 
-function formatDateWithHour(date: string) {
+function formatDateWithHour(date: string, locale: string) {
     const dt = new Date(date)
     if (Number.isNaN(dt.getTime())) return date
-    const day = dt.getDate().toString().padStart(2, "0")
-    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-    const month = months[dt.getMonth()]
-    const year = dt.getFullYear()
-    const jam = dt.toLocaleTimeString("id-ID", {
+    return dt.toLocaleDateString(locale, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
         hour: "2-digit",
         minute: "2-digit"
     })
-    return `${day} ${month} ${year}, ${jam}`
 }
 
 function formatMemorizationDisplay(memorization: string, recitationType: string) {
@@ -66,31 +65,32 @@ function formatMemorizationDisplay(memorization: string, recitationType: string)
 function getResultFromConclusion(conclusion: string | undefined, mistakesCount: number) {
     switch (conclusion?.toLowerCase()) {
         case "excellent":
-            return { text: "Sangat Baik", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
+            return { key: "excellent", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
         case "very_good":
         case "very good":
-            return { text: "Baik", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+            return { key: "very_good", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
         case "good":
-            return { text: "Baik", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+            return { key: "good", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
         case "pass":
-            return { text: "Lulus", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" }
+            return { key: "pass", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" }
         case "weak":
-            return { text: "Kurang", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
+            return { key: "weak", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
         case "not_pass":
         case "not pass":
-            return { text: "Tidak Lulus", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
+            return { key: "not_pass", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
         default:
-            if (mistakesCount === 0) return { text: "Sangat Baik", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
-            if (mistakesCount <= 2) return { text: "Baik", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
-            if (mistakesCount <= 4) return { text: "Baik", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
-            if (mistakesCount <= 6) return { text: "Lulus", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" }
-            if (mistakesCount <= 8) return { text: "Kurang", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
-            return { text: "Tidak Lulus", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
+            if (mistakesCount === 0) return { key: "excellent", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
+            if (mistakesCount <= 2) return { key: "very_good", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+            if (mistakesCount <= 4) return { key: "good", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+            if (mistakesCount <= 6) return { key: "pass", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" }
+            if (mistakesCount <= 8) return { key: "weak", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
+            return { key: "not_pass", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
     }
 }
 
 export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boolean }) {
     const router = useRouter()
+    const { t, locale } = useI18n()
     const [recaps, setRecaps] = useState<IRecap[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [currentPage, setCurrentPage] = useState(1)
@@ -157,7 +157,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                 <div className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                     <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-600" />
                 </div>
-                <p className="text-base font-medium text-gray-600 dark:text-gray-400">Belum ada setoran untuk pengguna ini</p>
+                <p className="text-base font-medium text-gray-600 dark:text-gray-400">{t("user_detail.setoran.empty", "Belum ada setoran untuk pengguna ini")}</p>
             </div>
         )
     }
@@ -167,7 +167,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
             <div className="flex items-center justify-between">
                 <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    Riwayat Setoran
+                    {t("user_detail.setoran.history_title", "Riwayat Setoran")}
                     <span className="text-sm font-medium text-gray-400">({recaps.length})</span>
                 </h4>
             </div>
@@ -176,12 +176,12 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-emerald-600 hover:bg-emerald-600">
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">Waktu</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">Penyetor</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">Penerima</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">Bacaan</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">Hasil</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50 text-center">Paraf</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.time", "Waktu")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.penyetor", "Penyetor")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.penerima", "Penerima")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.recitation", "Bacaan")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.result", "Hasil")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50 text-center">{t("user_detail.setoran.columns.paraf", "Paraf")}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -195,7 +195,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                                 >
                                     <TableCell>
                                         <span className="font-medium text-gray-700 dark:text-gray-200">
-                                            {formatDateWithHour(row.created_at || "")}
+                                            {formatDateWithHour(row.created_at || "", locale)}
                                         </span>
                                     </TableCell>
                                     <TableCell>
@@ -215,7 +215,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                                     </TableCell>
                                     <TableCell>
                                         <Badge className={`${result.color} border-0 font-medium w-fit`}>
-                                            {result.text}
+                                            {t(`user_detail.setoran.scores.${result.key}`, result.key)}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
@@ -244,7 +244,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                             className="bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateWithHour(row.created_at || "")}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateWithHour(row.created_at || "", locale)}</span>
                                 {row.paraf
                                     ? <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                     : <Minus className="h-5 w-5 text-gray-300 dark:text-gray-600" />}
@@ -254,14 +254,14 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                                     {formatMemorizationDisplay(row.memorization || "", row.recitation_type)}
                                 </p>
                                 <p className="text-gray-500">
-                                    Penyetor: {row.reciter?.nickname ? `${row.reciter.nickname} - ${row.reciter.name}` : row.reciter?.name}
+                                    {t("user_detail.setoran.penyetor_label", "Penyetor")}: {row.reciter?.nickname ? `${row.reciter.nickname} - ${row.reciter.name}` : row.reciter?.name}
                                 </p>
                                 <p className="text-gray-500">
-                                    Penerima: {row.examiner?.nickname ? `${row.examiner.nickname} - ${row.examiner.name}` : row.examiner?.name}
+                                    {t("user_detail.setoran.penerima_label", "Penerima")}: {row.examiner?.nickname ? `${row.examiner.nickname} - ${row.examiner.name}` : row.examiner?.name}
                                 </p>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
-                                <Badge className={`${result.color} border-0 font-medium`}>{result.text}</Badge>
+                                <Badge className={`${result.color} border-0 font-medium`}>{t(`user_detail.setoran.scores.${result.key}`, result.key)}</Badge>
                             </div>
                         </div>
                     )
@@ -271,7 +271,11 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
             {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-2">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Menampilkan {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, recaps.length)} dari {recaps.length}
+                        {t("user_detail.setoran.pagination", "Menampilkan {{from}}-{{to}} dari {{total}} setoran", {
+                            from: (currentPage - 1) * PAGE_SIZE + 1,
+                            to: Math.min(currentPage * PAGE_SIZE, recaps.length),
+                            total: recaps.length,
+                        })}
                     </p>
                     <div className="flex items-center gap-2">
                         <button

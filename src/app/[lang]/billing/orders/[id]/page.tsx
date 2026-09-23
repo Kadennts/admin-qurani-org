@@ -216,6 +216,65 @@ const FAUZIA_DETAIL = {
     ],
 }
 
+// ── Siti Rahmawati (#3001) Dummy Data ───────────────────────────────────────────────
+const SITI_BOOKING = {
+    id: 3001,
+    bookingCode: "e1f1a554-a3c1-46fd-b531-0824284c900c",
+    userName: "Siti Rahmawati",
+    userEmail: "siti.rahma@example.com",
+    trainerName: "Indi Fitriani",
+    packageName: "5x Pertemuan",
+    totalSessions: 5,
+    completedSessions: 2,
+    totalPayment: 387500,
+    bookingDate: "2026-04-05T00:00:00Z",
+    paymentGateway: "GoPay",
+    paymentMethod: "GoPay",
+    status: "active",
+    mode: "online",
+}
+
+const SITI_DETAIL = {
+    bookingId: 3001,
+    bookingCode: "e1f1a554-a3c1-46fd-b531-0824284c900c",
+    member: {
+        id: 889977665544101,
+        name: "Siti Rahmawati",
+        email: "siti.rahma@example.com",
+        phone: "+62 857-1100-9988",
+        location: "Semarang",
+        joinDate: "2025-09-01T00:00:00Z",
+    },
+    trainer: {
+        id: 302,
+        name: "Indi Fitriani",
+        email: "indi.f@superprof.id",
+        avatar: "https://i.pravatar.cc/150?img=47",
+        rating: 4.9,
+        totalStudents: 39,
+        specialization: "Tahsinul Qur'an & Tahfidzul Qur'an",
+        location: "Bekasi",
+        yearsExperience: 5,
+        subjects: ["Tahsinul Qur'an", "Tahfidzul Qur'an"],
+    },
+    payment: {
+        invoiceNo: "INV-2026-3001",
+        receiptRef: "MID-2026-04-0010",
+        method: "GoPay",
+        status: "paid",
+        paidAt: "2026-04-05T10:30:00Z",
+        pricePackage: 382500,
+        serviceFee: 0,
+        tax: 45900,
+        total: 428400,
+    },
+    sessions: [
+        { no: 1, date: "Jumat, 10 Apr 2026", time: "09:00 - 10:00", status: "completed", feedback: { rating: 5, pesan: "Sesi pengenalan makhraj sangat jelas." } },
+        { no: 2, date: "Minggu, 12 Apr 2026", time: "09:00 - 10:00", status: "completed", feedback: { rating: 5, pesan: "Sesi kedua lancar" } },
+        { no: 3, date: "Selasa, 14 Apr 2026", time: "09:00 - 10:00", status: "scheduled" }
+    ],
+}
+
 // ── Rahma Aulia (#3099) Pending Dummy Data ───────────────────────────────────────────────
 const RAHMA_BOOKING = {
     id: 3099,
@@ -518,8 +577,8 @@ function BookingDetailContent({ id }: { id: number }) {
 
     if (simOrder === undefined) return null
 
-    const fallbackBooking = id === 3010 ? ZULFA_BOOKING : id === 3098 ? FAUZIA_BOOKING : id === 3099 ? RAHMA_BOOKING : dummyData.bookings.find(b => b.id === id)
-    const fallbackDetail  = id === 3010 ? ZULFA_DETAIL  : id === 3098 ? FAUZIA_DETAIL  : id === 3099 ? RAHMA_DETAIL  : dummyData.bookingDetails.find(d => d.bookingId === id)
+    const fallbackBooking = id === 3001 ? SITI_BOOKING : id === 3010 ? ZULFA_BOOKING : id === 3098 ? FAUZIA_BOOKING : id === 3099 ? RAHMA_BOOKING : dummyData.bookings.find(b => b.id === id)
+    const fallbackDetail  = id === 3001 ? SITI_DETAIL : id === 3010 ? ZULFA_DETAIL  : id === 3098 ? FAUZIA_DETAIL  : id === 3099 ? RAHMA_DETAIL  : dummyData.bookingDetails.find(d => d.bookingId === id)
     
     const booking = convertedSim?.booking || apiDetail?.booking || fallbackBooking
     const detail  = convertedSim?.detail || apiDetail?.detail || fallbackDetail

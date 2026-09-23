@@ -5,6 +5,8 @@
 // (milik sim-wallet-store.ts) agar halaman Transaksi ikut terupdate.
 
 import { getSimTransactions } from "@/lib/sim-wallet-store"
+import dummyBillingData from "@/data/billing-dummy.json"
+import { getSimOrders, SimOrder } from "@/lib/sim-store"
 
 // ── Storage Keys ──────────────────────────────────────────────────────────────
 // STORE_VERSION: Naikkan angka ini setiap kali dummy data berubah agar
@@ -90,34 +92,87 @@ export interface SimPayment {
     isPaidOut?: boolean
 }
 
-// ── Dummy Data ─────────────────────────────────────────────────────────────────
+// Dynamic Generation based on bookings
+function generateDynamicData() {
+    const pending: SimPayout[] = []
+    const history: SimPayout[] = []
+    const payments: SimPayment[] = []
+    const refundsPending: SimRefund[] = []
+    const refundsProcessed: SimRefund[] = []
 
-// ── DUMMY DATA (sesuai 10 orders di halaman Orders/Pesanan) ─────────────────
-// Sumber kebenaran: billing-dummy.json bookings #3098, #3099, #3010, #3002, #3003, #3004, #3005, #3006, #3007, #3008
-// Order lunas (#3010, #3002, #3003, #3007) → masuk PAYOUT_PENDING
-// Order yang sudah dipayout (#3004, #3006) → masuk PAYOUT_HISTORY
-// Order bermasalah/refund → masuk REFUND_PENDING / REFUND_PROCESSED
+    const staticBookings = dummyBillingData.bookings || []
+    const simOrders = getSimOrders() || []
 
-const DUMMY_PAYOUT_PENDING: SimPayout[] = [
-    { id: "178572300220010000", userId: 889977665544101, userName: "Siti Rahmawati",       trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3001, amount: 387500, status: "pending", paymentMethod: "OVO",             createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "178572300220020000", userId: 889977665544103, userName: "Siti Aminah",           trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3002, amount: 90000,  status: "pending", paymentMethod: "Qurani Wallet",  createdAt: new Date(Date.now() - 345600000).toISOString() },
-    { id: "178572300220030000", userId: 889977665544104, userName: "Budi Santoso",          trainerId: 303, trainerName: "Iwan",               bookingId: 3003, amount: 705000, status: "pending", paymentMethod: "Bank Mandiri",    createdAt: new Date(Date.now() - 432000000).toISOString() },
-    { id: "178572300220070000", userId: 889977665544108, userName: "Farid Al-Amin",         trainerId: 305, trainerName: "Zain Al-Fattah",     bookingId: 3007, amount: 387500, status: "pending", paymentMethod: "Bank BCA",        createdAt: new Date(Date.now() - 518400000).toISOString() },
-    { id: "178572300220090000", userId: 889977665544110, userName: "Muhammad Yusuf",        trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3009, amount: 705000, status: "pending", paymentMethod: "Qurani Wallet",  createdAt: new Date(Date.now() - 604800000).toISOString() },
-    { id: "178572300220100000", userId: 889977665544110, userName: "Muhammad Yusuf",        trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "pending", paymentMethod: "BSI",             createdAt: new Date(Date.now() - 691200000).toISOString() },
-];
+    const allBookings = [
+        ...staticBookings.map((b: any) => {
+            const isCompleted = b.sessions && b.sessions.every((s:any) => s.status === "completed") && b.sessions.length > 0
+            return {
+                id: b.bookingId,
+                userId: b.member?.id,
+                userName: b.member?.name,
+                trainerId: b.trainer?.id,
+                trainerName: b.trainer?.name,
+                amount: b.payment?.pricePackage || 0,
+                status: isCompleted ? "selesai" : (b.payment?.status === "paid" ? "paid" : "pending"),
+                paymentMethod: b.payment?.method || "Transfer",
+                createdAt: b.payment?.paidAt || b.createdAt || new Date().toISOString()
+            }
+        }),
+        ...simOrders.map((o: SimOrder) => ({
+            id: o.id,
+            userId: o.member.id,
+            userName: o.member.name,
+            trainerId: o.trainer.id,
+            trainerName: o.trainer.name,
+            amount: o.pkg.price,
+            status: o.status === "completed" ? "selesai" : (o.paymentStatus === "paid" ? "paid" : "pending"),
+            paymentMethod: o.paymentGateway || "Transfer",
+            createdAt: o.paidAt || o.bookingDate || new Date().toISOString()
+        }))
+    ]
 
-const DUMMY_PAYOUT_HISTORY: SimPayout[] = [
-    { id: "178572300230040000", userId: 889977665544105, userName: "Dewi Rahayu",           trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000,  status: "paid_out", paymentMethod: "Bank BRI",       createdAt: new Date(Date.now() - 777600000).toISOString(), payoutReference: "PAY-2026-004", notes: "Transfer berhasil" },
-    { id: "178572300230050000", userId: 889977665544106, userName: "Nur Hidayah",           trainerId: 304, trainerName: "Aisyah",             bookingId: 3005, amount: 387500, status: "paid_out", paymentMethod: "Dana",           createdAt: new Date(Date.now() - 864000000).toISOString(), payoutReference: "PAY-2026-005", notes: "Transfer berhasil" },
-    { id: "178572300230080000", userId: 889977665544109, userName: "Halimah Tussa'diyah",   trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3008, amount: 90000,  status: "paid_out", paymentMethod: "Qurani Wallet",  createdAt: new Date(Date.now() - 950400000).toISOString(), payoutReference: "PAY-2026-008", notes: "Transfer berhasil" },
-];
+    allBookings.forEach((b) => {
+        // Teacher gets ~80% as payout in dummy scenario
+        const payoutAmount = Math.floor(b.amount * 0.8)
+        
+        const payment: SimPayment = {
+            id: `pay-${b.id}`,
+            userId: b.userId,
+            userName: b.userName,
+            trainerId: b.trainerId,
+            trainerName: b.trainerName,
+            bookingId: b.id,
+            amount: b.amount,
+            status: b.status === "selesai" ? "paid_out" : (b.status === "paid" ? "paid" : "pending"),
+            paymentMethod: b.paymentMethod,
+            createdAt: b.createdAt
+        }
+        payments.push(payment)
 
-const DUMMY_REFUND_PENDING: SimRefund[] = [
-    { id: "178572300240060000", userId: 889977665544107, userName: "Nia Hidayati", trainerId: 302, trainerName: "Indi Fitriani", bookingId: 3006, amount: 595000, refundAmount: 595000, status: "pending_refund", paymentMethod: "ShopeePay", refundReason: "Penampilan tidak sesuai harapan", sessionsInfo: "0 dari 5 Pertemuan", createdAt: new Date(Date.now() - 518400000).toISOString() },
-];
+        const payout: SimPayout = {
+            id: `po-${b.id}`,
+            userId: b.userId,
+            userName: b.userName,
+            trainerId: b.trainerId,
+            trainerName: b.trainerName,
+            bookingId: b.id,
+            amount: payoutAmount,
+            status: b.status === "selesai" ? "paid_out" : "pending",
+            paymentMethod: b.paymentMethod,
+            createdAt: b.createdAt
+        }
 
-const DUMMY_REFUND_PROCESSED: SimRefund[] = [];
+        if (b.status === "selesai") {
+            payout.isPaidOut = true
+            payout.payoutReference = `PAY-SIM-${b.id}`
+            history.push(payout)
+        } else if (b.status === "paid") {
+            pending.push(payout)
+        }
+    })
+
+    return { pending, history, payments, refundsPending, refundsProcessed }
+}
 
 const DUMMY_WITHDRAW_PENDING: SimWithdraw[] = [
     { id: "178572300260100000", userId: 889977665544101, user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" }, amount: 500000, bankName: "Bank BCA", accountNumber: "1234567890", accountName: "Siti Rahmawati", status: "pending", createdAt: new Date(Date.now() - 3600000).toISOString() },
@@ -133,21 +188,6 @@ const DUMMY_WITHDRAW_HISTORY: SimWithdraw[] = [
     { id: "178572300270300000", userId: 889977665544103, user: { name: "Siti Aminah", email: "siti.aminah@yahoo.com", username: "siti_a" }, amount: 500000, bankName: "Bank BNI", accountNumber: "1122334455", accountName: "Siti Aminah", status: "completed", gatewayReference: "WD-REF-003", createdAt: new Date(Date.now() - 518400000).toISOString() },
     { id: "178572300270400000", userId: 889977665544104, user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" }, amount: 250000, bankName: "Bank BRI", accountNumber: "6677889900", accountName: "Budi Santoso", status: "completed", gatewayReference: "WD-REF-004", createdAt: new Date(Date.now() - 604800000).toISOString() },
     { id: "178572300270500000", userId: 889977665544105, user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" }, amount: 400000, bankName: "GoPay", accountNumber: "081234567890", accountName: "Dewi Rahayu", status: "rejected", notes: "Nama tidak sesuai", createdAt: new Date(Date.now() - 691200000).toISOString() }
-];
-
-const DUMMY_PAYMENTS: SimPayment[] = [
-    { id: "178572300280010000", userId: 889977665544101, userName: "Siti Rahmawati",       trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3001, amount: 387500, status: "pending",  paymentMethod: "OVO",             createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "178572300280020000", userId: 889977665544103, userName: "Siti Aminah",           trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3002, amount: 90000,  status: "paid",     paymentMethod: "Qurani Wallet",   createdAt: new Date(Date.now() - 345600000).toISOString() },
-    { id: "178572300280030000", userId: 889977665544104, userName: "Budi Santoso",          trainerId: 303, trainerName: "Iwan",               bookingId: 3003, amount: 705000, status: "paid",     paymentMethod: "Bank Mandiri",    createdAt: new Date(Date.now() - 432000000).toISOString() },
-    { id: "178572300280040000", userId: 889977665544105, userName: "Dewi Rahayu",           trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3004, amount: 90000,  status: "paid",     paymentMethod: "Bank BRI",        createdAt: new Date(Date.now() - 518400000).toISOString() },
-    { id: "178572300280050000", userId: 889977665544106, userName: "Nur Hidayah",           trainerId: 304, trainerName: "Aisyah",             bookingId: 3005, amount: 387500, status: "paid",     paymentMethod: "Dana",            createdAt: new Date(Date.now() - 604800000).toISOString() },
-    { id: "178572300280060000", userId: 889977665544107, userName: "Nia Hidayati",          trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3006, amount: 595000, status: "refunded", paymentMethod: "ShopeePay",       createdAt: new Date(Date.now() - 518400000).toISOString() },
-    { id: "178572300280070000", userId: 889977665544108, userName: "Farid Al-Amin",         trainerId: 305, trainerName: "Zain Al-Fattah",     bookingId: 3007, amount: 387500, status: "paid",     paymentMethod: "Bank BCA",        createdAt: new Date(Date.now() - 691200000).toISOString() },
-    { id: "178572300280080000", userId: 889977665544109, userName: "Halimah Tussa'diyah",   trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3008, amount: 90000,  status: "paid",     paymentMethod: "Qurani Wallet",   createdAt: new Date(Date.now() - 777600000).toISOString() },
-    { id: "178572300280090000", userId: 889977665544110, userName: "Muhammad Yusuf",        trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3009, amount: 705000, status: "paid",     paymentMethod: "Qurani Wallet",   createdAt: new Date(Date.now() - 864000000).toISOString() },
-    { id: "178572300280100000", userId: 889977665544110, userName: "Muhammad Yusuf",        trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3010, amount: 250000, status: "paid",     paymentMethod: "BSI",             createdAt: new Date(Date.now() - 950400000).toISOString() },
-    { id: "178572300280980000", userId: 889977665544111, userName: "Fauzia Nurrohma",       trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3098, amount: 89600,  status: "paid",     paymentMethod: "LinkAja",         createdAt: new Date(Date.now() - 172800000).toISOString() },
-    { id: "178572300280990000", userId: 889977665544112, userName: "Rahma Aulia",           trainerId: 302, trainerName: "Indi Fitriani",       bookingId: 3099, amount: 420000, status: "pending",  paymentMethod: "BCA Virtual Account", createdAt: new Date(Date.now() - 259200000).toISOString() },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -188,7 +228,6 @@ function nextId(): string {
 export function initSimBillingStore(forceReset = false): void {
     if (typeof window === "undefined") return
 
-    // Auto-reset jika versi store berubah (dummy data diperbarui)
     const savedVersion = localStorage.getItem(STORE_VERSION_KEY)
     if (savedVersion !== STORE_VERSION) {
         forceReset = true
@@ -205,32 +244,31 @@ export function initSimBillingStore(forceReset = false): void {
         localStorage.removeItem(PAYMENT_LIST_KEY)
     }
 
-    if (!localStorage.getItem(PAYOUT_PENDING_KEY))
-        localStorage.setItem(PAYOUT_PENDING_KEY, JSON.stringify(DUMMY_PAYOUT_PENDING))
-    if (!localStorage.getItem(PAYOUT_HISTORY_KEY))
-        localStorage.setItem(PAYOUT_HISTORY_KEY, JSON.stringify(DUMMY_PAYOUT_HISTORY))
-    if (!localStorage.getItem(REFUND_PENDING_KEY))
-        localStorage.setItem(REFUND_PENDING_KEY, JSON.stringify(DUMMY_REFUND_PENDING))
-    if (!localStorage.getItem(REFUND_PROCESSED_KEY))
-        localStorage.setItem(REFUND_PROCESSED_KEY, JSON.stringify(DUMMY_REFUND_PROCESSED))
-    if (!localStorage.getItem(WITHDRAW_PENDING_KEY))
-        localStorage.setItem(WITHDRAW_PENDING_KEY, JSON.stringify(DUMMY_WITHDRAW_PENDING))
-    if (!localStorage.getItem(WITHDRAW_HISTORY_KEY))
-        localStorage.setItem(WITHDRAW_HISTORY_KEY, JSON.stringify(DUMMY_WITHDRAW_HISTORY))
-    if (!localStorage.getItem(PAYMENT_LIST_KEY))
-        localStorage.setItem(PAYMENT_LIST_KEY, JSON.stringify(DUMMY_PAYMENTS))
+    // Dynamic mapping from dummy data if empty
+    if (!localStorage.getItem(PAYOUT_PENDING_KEY) || !localStorage.getItem(PAYOUT_HISTORY_KEY) || !localStorage.getItem(PAYMENT_LIST_KEY)) {
+        const { pending, history, payments, refundsPending, refundsProcessed } = generateDynamicData()
+
+        if (!localStorage.getItem(PAYOUT_PENDING_KEY)) localStorage.setItem(PAYOUT_PENDING_KEY, JSON.stringify(pending))
+        if (!localStorage.getItem(PAYOUT_HISTORY_KEY)) localStorage.setItem(PAYOUT_HISTORY_KEY, JSON.stringify(history))
+        if (!localStorage.getItem(REFUND_PENDING_KEY)) localStorage.setItem(REFUND_PENDING_KEY, JSON.stringify(refundsPending))
+        if (!localStorage.getItem(REFUND_PROCESSED_KEY)) localStorage.setItem(REFUND_PROCESSED_KEY, JSON.stringify(refundsProcessed))
+        if (!localStorage.getItem(PAYMENT_LIST_KEY)) localStorage.setItem(PAYMENT_LIST_KEY, JSON.stringify(payments))
+    }
+
+    if (!localStorage.getItem(WITHDRAW_PENDING_KEY)) localStorage.setItem(WITHDRAW_PENDING_KEY, JSON.stringify(DUMMY_WITHDRAW_PENDING))
+    if (!localStorage.getItem(WITHDRAW_HISTORY_KEY)) localStorage.setItem(WITHDRAW_HISTORY_KEY, JSON.stringify(DUMMY_WITHDRAW_HISTORY))
 }
 
 // ── PAYOUT ────────────────────────────────────────────────────────────────────
 
 export function getSimPayoutPending(): SimPayout[] {
     initSimBillingStore()
-    return safeGet<SimPayout>(PAYOUT_PENDING_KEY, DUMMY_PAYOUT_PENDING)
+    return safeGet<SimPayout>(PAYOUT_PENDING_KEY, [])
 }
 
 export function getSimPayoutHistory(): SimPayout[] {
     initSimBillingStore()
-    return safeGet<SimPayout>(PAYOUT_HISTORY_KEY, DUMMY_PAYOUT_HISTORY)
+    return safeGet<SimPayout>(PAYOUT_HISTORY_KEY, [])
 }
 
 /**
@@ -283,12 +321,12 @@ export function confirmSimPayout(id: number | string, reference: string, notes?:
 
 export function getSimRefundPending(): SimRefund[] {
     initSimBillingStore()
-    return safeGet<SimRefund>(REFUND_PENDING_KEY, DUMMY_REFUND_PENDING)
+    return safeGet<SimRefund>(REFUND_PENDING_KEY, [])
 }
 
 export function getSimRefundProcessed(): SimRefund[] {
     initSimBillingStore()
-    return safeGet<SimRefund>(REFUND_PROCESSED_KEY, DUMMY_REFUND_PROCESSED)
+    return safeGet<SimRefund>(REFUND_PROCESSED_KEY, [])
 }
 
 /**
@@ -462,7 +500,7 @@ export function completeSimWithdraw(
 
 export function getSimPayments(): SimPayment[] {
     initSimBillingStore()
-    return safeGet<SimPayment>(PAYMENT_LIST_KEY, DUMMY_PAYMENTS)
+    return safeGet<SimPayment>(PAYMENT_LIST_KEY, [])
 }
 
 /**

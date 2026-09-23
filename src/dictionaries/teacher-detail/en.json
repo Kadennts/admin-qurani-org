@@ -24,7 +24,8 @@
       "view_user_profile": "View User Profile",
       "title": "Teacher Profile",
       "rejection_default": "Rejected by admin",
-      "verified_by_admin": "Verified by Admin"
+      "verified_by_admin": "Verified by Admin",
+      "related_institution": "Related Institution"
     },
     "modal": {
       "reject_title": "Reject Teacher Application",
@@ -302,17 +303,25 @@
     "orders_tab": {
       "search": "Search order, student name, or package...",
       "filter": "Filter",
+      "filter_label": "Filter Status",
       "loading": "Loading order data...",
       "empty": "No orders found.",
+      "empty_all": "No orders for this teacher yet.",
+      "empty_filter": "No orders match this filter.",
+      "show_all": "Show all ({{count}})",
+      "session_count": "{{count}} sessions",
+      "footer": "Showing {{shown}} of {{total}} orders",
       "columns": {
         "id": "Order ID",
         "member": "Student",
         "package": "Package",
+        "mode": "Mode",
         "amount": "Amount",
         "status": "Status",
         "date": "Date"
       },
       "status": {
+        "all": "All",
         "pending": "Pending",
         "active": "Active",
         "cancelled": "Cancelled",

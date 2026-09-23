@@ -91,19 +91,20 @@
     "not_found": "Data pengguna tidak ditemukan",
     "member_badge": "Member",
     "stats": {
+      "balance": "Total Saldo",
       "orders": "Total Pesanan",
-      "spent": "Total Pengeluaran",
       "setoran": "Total Setoran",
-      "last_activity": "Terakhir Aktif"
+      "transactions": "Total Transaksi"
     },
     "tabs": {
       "overview": "Overview",
-      "kyc": "KYC",
-      "wallet": "Wallet",
+      "kyc": "KYC Member",
+      "wallet": "Dompet",
       "orders": "Pesanan",
       "setoran": "Setoran",
-      "log": "Log"
+      "log": "Log Aktivitas"
     },
+    "view_teacher_profile": "Lihat Profil Guru",
     "overview": {
       "personal_title": "Detail Informasi Pribadi",
       "account_title": "Detail Akun",
@@ -116,17 +117,24 @@
       "male": "Laki-laki",
       "female": "Perempuan",
       "birth_date": "Tanggal Lahir",
+      "job": "Pekerjaan",
       "bio": "Bio",
+      "bio_empty": "Tidak ada bio yang dituliskan oleh pengguna.",
       "not_filled": "Belum diisi",
       "role": "Role",
       "role_member": "Member",
       "status": "Status",
       "status_active": "Aktif",
       "status_blocked": "Diblokir",
-      "joined": "Bergabung",
+      "status_blocked_badge": "Terblokir",
+      "joined": "Tanggal Gabung",
+      "timezone": "Timezone",
       "balance": "Saldo Kredit Qurani",
       "device": "Perangkat Terakhir",
       "os_version": "OS / Versi",
+      "address_title": "Alamat Lengkap",
+      "address_empty": "Lokasi belum diatur",
+      "login_ip": "Info Login Terakhir (IP)",
       "unknown": "Tidak diketahui"
     },
     "kyc": {
@@ -138,6 +146,16 @@
       "rejected": "Ditolak",
       "review": "Sedang Direview",
       "submitted": "sudah disubmit",
+      "approved_title": "KYC Disetujui",
+      "rejected_title": "KYC Ditolak",
+      "under_review": "Sedang Direview",
+      "waiting_review": "Menunggu Review",
+      "reviewed_on": "Direview pada {{date}}",
+      "submitted_on": "Disubmit pada {{date}}",
+      "view_detail": "Lihat Detail KYC",
+      "doc_type": "Tipe Dokumen",
+      "doc_number": "Nomor Dokumen",
+      "empty": "Pengguna belum mengajukan verifikasi KYC",
       "identity_title": "Identitas Diri",
       "ktp_label": "Nomor NIK",
       "ktp_photo": "Foto KTP",
@@ -153,8 +171,9 @@
     },
     "setoran": {
       "title": "Total Setoran",
+      "history_title": "Riwayat Setoran",
       "loading": "Memuat data setoran...",
-      "empty": "Belum ada setoran dari user ini.",
+      "empty": "Belum ada setoran untuk pengguna ini",
       "approval_warning": "Setoran membutuhkan persetujuan bank virtual sebelum aktivasi.",
       "user_districts": "Sekecamatan",
       "user_regencies": "Sekabupaten",
@@ -163,6 +182,8 @@
       "score": "Skor",
       "penyetor": "Penyetor",
       "penerima": "Penerima",
+      "penyetor_label": "Penyetor",
+      "penerima_label": "Penerima",
       "region": "Wilayah",
       "bank": "Bank",
       "no_name_match": "Nama tidak cocok",
@@ -170,7 +191,23 @@
       "tidak_lulus": "TIDAK LULUS",
       "approve_tooltip": "Setujui setoran ini",
       "reject_tooltip": "Tolak setoran ini",
-      "pagination": "Menampilkan {{from}}-{{to}} dari {{total}} setoran"
+      "pagination": "Menampilkan {{from}}-{{to}} dari {{total}} setoran",
+      "columns": {
+        "time": "Waktu",
+        "penyetor": "Penyetor",
+        "penerima": "Penerima",
+        "recitation": "Bacaan",
+        "result": "Hasil",
+        "paraf": "Paraf"
+      },
+      "scores": {
+        "excellent": "Sangat Baik",
+        "very_good": "Baik",
+        "good": "Baik",
+        "pass": "Lulus",
+        "weak": "Kurang",
+        "not_pass": "Tidak Lulus"
+      }
     },
     "orders": {
       "title": "Riwayat Pesanan",
@@ -183,6 +220,7 @@
         "mode": "Mode",
         "sessions": "Sesi",
         "price": "Harga",
+        "amount": "Nominal",
         "status": "Status",
         "date": "Tanggal"
       },
@@ -200,13 +238,37 @@
     "log": {
       "title": "Log Aktivitas",
       "loading": "Memuat log aktivitas...",
-      "empty": "Belum ada log aktivitas."
+      "empty": "Belum ada riwayat aktivitas untuk pengguna ini",
+      "activity": "Aktivitas"
     },
     "toasts": {
       "copied": "Tersalin ke clipboard!",
       "copy_failed": "Gagal menyalin",
       "resubmit": "Permintaan submit ulang KYC berhasil dikirim",
       "resubmit_error": "Gagal mengirim permintaan"
+    },
+    "wallet_statement": {
+      "view_list": "Daftar",
+      "view_mutasi": "Mutasi Bank",
+      "col_date": "Tanggal",
+      "col_desc": "Keterangan",
+      "col_debit": "Debit",
+      "col_credit": "Kredit",
+      "col_balance": "Saldo Akhir",
+      "filter_from": "Dari",
+      "filter_to": "Sampai",
+      "filter_type": "Jenis Transaksi",
+      "filter_type_all": "Semua",
+      "filter_topup": "TopUp",
+      "filter_withdraw": "Withdraw",
+      "filter_transfer": "Transfer",
+      "filter_payment": "Pembayaran",
+      "export_pdf": "Ekspor PDF",
+      "empty": "Tidak ada transaksi ditemukan",
+      "print_title": "Mutasi Rekening",
+      "print_user": "Pengguna",
+      "print_period": "Periode",
+      "print_generated": "Dicetak pada"
     }
   }
 }

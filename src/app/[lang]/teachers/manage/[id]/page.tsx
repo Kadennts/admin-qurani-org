@@ -12,14 +12,15 @@ import {
     AlertTriangle, ShieldCheck, ShieldOff, Image as ImageIcon, MessageSquare,
     Info, Award, FileText, User, BadgeCheck, CircleDashed, X, ExternalLink,
     Loader2, Package, Quote, Mail, Coins, PlayCircle, Users, LinkIcon, Hourglass,
-    Copy, Check, Globe, Wifi, WifiOff, CalendarDays, ShoppingCart, Wallet
+    Copy, Check, Globe, Wifi, WifiOff, CalendarDays, ShoppingCart
 } from "lucide-react"
 import { ToastContainer, showToast } from "@/components/ui/toast-sim"
 import dummyData from "@/data/billing-dummy.json"
 import pendingDummies from "@/data/pending-trainers-list.json"
 import { SIM_TRAINERS } from "@/data/sim-dummy-users"
+import guruDetailDummy from "@/data/guru-detail-dummy.json"
 import { TeacherOrdersTab } from "@/components/Teachers/TeacherOrdersTab"
-import { TeacherWalletTab } from "@/components/Teachers/TeacherWalletTab"
+// TeacherWalletTab removed — wallet tab dihapus dari profil guru
 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ function getClientToken(): string | null {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TrainerStatus = "verified" | "pending" | "suspended" | "rejected"
-type DetailTab = "informasi" | "paket" | "galeri" | "ulasan" | "pesanan" | "wallet"
+type DetailTab = "informasi" | "paket" | "galeri" | "ulasan" | "pesanan"
 type RequirementKey = "profil_kontak" | "kualifikasi_metode" | "sertifikat" | "media_portofolio"
 
 type TrainerDetail = {
@@ -137,8 +138,6 @@ function normalizeHeadline(raw: string | null): string | null {
     if (NON_QURANI_PATTERN.test(raw)) return "Pengajar Al-Qur'an & Tahfidz"
     return raw
 }
-
-import guruDetailDummy from "@/data/guru-detail-dummy.json"
 
 // ── Dummy Reviews ─────────────────────────────────────────────────────────────
 const DUMMY_REVIEWS: ReviewItem[] = guruDetailDummy.reviews
@@ -609,7 +608,9 @@ function GuruDetailContent() {
 
     const setTab = (val: DetailTab) => {
         setTabState(val)
-        router.replace(`/${params?.lang || "en"}/teachers/manage/${id}?tab=${val}`, { scroll: false })
+        let newUrl = `/${params?.lang || "en"}/teachers/manage/${id}?tab=${val}`
+        if (fromParam) newUrl += `&from=${fromParam}`
+        router.replace(newUrl, { scroll: false })
     }
 
     const [activeRequirement, setActiveRequirement] = useState<RequirementItem | null>(null)
@@ -766,15 +767,64 @@ function GuruDetailContent() {
                     averageRating: p.rating ?? p.averageRating ?? p.avgRating ?? 0
                 }))
 
-                setCourses(filteredAPI)
+                if (filteredAPI.length > 0) {
+                    setCourses(filteredAPI)
+                } else {
+                    // Fallback ke dummy JSON trainerPackages jika API tidak mengembalikan data
+                    const dummyCourses = dummyData.trainerPackages.filter(p => p.trainerId === id).map(p => ({
+                        id: p.id,
+                        title: p.name,
+                        description: p.description,
+                        price: p.totalPrice,
+                        currency: "IDR",
+                        sessions: p.sessions,
+                        level: "Beginner",
+                        features: [],
+                        isPublished: p.status === "active",
+                        totalStudents: p.totalOrders,
+                        averageRating: 0
+                    }))
+                    setCourses(dummyCourses)
+                }
             })
-            .catch((err) => {
-                setCoursesError(err.message)
-                setCourses([])
+            .catch(() => {
+                // API gagal — pakai dummy JSON trainerPackages
+                const dummyCourses = dummyData.trainerPackages.filter(p => p.trainerId === id).map(p => ({
+                    id: p.id,
+                    title: p.name,
+                    description: p.description,
+                    price: p.totalPrice,
+                    currency: "IDR",
+                    sessions: p.sessions,
+                    level: "Beginner",
+                    features: [],
+                    isPublished: p.status === "active",
+                    totalStudents: p.totalOrders,
+                    averageRating: 0
+                }))
+                if (dummyCourses.length > 0) {
+                    setCourses(dummyCourses)
+                    setCoursesError(null)
+                } else {
+                    setCoursesError("Data paket tidak tersedia")
+                    setCourses([])
+                }
             })
             .finally(() => {
                 setCoursesLoading(false)
             })
+
+        // Populate reviews dari dummy data per trainer
+        const reviewsMap = (guruDetailDummy as any).reviewsByTrainer ?? {}
+        const trainerReviews = reviewsMap[String(id)] ?? []
+        if (trainerReviews.length > 0) {
+            setReviews(trainerReviews)
+            setReviewsTotalCount(trainerReviews.length)
+        } else {
+            // Fallback ke reviews global jika tidak ada per-trainer
+            setReviews(DUMMY_REVIEWS)
+            setReviewsTotalCount(DUMMY_REVIEWS.length)
+        }
     }, [id, detail?.userName])
 
     // ── Derived ──────────────────────────────────────────────────────────────
@@ -812,10 +862,7 @@ function GuruDetailContent() {
     async function runAction(action: "approve" | "reject" | "suspend" | "unsuspend") {
         if (!detail || actionLoading) return
         const token = getClientToken()
-        if (!token) {
-            showToast({ type: "info", title: "Gagal", message: "Token login tidak ditemukan", endpoint: "POST /api/v1/Trainers/*" })
-            return
-        }
+        // Tidak block jika tidak ada token — fallback ke mock untuk local testing
         const endpoint =
             action === "approve" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
                 : action === "reject" ? `${API_BASE_URL}/api/v1/Trainers/${detail.id}/review`
@@ -854,7 +901,14 @@ function GuruDetailContent() {
             const statusMap: Record<typeof action, TrainerStatus> = {
                 approve: "verified", reject: "rejected", suspend: "suspended", unsuspend: "verified",
             }
-            setDetail(prev => prev ? { ...prev, status: statusMap[action] } : null)
+            const newStatus = statusMap[action]
+            setDetail(prev => prev ? { ...prev, status: newStatus } : null)
+            try { 
+                const stored = sessionStorage.getItem("guruStatuses")
+                const dict = stored ? JSON.parse(stored) : {}
+                dict[detail.id] = newStatus
+                sessionStorage.setItem("guruStatuses", JSON.stringify(dict))
+            } catch {}
         } catch (e: any) {
             // Fallback to local mutation for dummy data if API fails
             const titleMap: Record<typeof action, string> = {
@@ -871,7 +925,14 @@ function GuruDetailContent() {
                 approve: "verified", reject: "rejected", suspend: "suspended", unsuspend: "verified",
             }
             if (action in statusMap) {
-                setDetail(prev => prev ? { ...prev, status: statusMap[action] } : null)
+                const newStatus = statusMap[action]
+                setDetail(prev => prev ? { ...prev, status: newStatus } : null)
+                try { 
+                    const stored = sessionStorage.getItem("guruStatuses")
+                    const dict = stored ? JSON.parse(stored) : {}
+                    dict[detail.id] = newStatus
+                    sessionStorage.setItem("guruStatuses", JSON.stringify(dict))
+                } catch {}
             }
         } finally {
             setActionLoading(null)
@@ -881,10 +942,7 @@ function GuruDetailContent() {
     async function handleBackgroundCheck() {
         if (!detail || actionLoading) return
         const token = getClientToken()
-        if (!token) {
-            showToast({ type: "info", title: "Gagal", message: "Token login tidak ditemukan", endpoint: "POST /api/v1/Trainers/{id}/background-check" })
-            return
-        }
+        // Tidak block jika tidak ada token — fallback ke mock untuk local testing
         setActionLoading("bgcheck")
         try {
             const res = await fetch(`${API_BASE_URL}/api/v1/Trainers/${detail.id}/background-check`, {
@@ -906,8 +964,8 @@ function GuruDetailContent() {
         } catch (e: any) {
             showToast({
                 type: "success",
-                title: "Background Check Diminta (Mocked)",
-                message: `Berhasil mock permintaan background check untuk ${detail.userName} karena API error.`,
+                title: "Background Check Diminta",
+                message: `Permintaan background check untuk ${detail.userName} berhasil (Testing Mode).`,
                 endpoint: `POST /api/v1/Trainers/${detail.id}/background-check`,
             })
             setDetail(prev => prev ? { ...prev, bgCheckStatus: "requested" } : null)
@@ -919,10 +977,7 @@ function GuruDetailContent() {
     async function handleVerifyCredential(ev: any) {
         if (!detail || certLoading) return
         const token = getClientToken()
-        if (!token) {
-            showToast({ type: "info", title: "Gagal", message: "Token login tidak ditemukan", endpoint: "POST /api/v1/Trainers/{id}/verify-credential" })
-            return
-        }
+        // Tidak block jika tidak ada token — fallback ke mock
         setCertLoading(ev.url)
         try {
             let issuer = "Lembaga Terkait"
@@ -1060,7 +1115,7 @@ function GuruDetailContent() {
                     </div>
                 ) : (
                     <>
-                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start lg:items-start">
                             {/* ══ LEFT ══ */}
                             <div className="space-y-4 min-w-0">
 
@@ -1129,15 +1184,6 @@ function GuruDetailContent() {
                                                 </div>
                                             </div>
 
-                                            {/* Actions: Lihat Profil User (right-aligned) */}
-                                            <div className="flex-shrink-0 hidden sm:block">
-                                                <Link
-                                                    href={`/${params?.lang || "en"}/users/manage/${detail.userId}`}
-                                                    className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
-                                                >
-                                                    <User className="w-3.5 h-3.5" /> Lihat Profil User
-                                                </Link>
-                                            </div>
                                         </div>
 
                                         {/* Row 2: Expertise multi-badge */}
@@ -1159,84 +1205,76 @@ function GuruDetailContent() {
                                             </div>
                                         )}
 
-                                        {/* Row 3: ID User + copy */}
-                                        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">ID User</span>
-                                                <code className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                                                    {detail.userId}
-                                                </code>
-                                                <button
-                                                    onClick={copyUserId}
-                                                    title="Salin ID User"
-                                                    className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
-                                                >
-                                                    {copiedUserId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                                                </button>
-                                                {copiedUserId && (
-                                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Tersalin!</span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                                                <CalendarDays className="w-3.5 h-3.5" />
-                                                <span>Terdaftar {formatDate(detail.createdAt)}</span>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 
                                 {/* ── Quick Stats Row: 4 stat cards horizontal ── */}
-                                <div className="grid grid-cols-4 gap-3">
-                                    {/* Kursus */}
-                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                            <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
-                                            Kursus
-                                        </div>
-                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{detail.totalCourses}</p>
-                                        <p className="text-[10px] text-gray-400">paket aktif</p>
-                                    </div>
-                                    {/* Murid */}
-                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                            <Users className="w-3.5 h-3.5 text-blue-500" />
-                                            Murid
-                                        </div>
-                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{detail.totalStudents}</p>
-                                        <p className="text-[10px] text-gray-400">terdaftar</p>
-                                    </div>
-                                    {/* Rating */}
-                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                            <Star className="w-3.5 h-3.5 text-amber-500" />
-                                            Rating
-                                        </div>
-                                        <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">
-                                            {detail.averageRating > 0 ? detail.averageRating.toFixed(1) : "—"}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400">{detail.totalReviews} ulasan</p>
-                                    </div>
-                                    {/* Tarif */}
-                                    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                            <Coins className="w-3.5 h-3.5 text-violet-500" />
-                                            Tarif/Jam
-                                        </div>
-                                        <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                                            {formatCurrency(detail.hourlyRate, detail.currency)}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400">per jam</p>
-                                    </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {(() => {
+                                        // Hitung stats dari dummy data yang konsisten
+                                        const packagesMap = dummyData.trainerPackages.filter((p: any) => p.trainerId === id)
+                                        const ordersMap = (guruDetailDummy as any).ordersByTrainer ?? {}
+                                        const trainerOrders = ordersMap[String(id)] ?? []
+                                        const dummyPaketCount = packagesMap.length || detail.totalCourses || courses.length
+                                        const dummyTotalOrders = trainerOrders.length || packagesMap.reduce((s: number, p: any) => s + (p.totalOrders || 0), 0) || courses.reduce((s: number, c: any) => s + (c.totalStudents || 0), 0)
+                                        const reviewsMap = (guruDetailDummy as any).reviewsByTrainer ?? {}
+                                        const trainerReviews = reviewsMap[String(id)] ?? []
+                                        const reviewCount = trainerReviews.length || detail.totalReviews
+                                        const avgRating = trainerReviews.length > 0
+                                            ? (trainerReviews.reduce((s: number, r: any) => s + r.rating, 0) / trainerReviews.length)
+                                            : detail.averageRating
+                                        return (
+                                            <>
+                                                {/* Kursus */}
+                                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                        <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
+                                                        Kursus
+                                                    </div>
+                                                    <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{dummyPaketCount}</p>
+                                                    <p className="text-[10px] text-gray-400">paket aktif</p>
+                                                </div>
+                                                {/* Murid */}
+                                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                        <Users className="w-3.5 h-3.5 text-blue-500" />
+                                                        Murid
+                                                    </div>
+                                                    <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{dummyTotalOrders}</p>
+                                                    <p className="text-[10px] text-gray-400">total pesanan</p>
+                                                </div>
+                                                {/* Rating */}
+                                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                        <Star className="w-3.5 h-3.5 text-amber-500" />
+                                                        Rating
+                                                    </div>
+                                                    <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">
+                                                        {avgRating > 0 ? avgRating.toFixed(1) : "—"}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400">{reviewCount} ulasan</p>
+                                                </div>
+                                                {/* Total Pesanan */}
+                                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                        <ShoppingCart className="w-3.5 h-3.5 text-violet-500" />
+                                                        Total Pesanan
+                                                    </div>
+                                                    <p className="text-2xl font-black text-violet-600 dark:text-violet-400 leading-none">{dummyTotalOrders || "—"}</p>
+                                                    <p className="text-[10px] text-gray-400">total order</p>
+                                                </div>
+                                            </>
+                                        )
+                                    })()}
                                 </div>
 
                                 {/* Tabs */}
                                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                    <div className="grid grid-cols-3 sm:grid-cols-6 border-b border-gray-100 dark:border-gray-800">
+                                    <div className="grid grid-cols-5 border-b border-gray-100 dark:border-gray-800">
                                         {[
                                             { key: "informasi" as const, label: "Informasi", icon: Info },
                                             { key: "paket" as const, label: "Paket", icon: FileText },
                                             { key: "pesanan" as const, label: "Pesanan", icon: ShoppingCart },
-                                            { key: "wallet" as const, label: "Wallet", icon: Wallet },
                                             { key: "galeri" as const, label: "Galeri", icon: ImageIcon },
                                             { key: "ulasan" as const, label: "Ulasan", icon: MessageSquare },
                                         ].map(item => {
@@ -1246,13 +1284,14 @@ function GuruDetailContent() {
                                                 <button
                                                     key={item.key}
                                                     onClick={() => setTab(item.key)}
-                                                    className={`py-3 text-sm font-semibold inline-flex items-center justify-center gap-2 border-b-2 transition-colors ${active
+                                                    title={item.label}
+                                                    className={`py-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5 border-b-2 transition-colors ${active
                                                             ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/10"
                                                             : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                                                         }`}
                                                 >
-                                                    <Icon className="w-4 h-4" />
-                                                    {item.label}
+                                                    <Icon className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="hidden sm:inline">{item.label}</span>
                                                 </button>
                                             )
                                         })}
@@ -1699,15 +1738,12 @@ function GuruDetailContent() {
                                         <TeacherOrdersTab trainerId={detail.id} locale={(Array.isArray(params?.lang) ? params.lang[0] : params?.lang) || "id"} />
                                     )}
 
-                                    {/* Tab: Wallet */}
-                                    {tab === "wallet" && (
-                                        <TeacherWalletTab trainerId={detail.id} />
-                                    )}
+                                    {/* Tab: Wallet dihapus */}
                                 </div>
                             </div>
 
                             {/* ══ RIGHT SIDEBAR ══ */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 order-last lg:order-last">
 
                                 {/* ── Card: Tindakan ── */}
                                 {detail.status !== "pending" && (
@@ -2029,7 +2065,7 @@ function StatRow({ icon, label, value }: { icon: ReactNode; label: string; value
 export default function GuruDetailPage() {
     return (
         <DashboardLayout>
-            <I18nProvider namespaces={["billing", "common"]}>
+            <I18nProvider namespaces={["billing", "common", "teacher-detail"]}>
                 <GuruDetailContent />
             </I18nProvider>
         </DashboardLayout>
