@@ -8,7 +8,7 @@ const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
 const STORE_VERSION_KEY = "qurani_sim_wallet_version"
-const STORE_VERSION = "v12-fix-balances"
+const STORE_VERSION = "v13-pkg-names"
 
 // ─── RIWAYAT TRANSAKSI DINAMIS ───────────────────────────
 function generateDynamicTransactions() {
@@ -21,6 +21,11 @@ function generateDynamicTransactions() {
         { id: "1785723002102", userId: 889977665544102, user: { name: "Ahmad Fauzan", email: "ahmad.fauzan@example.com", username: "fauzan_ahmad" }, type: 1, typeName: "TopUp", description: "Top up via BCA Virtual Account", amount: 200000, balanceBefore: 0, balanceAfter: 200000, status: "completed", paymentMethod: "BCA Virtual Account", referenceId: "EXT-TOP-002", createdAt: new Date(Date.now() - 432000000).toISOString() },
         { id: "1785723002104", userId: 889977665544104, user: { name: "Budi Santoso", email: "budi.santoso@email.com", username: "budi_santoso" }, type: 1, typeName: "TopUp", description: "Top up via GoPay", amount: 150000, balanceBefore: 0, balanceAfter: 150000, status: "completed", paymentMethod: "GoPay", referenceId: "EXT-TOP-004", createdAt: new Date(Date.now() - 604800000).toISOString() },
         { id: "1785723002105", userId: 889977665544105, user: { name: "Dewi Rahayu", email: "dewi.rahayu@gmail.com", username: "dewi_rahayu" }, type: 1, typeName: "TopUp", description: "Top up via Bank BNI", amount: 500000, balanceBefore: 0, balanceAfter: 500000, status: "completed", paymentMethod: "Bank BNI", referenceId: "EXT-TOP-005", createdAt: new Date(Date.now() - 691200000).toISOString() },
+        { id: "1785723002106", userId: 889977665544106, user: { name: "Nur Hidayah", email: "nur.hidayah@example.com", username: "nur_hidayah" }, type: 1, typeName: "TopUp", description: "Top up via GoPay", amount: 250000, balanceBefore: 0, balanceAfter: 250000, status: "completed", paymentMethod: "GoPay", referenceId: "EXT-TOP-006", createdAt: new Date(Date.now() - 518400000).toISOString() },
+        { id: "1785723002107", userId: 889977665544107, user: { name: "Nia Hidayati", email: "nia.hidayati@mail.com", username: "nia_hidayati" }, type: 1, typeName: "TopUp", description: "Top up via OVO", amount: 400000, balanceBefore: 0, balanceAfter: 400000, status: "completed", paymentMethod: "OVO", referenceId: "EXT-TOP-007", createdAt: new Date(Date.now() - 777600000).toISOString() },
+        { id: "1785723002108", userId: 889977665544108, user: { name: "Farid Al-Amin", email: "farid.alamin@edu.id", username: "farid_alamin" }, type: 1, typeName: "TopUp", description: "Top up via Bank Mandiri", amount: 600000, balanceBefore: 0, balanceAfter: 600000, status: "completed", paymentMethod: "Bank Mandiri", referenceId: "EXT-TOP-008", createdAt: new Date(Date.now() - 864000000).toISOString() },
+        { id: "1785723002109", userId: 889977665544109, user: { name: "Halimah Tussa'diyah", email: "halimah.ts@gmail.com", username: "halimah_ts" }, type: 1, typeName: "TopUp", description: "Top up via Dana", amount: 350000, balanceBefore: 0, balanceAfter: 350000, status: "completed", paymentMethod: "Dana", referenceId: "EXT-TOP-009", createdAt: new Date(Date.now() - 950400000).toISOString() },
+        { id: "1785723002110", userId: 889977665544110, user: { name: "Muhammad Yusuf", email: "m.yusuf@qurani.id", username: "m_yusuf" }, type: 1, typeName: "TopUp", description: "Top up via ShopeePay", amount: 450000, balanceBefore: 0, balanceAfter: 450000, status: "completed", paymentMethod: "ShopeePay", referenceId: "EXT-TOP-010", createdAt: new Date(Date.now() - 1036800000).toISOString() },
         // Withdraws
         { id: "178572300270100000", userId: 889977665544101, user: { name: "Siti Rahmawati", email: "siti.rahma@example.com", username: "siti_rahma" }, type: 2, typeName: "Withdraw", description: "Penarikan ke Bank BCA", amount: -200000, balanceBefore: 300000, balanceAfter: 100000, status: "completed", paymentMethod: "Bank BCA", referenceId: "WD-REF-001", createdAt: new Date(Date.now() - 172800000).toISOString() },
         { id: "178572300270300000", userId: 889977665544103, user: { name: "Siti Aminah", email: "siti.aminah@example.com", username: "siti_a" }, type: 2, typeName: "Withdraw", description: "Penarikan ke Bank BNI", amount: -500000, balanceBefore: 500000, balanceAfter: 0, status: "completed", paymentMethod: "Bank BNI", referenceId: "WD-REF-003", createdAt: new Date(Date.now() - 518400000).toISOString() },
@@ -29,20 +34,34 @@ function generateDynamicTransactions() {
 
     transactions.push(...staticTransactions);
 
+    // Build package name lookup from trainerPackages for richer descriptions
+    const pkgMap: Record<string, string> = {};
+    const trainerNameMap: Record<number, string> = {};
+    (dummyBillingData.trainerPackages || []).forEach((pkg: any) => {
+        pkgMap[String(pkg.id)] = pkg.name;
+        trainerNameMap[pkg.trainerId] = pkg.trainerName;
+    });
+
     const staticBookings = dummyBillingData.bookings || [];
     const simOrders = getSimOrders() || [];
 
     const allBookings = [
         ...staticBookings.map((b: any) => {
             const isCompleted = b.sessions && b.sessions.every((s:any) => s.status === "completed") && b.sessions.length > 0;
+            // Try to get the package name from trainerPackages
+            const pkgId = b.payment?.packageId || b.packageId;
+            const packageName = pkgId ? (pkgMap[String(pkgId)] || null) : null;
+            const trainerName = b.trainer?.name || (b.trainerId ? trainerNameMap[b.trainerId] : null) || "";
             return {
                 id: b.bookingId,
                 user: b.member || { id: 0, name: "" },
-                trainer: b.trainer || { id: 0, name: "" },
+                trainer: b.trainer || { id: 0, name: trainerName },
                 amount: b.payment?.pricePackage || b.payment?.total || 0,
                 status: isCompleted ? "selesai" : (b.payment?.status === "paid" ? "paid" : "pending"),
                 paymentMethod: b.payment?.method || "Transfer",
-                createdAt: b.payment?.paidAt || b.createdAt || new Date().toISOString()
+                createdAt: b.payment?.paidAt || b.createdAt || new Date().toISOString(),
+                packageName,
+                trainerId: b.trainerId || b.trainer?.id,
             }
         }),
         ...simOrders.map((o: SimOrder) => ({
@@ -52,7 +71,9 @@ function generateDynamicTransactions() {
             amount: o.pkg.price,
             status: o.status === "completed" ? "selesai" : (o.paymentStatus === "paid" ? "paid" : "pending"),
             paymentMethod: o.paymentGateway || "Transfer",
-            createdAt: o.paidAt || o.bookingDate || new Date().toISOString()
+            createdAt: o.paidAt || o.bookingDate || new Date().toISOString(),
+            packageName: o.pkg.name || null,
+            trainerId: o.trainer?.id,
         }))
     ];
 
@@ -60,6 +81,11 @@ function generateDynamicTransactions() {
     // and if completed, a payout (adding to teacher)
     allBookings.forEach(b => {
         if (b.status === "paid" || b.status === "selesai") {
+            // Deskripsi dengan nama paket jika tersedia
+            const pkgLabel = b.packageName
+                ? `${b.packageName}${b.trainer?.name ? ` — ${b.trainer.name}` : ""}`
+                : `Pesanan #${b.id}`;
+            
             // User Payment Transaction
             transactions.push({
                 id: `TXN-PAY-${b.id}`,
@@ -67,10 +93,10 @@ function generateDynamicTransactions() {
                 user: { name: b.user.name, email: "", username: "" },
                 type: 4,
                 typeName: "Payment",
-                description: `Pembayaran pesanan #${b.id}`,
+                description: `Pembayaran ${pkgLabel}`,
                 amount: -Math.abs(b.amount),
                 balanceBefore: 0,
-                balanceAfter: -Math.abs(b.amount), // purely dummy calculation
+                balanceAfter: -Math.abs(b.amount),
                 status: "completed",
                 paymentMethod: b.paymentMethod,
                 referenceId: `TXN-PAY-REF-${b.id}`,
@@ -79,6 +105,10 @@ function generateDynamicTransactions() {
         }
 
         if (b.status === "selesai") {
+            const pkgLabel = b.packageName
+                ? `${b.packageName}${b.user?.name ? ` dari ${b.user.name}` : ""}`
+                : `Pesanan #${b.id}`;
+
             // Teacher Payout Transaction
             transactions.push({
                 id: `TXN-IN-${b.id}`,
@@ -86,10 +116,10 @@ function generateDynamicTransactions() {
                 user: { name: b.trainer.name, email: "", username: "" },
                 type: 4,
                 typeName: "Payment",
-                description: `Pemasukan pesanan #${b.id}`,
+                description: `Payout ${pkgLabel}`,
                 amount: Math.floor(b.amount * 0.8),
                 balanceBefore: 0,
-                balanceAfter: Math.floor(b.amount * 0.8), // purely dummy
+                balanceAfter: Math.floor(b.amount * 0.8),
                 status: "completed",
                 paymentMethod: "Qurani Wallet",
                 referenceId: `TXN-IN-REF-${b.id}`,
@@ -437,3 +467,83 @@ export function getSimWalletBalances(userId: string | number) {
         pendingBalance: Math.max(0, pendingBalance)
     };
 }
+
+// ─── PAYOUT DATA UNTUK GURU ────────────────────────────────────────────────────
+
+/**
+ * Generate dummy payout records untuk seorang guru (trainer).
+ * Data diturunkan dari bookings yang sudah selesai di billing-dummy.json + sim orders.
+ * @param userId  userId / trainerId guru
+ */
+export function getSimPayouts(userId: string | number): any[] {
+    if (typeof window === "undefined") return [];
+    try {
+        initSimWalletStore();
+        const txs = getSimTransactions();
+        // Payout = transaksi dengan amount positif (pemasukan) yang terkait user ini
+        const payouts = txs.filter((tx: any) =>
+            String(tx.userId) === String(userId) &&
+            tx.amount > 0 &&
+            (tx.typeName === "Payment" || tx.type === 4)
+        );
+
+        // Tambah beberapa payout dummy jika kosong, agar UI tidak kosong
+        if (payouts.length === 0) {
+            const now = Date.now();
+            return [
+                {
+                    id: `PO-${userId}-001`,
+                    userId: Number(userId),
+                    orderId: `ORD-${userId}-1001`,
+                    packageName: "5x Pertemuan",
+                    amount: Math.floor(85000 * 0.8),
+                    status: "completed",
+                    createdAt: new Date(now - 7 * 86400000).toISOString(),
+                    paidAt: new Date(now - 6 * 86400000).toISOString(),
+                },
+                {
+                    id: `PO-${userId}-002`,
+                    userId: Number(userId),
+                    orderId: `ORD-${userId}-1002`,
+                    packageName: "1x Pertemuan",
+                    amount: Math.floor(120000 * 0.8),
+                    status: "pending",
+                    createdAt: new Date(now - 2 * 86400000).toISOString(),
+                    paidAt: null,
+                },
+                {
+                    id: `PO-${userId}-003`,
+                    userId: Number(userId),
+                    orderId: `ORD-${userId}-1003`,
+                    packageName: "10x Pertemuan",
+                    amount: Math.floor(550000 * 0.8),
+                    status: "completed",
+                    createdAt: new Date(now - 14 * 86400000).toISOString(),
+                    paidAt: new Date(now - 13 * 86400000).toISOString(),
+                },
+                {
+                    id: `PO-${userId}-004`,
+                    userId: Number(userId),
+                    orderId: `ORD-${userId}-1004`,
+                    packageName: "5x Pertemuan",
+                    amount: Math.floor(375000 * 0.8),
+                    status: "pending",
+                    createdAt: new Date(now - 1 * 86400000).toISOString(),
+                    paidAt: null,
+                },
+            ];
+        }
+
+        return payouts.map((tx: any, i: number) => ({
+            id: tx.referenceId || `PO-${userId}-${i + 1}`,
+            userId: tx.userId,
+            orderId: tx.referenceId || tx.id,
+            packageName: tx.description || "Pembayaran Pesanan",
+            amount: tx.amount,
+            status: tx.status === "completed" ? "completed" : "pending",
+            createdAt: tx.createdAt,
+            paidAt: tx.status === "completed" ? tx.createdAt : null,
+        }));
+    } catch { return []; }
+}
+

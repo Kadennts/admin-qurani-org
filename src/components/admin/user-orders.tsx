@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table"
 import { useI18n } from "@/components/providers/i18n-provider"
 import dummyData from "@/data/billing-dummy.json"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { formatTimeAgo, formatTooltipDate } from "@/lib/date-utils"
 
 function formatCurrency(amount: number, locale: string) {
     return new Intl.NumberFormat(locale, {
@@ -96,8 +98,8 @@ export function UserOrders({ userId }: { userId: string }) {
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.package", "Paket")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.sessions", "Sesi")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.amount", "Nominal")}</TableHead>
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.date", "Tanggal")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.status", "Status")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.orders.columns.date", "Tanggal")}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -127,15 +129,24 @@ export function UserOrders({ userId }: { userId: string }) {
                                         <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalPayment, locale)}</span>
                                     </TableCell>
                                     <TableCell>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                                            <Calendar className="w-3.5 h-3.5" />
-                                            {formatDate(order.bookingDate, locale)}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
                                         <Badge className={`${st.badgeCls} border-0 font-medium w-fit`}>
                                             {t(st.key, st.key)}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5 cursor-help border-b border-dashed border-gray-400 w-fit">
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                        {formatTimeAgo(order.bookingDate, locale)}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{formatTooltipDate(order.bookingDate)}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                     </TableCell>
                                 </TableRow>
                             )
@@ -161,7 +172,7 @@ export function UserOrders({ userId }: { userId: string }) {
                                 <p className="font-medium">{order.packageName}</p>
                                 <p className="text-gray-500">{t("user_detail.orders.columns.trainer", "Guru")}: {order.trainerName}</p>
                                 <p className="text-gray-500">{order.completedSessions}/{order.totalSessions} {t("user_detail.orders.session_label", "sesi")}</p>
-                                <p className="text-gray-500">{formatDate(order.bookingDate, locale)}</p>
+                                <p className="text-gray-500">{formatTooltipDate(order.bookingDate)}</p>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
                                 <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalPayment, locale)}</span>

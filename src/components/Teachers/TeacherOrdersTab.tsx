@@ -145,16 +145,46 @@ export function TeacherOrdersTab({ trainerId, userId, locale }: Props) {
                     .filter((o: any) => String(o.trainerId) === String(trainerId))
                     .map((o: any) => bookingToPipeline(o))
 
+                const trainerOrdersRows: BillingPipelineOrder[] = ((guruDetailDummy.ordersByTrainer as any)[String(trainerId)] || []).map((o: any) => {
+                    let status: BillingPipelineStatus = "baru"
+                    if (o.status === "selesai") status = "selesai"
+                    else if (o.status === "gagal") status = "gagal"
+                    else if (o.status === "aktif") status = "aktif"
+
+                    return {
+                        id: o.id,
+                        userId: o.memberId,
+                        bookingCode: `#${String(o.id).toUpperCase()}`,
+                        member: o.memberName,
+                        username: toUsername("", o.memberName),
+                        memberAvatar: initials(o.memberName),
+                        guru: "Trainer",
+                        guruUsername: `@trainer`,
+                        paket: o.courseName,
+                        sesi: o.totalSessions,
+                        sesiSelesai: o.completedSessions,
+                        harga: o.price,
+                        tglPesan: new Date(o.bookingDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+                        payment: o.paymentStatus === "paid" ? "Paid" : "Pending",
+                        rawDate: new Date(o.bookingDate),
+                        status,
+                        isPendingPayment: o.paymentStatus === "pending",
+                        mode: o.mode || "online",
+                        trainerId: Number(trainerId)
+                    }
+                })
+
                 // 4. Merge: API data diutamakan, dummy sebagai fallback jika kosong
                 const apiAndSim = [...data, ...simRows]
+                const allDummies = [...jsonDummyRows, ...trainerOrdersRows]
                 if (apiAndSim.length > 0) {
                     // API / sim berhasil — pakai itu, jangan duplikasi dengan dummy
                     const uniqueIds = new Set<string | number>(apiAndSim.map(o => o.id))
-                    const extra = jsonDummyRows.filter(o => !uniqueIds.has(o.id))
+                    const extra = allDummies.filter(o => !uniqueIds.has(o.id))
                     if (mounted) setOrders([...apiAndSim, ...extra].sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime()))
                 } else {
                     // API gagal / kosong — pakai dummy JSON saja
-                    if (mounted) setOrders(jsonDummyRows.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime()))
+                    if (mounted) setOrders(allDummies.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime()))
                 }
             } catch (err) {
                 console.error("Failed to load orders", err)

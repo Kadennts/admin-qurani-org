@@ -64,7 +64,7 @@ const getSidebarData = (
 ) => {
   const baseNavItems: NavItem[] = [
     {
-      title: t("navigation.dashboard", "Dashboard Utama"),
+      title: t("navigation.dashboard", "Dashboard"),
       url: "/dashboard",
       icon: LayoutDashboard,
       items: [],
@@ -117,12 +117,12 @@ const getSidebarData = (
           icon: RxDashboard,
         },
         {
-          title: t("navigation.orders", "Pesanan"),
+          title: t("navigation.orders", "Orders"),
           url: "/billing/orders",
           icon: Receipt,
         },
         {
-          title: t("navigation.promo_coupons", "Promo & Kupon"),
+          title: t("navigation.promo_coupons", "Promo & Coupons"),
           url: "/billing/discountcodes",
           icon: Tag,
         },
@@ -135,11 +135,6 @@ const getSidebarData = (
           title: t("navigation.topup", "TopUp"),
           url: "/billing/topup",
           icon: ArrowDownToLine,
-        },
-        {
-          title: t("navigation.transaksi", "Transaksi"),
-          url: "/billing/transaction",
-          icon: History,
         },
         {
           title: t("billing.payments.title", "Payment"),
@@ -263,17 +258,17 @@ const getSidebarData = (
           icon: GraduationCap,
         },
         {
-          title: t("navigation.trainer_applications", "Pengajuan Guru"),
+          title: t("navigation.trainer_applications", "Trainer Applications"),
           url: "/teachers/applications",
           icon: UserCheck,
         },
         {
-          title: t("navigation.trainer_calendar", "Kalender"),
+          title: t("navigation.trainer_calendar", "Trainer Calendar"),
           url: "/teachers/calendar",
           icon: CalendarDays,
         },
         {
-          title: t("navigation.trainer_performance", "Performa Penyeleksi"),
+          title: t("navigation.trainer_performance", "Trainer Performance"),
           url: "/teachers/performance",
           icon: Star,
         },
@@ -283,7 +278,7 @@ const getSidebarData = (
           icon: Package,
         },
         {
-          title: t("navigation.trainer_certificates", "Sertifikat"),
+          title: t("navigation.trainer_certificates", "Certificates"),
           url: "/teachers/certificates",
           icon: Award,
         },

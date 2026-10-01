@@ -81,3 +81,35 @@ export function formatTooltipDate(dateInput: Date | string | null | undefined): 
         return ""
     }
 }
+
+import { formatDistanceToNow } from 'date-fns'
+import { enUS, id as idLocale } from 'date-fns/locale'
+
+export function formatTimeAgo(dateInput: Date | string | null | undefined, localeStr = 'en'): string {
+    if (!dateInput) return ""
+    try {
+        let date: Date;
+        if (dateInput instanceof Date) {
+            date = dateInput
+        } else {
+            let dateStr = String(dateInput).trim()
+            if (!dateStr.includes('Z') && !dateStr.includes('+')) {
+                if (dateStr.includes(' ')) {
+                    dateStr = dateStr.replace(' ', 'T') + 'Z'
+                } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                    dateStr = dateStr + ':00Z'
+                }
+            }
+            date = new Date(dateStr)
+        }
+        
+        if (Number.isNaN(date.getTime())) return ""
+
+        return formatDistanceToNow(date, { 
+            addSuffix: true,
+            locale: localeStr === 'id' ? idLocale : enUS
+        })
+    } catch {
+        return ""
+    }
+}

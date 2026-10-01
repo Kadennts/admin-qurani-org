@@ -66,16 +66,18 @@ export function useTranslation(namespaces: string[] = ['common']) {
   const t = (key: string, fallback?: string, params?: Record<string, string | number>): string => {
     const keys = key.split('.');
     let value: unknown = dictionary;
+    let found = true;
 
     for (const k of keys) {
       if (value && typeof value === 'object' && value !== null && k in value) {
         value = (value as Record<string, unknown>)[k];
       } else {
-        return fallback || key;
+        found = false;
+        break;
       }
     }
 
-    let result = typeof value === 'string' ? value : fallback || key;
+    let result = found && typeof value === 'string' ? value : fallback || key;
 
     // Handle interpolation if params are provided
     if (params && typeof result === 'string') {

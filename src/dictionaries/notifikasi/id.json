@@ -73,7 +73,7 @@
     "filter_placeholder": "Cari berdasar username atau nama grup...",
     "all_data_displayed": "Semua data telah ditampilkan",
     "ticket_new_message": "Pesan baru pada ticket support",
-    "new_support_ticket": "Ticket Support", 
+    "new_support_ticket": "Ticket Support",
     "ticket_reply_title": "Balasan untuk Ticket",
     "replied_message": "membalas",
     "new_reply_from": "Pesan baru dari",
@@ -82,6 +82,13 @@
     "reports": "Laporan",
     "tickets": "Tiket",
     "tidak_ada_notifikasi_reports": "Tidak ada notifikasi laporan",
-    "belum_ada_reports": "Belum ada notifikasi laporan baru."
+    "belum_ada_reports": "Belum ada notifikasi laporan baru.",
+    "ticket_reminder_due_title": "Reminder Selesai",
+    "ticket_reminder_due_message": "Reminder ticket telah selesai",
+    "undangan_grup_ditolak": "Undangan grup ditolak",
+    "undangan_grup_diterima": "Undangan grup diterima",
+    "cari": "Cari",
+    "ticket_reply": "Pesan baru pada ticket support",
+    "semua_notifikasi_dihapus": "Semua notifikasi berhasil dihapus"
   }
 }

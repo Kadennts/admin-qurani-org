@@ -41,7 +41,7 @@ export const NavTrigerSidebar = React.memo(function NavUser() {
           }
         >
           <PanelLeftIcon className="h-4 w-4" />
-          <span className="text-sm">{t('navigation.close_sidebar')}</span>
+          <span className="text-sm">{t('navigation.close_sidebar', 'Tutup Sidebar')}</span>
         </div>
       )}
     </>

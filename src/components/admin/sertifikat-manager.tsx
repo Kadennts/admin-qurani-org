@@ -87,6 +87,22 @@ function formatDate(iso: string | null): string {
   }
 }
 
+function formatTimeAgo(iso: string | null): string {
+  if (!iso) return "—"
+  try {
+    const date = new Date(iso)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+    
+    if (diffInSeconds < 60) return "Baru saja"
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit yang lalu`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam yang lalu`
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} hari yang lalu`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} bulan yang lalu`
+    return `${Math.floor(diffInSeconds / 31536000)} tahun yang lalu`
+  } catch { return "—" }
+}
+
 function statusBadge(cert: CertificateDto) {
   if (cert.isRevoked) {
     return (
@@ -569,10 +585,10 @@ export function SertifikatManager() {
                       <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                           <tr>
-                            {["Murid", "Trainer", "No. Sertifikat", "Tipe", "Waktu", "Status", "Aksi"].map((h) => (
+                            {["Murid", "Trainer", "No. Sertifikat", "Tipe", "Status", "Aksi", "Waktu"].map((h) => (
                               <th
                                 key={h}
-                                className={`px-6 py-4 text-[10px] font-extrabold tracking-wider text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/80 whitespace-nowrap ${h === "Aksi" ? "text-right" : "text-left"}`}
+                                className={`px-6 py-4 text-[10px] font-extrabold tracking-wider text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/80 whitespace-nowrap ${h === "Aksi" || h === "Waktu" ? "text-right" : "text-left"}`}
                               >
                                 {h}
                               </th>
@@ -616,9 +632,6 @@ export function SertifikatManager() {
                                     {cert.credentialType}
                                   </span>
                                 ) : "—"}
-                              </td>
-                              <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
-                                {formatDate(cert.issuedAt)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">{statusBadge(cert)}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -711,6 +724,12 @@ export function SertifikatManager() {
                                     </AlertDialog>
                                   )}
                                 </div>
+                              </td>
+                              <td 
+                                className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs text-right cursor-help"
+                                title={cert.issuedAt ? new Date(cert.issuedAt).toLocaleString() : ""}
+                              >
+                                {formatTimeAgo(cert.issuedAt)}
                               </td>
                             </motion.tr>
                           ))}

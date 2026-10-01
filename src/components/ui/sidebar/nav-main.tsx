@@ -182,9 +182,17 @@ export const NavMain = React.memo(function NavMain({
       setOpenMenus(initialState)
       initializedRef.current = true
     } else if (groupToOpen) {
+      // Auto-close semua section lain, buka hanya yang aktif
       setOpenMenus(prev => {
-        if (prev[groupToOpen]) return prev
-        return { ...prev, [groupToOpen]: true }
+        const newState: Record<string, boolean> = {}
+        items.forEach(item => {
+          if (item.items && item.items.length > 0) {
+            newState[item.title] = item.title === groupToOpen
+          }
+        })
+        // Skip update jika state sudah sama (avoid unnecessary re-render)
+        const isSame = Object.keys(newState).every(k => prev[k] === newState[k])
+        return isSame ? prev : newState
       })
     }
   }, [pathname, items, isSubItemActive])

@@ -16,6 +16,8 @@ import { useI18n } from "@/components/providers/i18n-provider"
 import { getRecapAllAdmin } from "@/utils/api/recaps/fetch"
 import { IRecap } from "@/types/recap"
 import { getSimSetoransByUser } from "@/data/sim-setoran"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { formatTimeAgo, formatTooltipDate } from "@/lib/date-utils"
 
 const PAGE_SIZE = 10
 
@@ -176,12 +178,12 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-emerald-600 hover:bg-emerald-600">
-                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.time", "Waktu")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.penyetor", "Penyetor")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.penerima", "Penerima")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.recitation", "Bacaan")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.result", "Hasil")}</TableHead>
                             <TableHead className="font-semibold text-slate-50 dark:text-slate-50 text-center">{t("user_detail.setoran.columns.paraf", "Paraf")}</TableHead>
+                            <TableHead className="font-semibold text-slate-50 dark:text-slate-50">{t("user_detail.setoran.columns.time", "Waktu")}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -193,11 +195,6 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                                     onClick={() => row.id && router.push(`/setoran/recap/${row.id}`)}
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
                                 >
-                                    <TableCell>
-                                        <span className="font-medium text-gray-700 dark:text-gray-200">
-                                            {formatDateWithHour(row.created_at || "", locale)}
-                                        </span>
-                                    </TableCell>
                                     <TableCell>
                                         <span className="font-medium text-gray-700 dark:text-gray-200">
                                             {row.reciter?.nickname ? `${row.reciter.nickname} - ${row.reciter.name}` : row.reciter?.name}
@@ -227,6 +224,20 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                                             )}
                                         </div>
                                     </TableCell>
+                                    <TableCell>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200 cursor-help border-b border-dashed border-gray-400">
+                                                        {formatTimeAgo(row.created_at, locale)}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{formatTooltipDate(row.created_at)}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </TableCell>
                                 </TableRow>
                             )
                         })}
@@ -244,7 +255,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                             className="bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateWithHour(row.created_at || "", locale)}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatTooltipDate(row.created_at)}</span>
                                 {row.paraf
                                     ? <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                     : <Minus className="h-5 w-5 text-gray-300 dark:text-gray-600" />}

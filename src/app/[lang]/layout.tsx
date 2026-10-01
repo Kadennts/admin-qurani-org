@@ -29,7 +29,7 @@ export default async function LangLayout({
         defaultTheme="light"
         disableTransitionOnChange
       >
-        <I18nProvider namespaces={["common", "navigation", "search", "profile"]}>
+        <I18nProvider namespaces={["common", "navigation", "search", "profile", "support", "billing", "statistik", "dashboard", "notifikasi", "hasil-setoran", "kyc_member", "admin-dashboard", "admin-users", "admin-kategori", "masterdata", "teacher-detail"]}>
           <DynamicTitle />
           <SWRProvider>
             <AuthProvider>

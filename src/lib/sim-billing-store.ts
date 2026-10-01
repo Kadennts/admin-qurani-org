@@ -11,7 +11,7 @@ import { getSimOrders, SimOrder } from "@/lib/sim-store"
 // ── Storage Keys ──────────────────────────────────────────────────────────────
 // STORE_VERSION: Naikkan angka ini setiap kali dummy data berubah agar
 // localStorage lama otomatis di-reset ke data terbaru.
-const STORE_VERSION        = "v12-payment-methods"  // ← diperbarui: metode pembayaran bervariasi
+const STORE_VERSION        = "v13-fix-mappings"
 const STORE_VERSION_KEY    = "qurani_sim_billing_version"
 const PAYOUT_PENDING_KEY   = "qurani_sim_payout_pending"
 const PAYOUT_HISTORY_KEY   = "qurani_sim_payout_history"
@@ -97,25 +97,28 @@ function generateDynamicData() {
     const pending: SimPayout[] = []
     const history: SimPayout[] = []
     const payments: SimPayment[] = []
-    const refundsPending: SimRefund[] = []
-    const refundsProcessed: SimRefund[] = []
 
     const staticBookings = dummyBillingData.bookings || []
     const simOrders = getSimOrders() || []
 
     const allBookings = [
         ...staticBookings.map((b: any) => {
-            const isCompleted = b.sessions && b.sessions.every((s:any) => s.status === "completed") && b.sessions.length > 0
+            let derivedStatus = "pending";
+            if (b.status === "completed" || b.status === "selesai") {
+                derivedStatus = "selesai";
+            } else if (b.status === "paid") {
+                derivedStatus = "paid";
+            }
             return {
-                id: b.bookingId,
-                userId: b.member?.id,
-                userName: b.member?.name,
-                trainerId: b.trainer?.id,
-                trainerName: b.trainer?.name,
-                amount: b.payment?.pricePackage || 0,
-                status: isCompleted ? "selesai" : (b.payment?.status === "paid" ? "paid" : "pending"),
-                paymentMethod: b.payment?.method || "Transfer",
-                createdAt: b.payment?.paidAt || b.createdAt || new Date().toISOString()
+                id: b.id || b.bookingId,
+                userId: b.userId || b.member?.id,
+                userName: b.userName || b.member?.name,
+                trainerId: b.trainerId || b.trainer?.id,
+                trainerName: b.trainerName || b.trainer?.name,
+                amount: b.totalPayment || b.pricePackage || b.payment?.pricePackage || 0,
+                status: derivedStatus,
+                paymentMethod: b.paymentMethod || b.payment?.method || "Transfer",
+                createdAt: b.bookingDate || b.createdAt || b.payment?.paidAt || new Date().toISOString()
             }
         }),
         ...simOrders.map((o: SimOrder) => ({
@@ -170,6 +173,16 @@ function generateDynamicData() {
             pending.push(payout)
         }
     })
+
+    const refundsPending: SimRefund[] = [
+        { id: "REF-3006", userId: 889977665544105, userName: "Dewi Rahayu", trainerId: 301, trainerName: "Hasyim asy'ari, Lc", bookingId: 3006, amount: 155000, refundAmount: 155000, status: "pending", paymentMethod: "GoPay", refundReason: "Jadwal bentrok dan tidak ada reschedule", createdAt: new Date(Date.now() - 172800000).toISOString() },
+        { id: "REF-3008", userId: 889977665544103, userName: "Siti Aminah", trainerId: 304, trainerName: "Aisyah", bookingId: 3008, amount: 285000, refundAmount: 142500, status: "pending", paymentMethod: "Bank Transfer", refundReason: "Ingin ganti guru, sesi baru jalan separuh", sessionsInfo: "2/4 Sesi selesai", createdAt: new Date(Date.now() - 345600000).toISOString() }
+    ]
+    
+    const refundsProcessed: SimRefund[] = [
+        { id: "REF-3004", userId: 889977665544101, userName: "Siti Rahmawati", trainerId: 303, trainerName: "Siti Nurhaliza", bookingId: 3004, amount: 80000, refundAmount: 80000, status: "processed", paymentMethod: "VA Mandiri", refundReason: "Guru berhalangan hadir", createdAt: new Date(Date.now() - 604800000).toISOString(), updatedAt: new Date(Date.now() - 518400000).toISOString(), notes: "Refund telah dikembalikan ke saldo wallet" },
+        { id: "REF-3011", userId: 889977665544104, userName: "Budi Santoso", trainerId: 305, trainerName: "Zain Al-Fattah", bookingId: 3011, amount: 405000, refundAmount: 0, status: "rejected", paymentMethod: "OVO", refundReason: "Sinyal sering putus dari murid", createdAt: new Date(Date.now() - 864000000).toISOString(), updatedAt: new Date(Date.now() - 864000000).toISOString(), notes: "Refund ditolak karena masalah teknis bukan dari sisi pengajar" }
+    ]
 
     return { pending, history, payments, refundsPending, refundsProcessed }
 }

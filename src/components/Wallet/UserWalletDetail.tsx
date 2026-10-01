@@ -4,7 +4,9 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
     Wallet, History, Loader2, AlertTriangle, FileText,
-    ChevronDown, SlidersHorizontal, X, Printer
+    ChevronDown, SlidersHorizontal, X, Printer, GraduationCap,
+    ArrowRight, Clock, CheckCircle2, XCircle, ExternalLink,
+    DollarSign, ArrowDownLeft, ArrowUpRight, ShoppingCart, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +16,8 @@ import {
     getSimWallet,
     updateSimWallet,
     getSimWalletBalances,
-    getSimTransactions
+    getSimTransactions,
+    getSimPayouts
 } from "@/lib/sim-wallet-store";
 import {
     Dialog,
@@ -196,6 +199,8 @@ interface UserWalletDetailProps {
     userData?: any;
     hideProfileCard?: boolean;
     hideLimitFeature?: boolean;
+    /** Jika true, card Saldo Pending bisa diklik untuk melihat data payout guru */
+    isTeacher?: boolean;
 }
 
 type ViewMode = "list" | "mutasi";
@@ -207,6 +212,7 @@ export function UserWalletDetail({
     userData,
     hideProfileCard = false,
     hideLimitFeature = false,
+    isTeacher = false,
 }: UserWalletDetailProps) {
     const router = useRouter();
     const pathname = usePathname();
@@ -242,6 +248,10 @@ export function UserWalletDetail({
     const [suspendReason, setSuspendReason] = useState("");
     const [isActivateModalOpen, setIsActivateModalOpen] = useState(false);
 
+    // ─── Payout Popup (untuk user yang juga guru) ────────────────────────────
+    const [isPayoutPopupOpen, setIsPayoutPopupOpen] = useState(false);
+    const [payoutRecords, setPayoutRecords] = useState<any[]>([]);
+
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // ─── Print ref ──────────────────────────────────────────────────────────
@@ -270,6 +280,14 @@ export function UserWalletDetail({
     useEffect(() => {
         if (userId) fetchData();
     }, [userId]);
+
+    // Load payout data jika user adalah guru
+    useEffect(() => {
+        if (isTeacher && userId) {
+            const records = getSimPayouts(userId);
+            setPayoutRecords(records);
+        }
+    }, [isTeacher, userId]);
 
     // Close filter popover on outside click
     useEffect(() => {
@@ -633,6 +651,7 @@ export function UserWalletDetail({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {/* Saldo Aktif */}
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
                         <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
                             {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
@@ -641,14 +660,39 @@ export function UserWalletDetail({
                             {formatCurrency(walletData?.activeBalance || walletData?.balance || 0, locale)}
                         </div>
                     </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
-                            {t("billing.wallet_detail.pending_balance", "Saldo Pending")}
+
+                    {/* Saldo Pending — clickable untuk guru */}
+                    <div
+                        className={`p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border transition-all duration-200 ${
+                            isTeacher
+                                ? "border-amber-200 dark:border-amber-700 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:shadow-md group"
+                                : "border-gray-100 dark:border-gray-800"
+                        }`}
+                        onClick={isTeacher ? () => setIsPayoutPopupOpen(true) : undefined}
+                        title={isTeacher ? "Klik untuk melihat data payout guru" : undefined}
+                    >
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                                {t("billing.wallet_detail.pending_balance", "Saldo Pending")}
+                            </div>
+                            {isTeacher && (
+                                <div className="flex items-center gap-1">
+                                    <GraduationCap className="w-3.5 h-3.5 text-amber-500" />
+                                    <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            )}
                         </div>
                         <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                             {formatCurrency(walletData?.pendingBalance || 0, locale)}
                         </div>
+                        {isTeacher && (
+                            <p className="text-[10px] text-amber-500 font-medium mt-1.5">
+                                Klik untuk lihat data payout
+                            </p>
+                        )}
                     </div>
+
+                    {/* Total Transaksi */}
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col justify-center">
                         <div className="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">
                             {t("billing.wallet_detail.total_transactions", "Total Transaksi")}
@@ -917,9 +961,44 @@ export function UserWalletDetail({
                     </>
                 )}
 
-                {/* ── MUTASI BANK MODE ──────────────────────────────────────────────── */}
+                {/* ── MUTASI BANK MODE (TIMELINE DESIGN) ──────────────────────────────────────────────── */}
                 {viewMode === "mutasi" && (
-                    <div ref={printRef}>
+                    <div ref={printRef} className="space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t("billing.wallet_detail.active_balance", "Saldo Aktif")}</p>
+                                    <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(walletData?.activeBalance ?? 0, locale)}</p>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                                    <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Pemasukan</p>
+                                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                                        {formatCurrency(mutasiRows.filter((tx: any) => tx.amount > 0).reduce((acc: number, tx: any) => acc + tx.amount, 0), locale)}
+                                    </p>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                                    <ArrowDownLeft className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Pengeluaran</p>
+                                    <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                                        {formatCurrency(Math.abs(mutasiRows.filter((tx: any) => tx.amount < 0).reduce((acc: number, tx: any) => acc + tx.amount, 0)), locale)}
+                                    </p>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                                    <ArrowUpRight className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                </div>
+                            </div>
+                        </div>
+
                         {mutasiRows.length === 0 ? (
                             <div className="text-center py-12 px-4 text-gray-400">
                                 <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
@@ -928,182 +1007,74 @@ export function UserWalletDetail({
                                 </p>
                             </div>
                         ) : (
-                            <>
-                                {/* ── Desktop table ── */}
-                                <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-sm whitespace-nowrap" dir={isRTL ? "rtl" : "ltr"}>
-                                        <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
-                                            <tr>
-                                                <th className={`px-5 py-3.5 ${isRTL ? "text-right" : "text-left"}`}>
-                                                    {t("user_detail.wallet_statement.col_date", "Tanggal")}
-                                                </th>
-                                                <th className={`px-5 py-3.5 ${isRTL ? "text-right" : "text-left"}`}>
-                                                    {t("user_detail.wallet_statement.col_desc", "Keterangan")}
-                                                </th>
-                                                <th className="px-5 py-3.5 text-right">
-                                                    {t("user_detail.wallet_statement.col_debit", "Debit")}
-                                                </th>
-                                                <th className="px-5 py-3.5 text-right">
-                                                    {t("user_detail.wallet_statement.col_credit", "Kredit")}
-                                                </th>
-                                                <th className="px-5 py-3.5 text-right">
-                                                    {t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
-                                            {mutasiRows.map((tx: any, idx: number) => {
-                                                const isDebit = tx.amount < 0;
-                                                const isFirst = idx === 0;
-                                                return (
-                                                    <tr
-                                                        key={`${tx.id}-${idx}`}
-                                                        className={`transition-colors ${isFirst
-                                                            ? "bg-emerald-50/60 dark:bg-emerald-900/10"
-                                                            : "hover:bg-gray-50/60 dark:hover:bg-gray-800/30"
-                                                            }`}
-                                                    >
-                                                        <td className="px-5 py-3.5">
-                                                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                                                                {formatDateShort(tx.createdAt, locale)}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-5 py-3.5 max-w-[280px]">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {getTxTypeBadge(tx.type, t)}
-                                                                    <span className="text-[10px] font-mono text-gray-400">
-                                                                        {tx.referenceId || `#${tx.id}`}
-                                                                    </span>
-                                                                </div>
-                                                                {tx.description && (
-                                                                    <span className="text-[11px] text-gray-500 truncate">
-                                                                        {tx.description}
-                                                                    </span>
+                            <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 dark:before:via-gray-700 before:to-transparent">
+                                {mutasiRows.map((tx: any, idx: number) => {
+                                    const isDebit = tx.amount < 0;
+                                    const isFirst = idx === 0;
+                                    
+                                    // Icons based on type
+                                    let Icon = History;
+                                    let iconBg = "bg-gray-100 dark:bg-gray-800";
+                                    let iconColor = "text-gray-500 dark:text-gray-400";
+
+                                    if (tx.type === 1) { // TopUp
+                                        Icon = ArrowDownLeft;
+                                        iconBg = "bg-emerald-100 dark:bg-emerald-900/30";
+                                        iconColor = "text-emerald-600 dark:text-emerald-400";
+                                    } else if (tx.type === 2) { // Withdraw
+                                        Icon = ArrowUpRight;
+                                        iconBg = "bg-orange-100 dark:bg-orange-900/30";
+                                        iconColor = "text-orange-600 dark:text-orange-400";
+                                    } else if (tx.type === 4) { // Payment
+                                        Icon = isDebit ? ShoppingCart : CheckCircle;
+                                        iconBg = isDebit ? "bg-red-100 dark:bg-red-900/30" : "bg-emerald-100 dark:bg-emerald-900/30";
+                                        iconColor = isDebit ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
+                                    }
+
+                                    return (
+                                        <div key={`mob-${tx.id}-${idx}`} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active mb-8">
+                                            {/* Icon */}
+                                            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white dark:border-gray-900 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 ${iconBg} ${iconColor}`}>
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                            
+                                            {/* Content Card */}
+                                            <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/60 hover:shadow-md transition-shadow">
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">{formatDateShort(tx.createdAt, locale)}</span>
+                                                                {isFirst && (
+                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">TERBARU</span>
                                                                 )}
                                                             </div>
-                                                        </td>
-                                                        <td className="px-5 py-3.5 text-right">
-                                                            {isDebit ? (
-                                                                <span className="font-bold text-sm text-red-600 dark:text-red-400">
-                                                                    {formatCurrency(Math.abs(tx.amount), locale)}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-gray-300 dark:text-gray-700 text-sm">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-5 py-3.5 text-right">
-                                                            {!isDebit ? (
-                                                                <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                                                                    {formatCurrency(tx.amount, locale)}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-gray-300 dark:text-gray-700 text-sm">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-5 py-3.5 text-right">
-                                                            <span className={`font-black text-sm ${isFirst
-                                                                ? "text-emerald-600 dark:text-emerald-400"
-                                                                : "text-gray-800 dark:text-gray-200"
-                                                                }`}>
-                                                                {formatCurrency(tx.runningBalance, locale)}
+                                                            <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{getTxTypeName(tx.type, t)}</h4>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className={`text-base font-black ${isDebit ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                                {isDebit ? '-' : '+'}{formatCurrency(Math.abs(tx.amount), locale)}
                                                             </span>
-                                                            {isFirst && (
-                                                                <div className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider mt-0.5">
-                                                                    ● {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                        {/* Footer: active balance confirmation */}
-                                        <tfoot>
-                                            <tr className="bg-emerald-50 dark:bg-emerald-900/20 border-t-2 border-emerald-200 dark:border-emerald-800">
-                                                <td colSpan={4} className="px-5 py-3 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                                                    {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
-                                                </td>
-                                                <td className="px-5 py-3 text-right font-black text-base text-emerald-700 dark:text-emerald-400">
-                                                    {formatCurrency(walletData?.activeBalance ?? 0, locale)}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-
-                                {/* ── Mobile card layout ── */}
-                                <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-800">
-                                    {mutasiRows.map((tx: any, idx: number) => {
-                                        const isDebit = tx.amount < 0;
-                                        const isFirst = idx === 0;
-                                        return (
-                                            <div
-                                                key={`mob-${tx.id}-${idx}`}
-                                                className={`px-4 py-3.5 ${isFirst ? "bg-emerald-50/60 dark:bg-emerald-900/10" : ""}`}
-                                            >
-                                                {/* Row 1: date + type */}
-                                                <div className="flex items-center justify-between gap-2 mb-2">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        {getTxTypeBadge(tx.type, t)}
-                                                        <span className="text-[10px] font-mono text-gray-400">
-                                                            {tx.referenceId || `#${tx.id}`}
-                                                        </span>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">
-                                                        {formatDateShort(tx.createdAt, locale)}
-                                                    </span>
-                                                </div>
-                                                {/* Description */}
-                                                {tx.description && (
-                                                    <p className="text-[11px] text-gray-500 mb-2 leading-snug">{tx.description}</p>
-                                                )}
-                                                {/* Row 2: Debit / Kredit / Saldo */}
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
-                                                            {t("user_detail.wallet_statement.col_debit", "Debit")}
-                                                        </p>
-                                                        <p className={`text-sm font-bold ${isDebit ? "text-red-600 dark:text-red-400" : "text-gray-300 dark:text-gray-700"}`}>
-                                                            {isDebit ? formatCurrency(Math.abs(tx.amount), locale) : "—"}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
-                                                            {t("user_detail.wallet_statement.col_credit", "Kredit")}
-                                                        </p>
-                                                        <p className={`text-sm font-bold ${!isDebit ? "text-emerald-600 dark:text-emerald-400" : "text-gray-300 dark:text-gray-700"}`}>
-                                                            {!isDebit ? formatCurrency(tx.amount, locale) : "—"}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 text-right">
-                                                        <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider">
-                                                            {t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}
-                                                        </p>
-                                                        <p className={`text-sm font-black ${isFirst ? "text-emerald-600 dark:text-emerald-400" : "text-gray-800 dark:text-gray-200"}`}>
-                                                            {formatCurrency(tx.runningBalance, locale)}
-                                                        </p>
-                                                        {isFirst && (
-                                                            <p className="text-[8px] text-emerald-500 font-bold uppercase">
-                                                                ● {t("billing.wallet_detail.active_balance", "Aktif")}
-                                                            </p>
-                                                        )}
+                                                    
+                                                    {tx.description && (
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">{tx.description}</p>
+                                                    )}
+                                                    
+                                                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex justify-between items-center">
+                                                        <span className="text-[10px] font-mono text-gray-400">Ref: {tx.referenceId || `#${tx.id}`}</span>
+                                                        <div className="text-right flex items-center gap-2">
+                                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Saldo</span>
+                                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatCurrency(tx.runningBalance, locale)}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                    {/* Mobile footer */}
-                                    <div className="px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-between border-t-2 border-emerald-200 dark:border-emerald-800">
-                                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                                            {t("billing.wallet_detail.active_balance", "Saldo Aktif")}
-                                        </span>
-                                        <span className="font-black text-base text-emerald-700 dark:text-emerald-400">
-                                            {formatCurrency(walletData?.activeBalance ?? 0, locale)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 )}
@@ -1212,6 +1183,140 @@ export function UserWalletDetail({
                         >
                             {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             {t("billing.wallet_detail.activate_modal.confirm", "Aktifkan")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Payout Popup Modal (untuk user yang juga Guru) ────────────────── */}
+            <Dialog open={isPayoutPopupOpen} onOpenChange={setIsPayoutPopupOpen}>
+                <DialogContent className="sm:max-w-[560px] max-h-[80vh] overflow-hidden flex flex-col">
+                    <DialogHeader className="pb-3 border-b border-gray-100 dark:border-gray-800">
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                                <GraduationCap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            Data Payout Guru
+                        </DialogTitle>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Riwayat payout dari pesanan yang telah selesai untuk{" "}
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                {userData?.name || `User #${userId}`}
+                            </span>
+                        </p>
+                    </DialogHeader>
+
+                    {/* Summary Row */}
+                    <div className="grid grid-cols-3 gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
+                        {[
+                            {
+                                label: "Total Payout",
+                                value: formatCurrency(
+                                    payoutRecords.reduce((s, p) => s + (p.amount || 0), 0),
+                                    locale
+                                ),
+                                color: "text-gray-900 dark:text-white",
+                            },
+                            {
+                                label: "Sudah Dibayar",
+                                value: payoutRecords.filter((p) => p.status === "completed").length,
+                                color: "text-emerald-600 dark:text-emerald-400",
+                            },
+                            {
+                                label: "Menunggu",
+                                value: payoutRecords.filter((p) => p.status === "pending").length,
+                                color: "text-amber-600 dark:text-amber-400",
+                            },
+                        ].map((stat) => (
+                            <div key={stat.label} className="text-center">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">{stat.label}</p>
+                                <p className={`text-lg font-black ${stat.color}`}>{stat.value}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Payout List */}
+                    <div className="flex-1 overflow-y-auto -mx-6 px-6">
+                        {payoutRecords.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-3">
+                                <GraduationCap className="w-10 h-10 text-gray-300" />
+                                <p className="text-sm font-medium">Belum ada data payout</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 py-3">
+                                {payoutRecords.map((payout: any) => {
+                                    const isCompleted = payout.status === "completed";
+                                    const isPending = payout.status === "pending";
+                                    return (
+                                        <div
+                                            key={payout.id}
+                                            className="flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 transition-colors"
+                                        >
+                                            {/* Status icon */}
+                                            <div className={`p-2 rounded-lg shrink-0 ${
+                                                isCompleted
+                                                    ? "bg-emerald-50 dark:bg-emerald-900/20"
+                                                    : "bg-amber-50 dark:bg-amber-900/20"
+                                            }`}>
+                                                {isCompleted ? (
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                ) : (
+                                                    <Clock className="w-4 h-4 text-amber-500" />
+                                                )}
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                                    {payout.packageName}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 font-mono">
+                                                    {payout.orderId} &nbsp;·&nbsp;
+                                                    {formatDateShort(payout.createdAt, locale)}
+                                                </p>
+                                            </div>
+
+                                            {/* Amount + status */}
+                                            <div className="text-right shrink-0">
+                                                <p className={`text-sm font-black ${
+                                                    isCompleted
+                                                        ? "text-emerald-600 dark:text-emerald-400"
+                                                        : "text-amber-600 dark:text-amber-400"
+                                                }`}>
+                                                    +{formatCurrency(payout.amount, locale)}
+                                                </p>
+                                                <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                                                    isCompleted
+                                                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                                                        : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                                                }`}>
+                                                    {isCompleted ? "Dibayar" : "Pending"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsPayoutPopupOpen(false)}
+                            className="flex-1 sm:flex-none"
+                        >
+                            Tutup
+                        </Button>
+                        <Button
+                            className="flex-1 bg-amber-500 hover:bg-amber-600 text-white gap-2"
+                            onClick={() => {
+                                setIsPayoutPopupOpen(false);
+                                router.push(`/${lang}/billing/payout`);
+                            }}
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                            Lihat Semua Payout
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -212,7 +212,7 @@ function Sidebar({
         {/* Mobile Overlay */}
         <div
           className={cn(
-            "fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-all duration-300 ease-in-out",
+            "fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm transition-all duration-300 ease-in-out",
             openMobile ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
           onClick={() => setOpenMobile(false)}
@@ -231,7 +231,7 @@ function Sidebar({
           aria-modal="true"
           aria-label="Navigation menu"
           className={cn(
-            "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out",
+            "fixed inset-y-0 left-0 z-[100] transform transition-transform duration-300 ease-out",
             "bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-800",
             "shadow-xl focus-within:outline-none overflow-hidden",
             openMobile ? "translate-x-0" : "-translate-x-full"

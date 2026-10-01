@@ -1582,7 +1582,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                         <span className="w-3 h-3 sm:w-4 sm:h-4 md:w-4.5 md:h-4.5 flex items-center justify-center">
                             <Bell className="h-3 w-3 sm:h-5 sm:w-5 md:h-5 md:w-5" />
                         </span>
-                        {t('notifikasi.tampilkan_semua')}
+                        {t('notifikasi.tampilkan_semua', 'Tampilkan Semua')}
                     </Button>
                     {/* Temporarily commented out Friend tab */}
                     {/* <Button
@@ -1602,7 +1602,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                         <span className="w-3 h-3 sm:w-4 sm:h-4 md:w-4.5 md:h-4.5 flex items-center justify-center">
                             <Users className="h-3 w-3 sm:h-5 sm:w-5 md:h-5 md:w-5" />
                         </span>
-                        {t('notifikasi.friend')}
+                        {t('notifikasi.friend', 'Teman')}
                     </Button> */}
                     {/* Temporarily commented out Group tab */}
                     {/* <Button
@@ -1622,7 +1622,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                         <span className="w-3 h-3 sm:w-4 sm:h-4 md:w-4.5 md:h-4.5 flex items-center justify-center">
                             <Component className="h-3 w-3 sm:h-5 sm:w-5 md:h-5 md:w-5" />
                         </span>
-                        {t('notifikasi.group')}
+                        {t('notifikasi.group', 'Grup')}
                         
                     </Button> */}
                     {/* Temporarily commented out Setoran (Recitation) tab */}
@@ -1643,7 +1643,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                         <span className="w-3 h-3 sm:w-4 sm:h-4 md:w-4.5 md:h-4.5 flex items-center justify-center">
                             <BookOpen className="h-3 w-3 sm:h-5 sm:w-5 md:h-5 md:w-5" />
                         </span>
-                        {t('notifikasi.setoran')}
+                        {t('notifikasi.setoran', 'Setoran')}
                     </Button> */}
                     {/* Reports tab - kept active */}
                     <Button
@@ -1742,7 +1742,7 @@ export function Notifikasi({ userId }: NotifikasiProps) {
                                             </div>
                                         ) : displayedNotifications.length === filteredNotifications.length && filteredNotifications.length > 0 ? (
                                             <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                                                {t('notifikasi.all_data_displayed')}
+                                                {t('notifikasi.all_data_displayed', 'Semua data telah ditampilkan')}
                                             </p>
                                         ) : null}
                                     </div>

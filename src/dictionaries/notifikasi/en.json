@@ -73,7 +73,7 @@
     "filter_placeholder": "Search by username or grup name...",
     "all_data_displayed": "All data has been displayed",
     "ticket_new_message": "New message on support ticket",
-    "new_support_ticket": "Support Ticket", 
+    "new_support_ticket": "Support Ticket",
     "ticket_reply_title": "Reply on Ticket",
     "replied_message": "replied",
     "new_reply_from": "New message from",
@@ -82,6 +82,13 @@
     "reports": "Reports",
     "tickets": "Tickets",
     "tidak_ada_notifikasi_reports": "No reports notifications",
-    "belum_ada_reports": "No reports notifications yet."
+    "belum_ada_reports": "No reports notifications yet.",
+    "ticket_reminder_due_title": "Reminder Completed",
+    "ticket_reminder_due_message": "Ticket reminder has been completed",
+    "undangan_grup_ditolak": "Group invitation rejected",
+    "undangan_grup_diterima": "Group invitation accepted",
+    "cari": "Search",
+    "ticket_reply": "New message on support ticket",
+    "semua_notifikasi_dihapus": "All notifications deleted successfully"
   }
 }
