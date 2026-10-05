@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
-    Search, ShoppingBag, Zap, CheckCircle2, X,
+    Search, ShoppingBag, CheckCircle2, X,
     MoreHorizontal, ChevronLeft,
     ChevronRight, Trash2,
     ChevronDown, Check, Timer, BarChart2, History, Calendar,
@@ -240,7 +240,6 @@ function SimModal({ onClose, onOrderCreated }: { onClose: () => void; onOrderCre
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
                     <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-emerald-500" />
                         <p className="font-bold text-gray-900 dark:text-white text-sm">Simulasi Pesanan Baru</p>
                     </div>
                     <button onClick={onClose}><X className="w-4 h-4 text-gray-400 hover:text-gray-600" /></button>
@@ -415,7 +414,6 @@ function PesananContent() {
     const [apiOrders, setApiOrders] = useState<PipelineOrder[]>([])
     const [apiLoading, setApiLoading] = useState(true)
     const [apiError, setApiError] = useState<string | null>(null)
-    const [showSim, setShowSim] = useState(false)
     const [statusOverrides, setStatusOverrides] = useState<Record<string | number, PipelineStatus>>({})
     const [selectedIds, setSelectedIds] = useState<Array<string | number>>([])
     const [openActionId, setOpenActionId] = useState<string | number | null>(null)
@@ -706,7 +704,7 @@ function PesananContent() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-5">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-2 sm:p-5">
 
             <div className="max-w-[1600px] mx-auto">
                 {/* ── Page Header ── */}
@@ -718,7 +716,7 @@ function PesananContent() {
                 </div>
 
                 {/* ── Stats Cards ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
                         <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex-shrink-0"><Timer className="w-6 h-6 text-amber-600 dark:text-amber-400" /></div>
                         <div>
@@ -727,7 +725,7 @@ function PesananContent() {
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                        <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-lg flex-shrink-0"><Zap className="w-6 h-6 text-sky-600 dark:text-sky-400" /></div>
+                        <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-lg flex-shrink-0"><BarChart2 className="w-6 h-6 text-sky-600 dark:text-sky-400" /></div>
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Aktif</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{dateFiltered.filter(o => ['lunas', 'aktif'].includes(o.status)).length}</p>
@@ -750,58 +748,60 @@ function PesananContent() {
                 </div>
 
                 {/* ── Action Toolbar ── */}
-                <div className="flex items-center gap-4 mb-6">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
                     {/* Search & Filter Container */}
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 shadow-sm flex items-center gap-3 flex-1 max-w-[calc(100%-180px)]">
-                        <div className="relative group flex-1 max-w-2xl flex">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-2 sm:p-3 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
+                        <div className="relative group flex-1 flex">
                             <div className="relative flex-1">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                                 {apiLoading && search && (
-                                    <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                    <Loader2 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
                                 )}
                                 <input
                                     type="text"
-                                    placeholder="Cari member, guru, paket, kode pesanan..."
+                                    placeholder="Cari member, guru..."
                                     value={searchInput}
                                     onChange={e => handleSearchChange(e.target.value)}
                                     onKeyDown={handleKeyPress}
-                                    className="w-full pl-11 pr-4 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all border-r-0"
+                                    className="w-full pl-9 sm:pl-11 pr-4 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all border-r-0"
                                 />
                             </div>
                             <button
                                 onClick={handleSearchSubmit}
-                                className="px-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer"
+                                className="px-4 sm:px-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer"
                             >
                                 Cari
                             </button>
                         </div>
-                        <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
                         
-                        <button
-                            onClick={() => setBulkOpen(o => !o)}
-                            disabled={selectedIds.length === 0 || updatingStatus}
-                            className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all shadow-sm ${
-                                selectedIds.length > 0 
-                                ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
-                                : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
-                            }`}
-                        >
-                            Bulk Status
-                            {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-white text-[10px] ml-1">{selectedIds.length}</span>}
-                            <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="hidden sm:block h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
+                        
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setBulkOpen(o => !o)}
+                                disabled={selectedIds.length === 0 || updatingStatus}
+                                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 sm:py-2 text-xs font-bold transition-all shadow-sm ${
+                                    selectedIds.length > 0 
+                                    ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
+                                    : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
+                                }`}
+                            >
+                                Bulk
+                                {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-white text-[10px] ml-1">{selectedIds.length}</span>}
+                                <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
 
-                        <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
-                        <button
-                            onClick={() => setFilterOpen(true)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
-                                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
-                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                            }`}
-                        >
-                            <Filter className="w-4 h-4" />
-                            Filter
-                        </button>
+                            <button
+                                onClick={() => setFilterOpen(true)}
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2.5 rounded-xl border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
+                                    ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                }`}
+                            >
+                                <Filter className="w-4 h-4" />
+                                Filter
+                            </button>
+                        </div>
                     </div>
 
                     <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
@@ -891,11 +891,6 @@ function PesananContent() {
                             </button>
                         )}
                         
-                        <button onClick={() => setShowSim(true)}
-                            title="Simulasi pesanan untuk testing"
-                            className="flex items-center justify-center w-[48px] h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none transition-all cursor-pointer group">
-                            <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                        </button>
                     </div>
                 </div>
 
@@ -1242,7 +1237,7 @@ function PesananContent() {
                 </div>
             </div>
 
-            {showSim && <SimModal onClose={() => setShowSim(false)} onOrderCreated={refreshSim} />}
+
 
             {/* ── Bulk Status Modal ── */}
             {bulkOpen && selectedIds.length > 0 && (
@@ -1306,3 +1301,4 @@ function PesananContent() {
 export default function PesananPage() {
     return <PesananContent />
 }
+

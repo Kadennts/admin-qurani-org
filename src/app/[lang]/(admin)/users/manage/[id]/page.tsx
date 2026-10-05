@@ -407,7 +407,7 @@ function UserDetailContent() {
                                         {t("user_detail.tabs.kyc", "KYC Member")}
                                     </TabsTrigger>
                                     <TabsTrigger value="wallet" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
-                                        {t("user_detail.tabs.wallet", "Dompet User")}
+                                        {t("user_detail.tabs.wallet", "Wallet")}
                                     </TabsTrigger>
                                     <TabsTrigger value="pesanan" className="shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-1 py-3 sm:py-4 data-[state=active]:shadow-none text-xs sm:text-sm font-semibold text-gray-500 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white">
                                         {t("user_detail.tabs.orders", "Pesanan")}

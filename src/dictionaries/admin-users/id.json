@@ -99,7 +99,7 @@
     "tabs": {
       "overview": "Overview",
       "kyc": "KYC Member",
-      "wallet": "Dompet",
+      "wallet": "Wallet",
       "orders": "Pesanan",
       "setoran": "Setoran",
       "log": "Log Aktivitas"
@@ -192,6 +192,10 @@
       "approve_tooltip": "Setujui setoran ini",
       "reject_tooltip": "Tolak setoran ini",
       "pagination": "Menampilkan {{from}}-{{to}} dari {{total}} setoran",
+      "view_all": "Lihat Semua Setoran",
+      "view_all_count": "Lihat Semua ({{count}} Setoran)",
+      "full_page_title": "Semua Setoran",
+      "showing_preview": "Menampilkan 10 setoran terbaru",
       "columns": {
         "time": "Waktu",
         "penyetor": "Penyetor",
@@ -233,7 +237,11 @@
       },
       "session_label": "sesi",
       "detail": "Detail",
-      "no_details": "Belum ada detail."
+      "no_details": "Belum ada detail.",
+      "view_all": "Lihat Semua Pesanan",
+      "view_all_count": "Lihat Semua ({{count}} Pesanan)",
+      "full_page_title": "Semua Pesanan",
+      "showing_preview": "Menampilkan 10 pesanan terbaru"
     },
     "log": {
       "title": "Log Aktivitas",
@@ -268,7 +276,13 @@
       "print_title": "Mutasi Rekening",
       "print_user": "Pengguna",
       "print_period": "Periode",
-      "print_generated": "Dicetak pada"
+      "print_generated": "Dicetak pada",
+      "view_all": "Lihat Semua Mutasi",
+      "view_all_count": "Lihat Semua ({{count}} Mutasi)",
+      "full_page_title": "Semua Mutasi Saldo",
+      "showing_preview": "Menampilkan 10 mutasi terbaru",
+      "income": "Pemasukan",
+      "expense": "Pengeluaran"
     }
   }
 }

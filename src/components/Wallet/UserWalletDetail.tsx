@@ -5,8 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import {
     Wallet, History, Loader2, AlertTriangle, FileText,
     ChevronDown, SlidersHorizontal, X, Printer, GraduationCap,
-    ArrowRight, Clock, CheckCircle2, XCircle, ExternalLink,
-    DollarSign, ArrowDownLeft, ArrowUpRight, ShoppingCart, CheckCircle
+    ArrowRight, Clock, CheckCircle2, ExternalLink,
+    ArrowDownLeft, ArrowUpRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -201,7 +201,11 @@ interface UserWalletDetailProps {
     hideLimitFeature?: boolean;
     /** Jika true, card Saldo Pending bisa diklik untuk melihat data payout guru */
     isTeacher?: boolean;
+    /** Preview mode: hanya tampilkan 10 mutasi terbaru di profile, dengan tombol Lihat Semua */
+    preview?: boolean;
 }
+
+const MUTASI_PREVIEW = 10;
 
 type ViewMode = "list" | "mutasi";
 
@@ -213,6 +217,7 @@ export function UserWalletDetail({
     hideProfileCard = false,
     hideLimitFeature = false,
     isTeacher = false,
+    preview = true,
 }: UserWalletDetailProps) {
     const router = useRouter();
     const pathname = usePathname();
@@ -424,91 +429,217 @@ export function UserWalletDetail({
 
     const handleExportPDF = () => {
         const userName = userData?.name || userData?.username || userId;
-        const fromLabel = filterDateFrom || "—";
-        const toLabel = filterDateTo || "—";
+        const userEmail = userData?.email || "";
+        const fromLabel = filterDateFrom
+            ? new Date(filterDateFrom).toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" })
+            : "\u2014";
+        const toLabel = filterDateTo
+            ? new Date(filterDateTo).toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" })
+            : "\u2014";
+        const generatedAt = new Date().toLocaleString(locale, {
+            day: "2-digit", month: "long", year: "numeric",
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+        });
+
         const printWindow = window.open("", "_blank");
         if (!printWindow) {
             toast.error("Popup diblokir browser. Izinkan popup untuk ekspor PDF.");
             return;
         }
 
-        const rows = mutasiRows
-            .map(
-                (tx) => `
-          <tr>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap;font-size:12px;color:#374151">
-              ${formatDateShort(tx.createdAt, locale)}
-            </td>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151">
-              <div style="font-weight:600">${getTxTypeName(tx.type, t)}</div>
-              <div style="color:#9ca3af;font-size:11px">${tx.referenceId || `#${tx.id}`}</div>
-              <div style="color:#6b7280;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tx.description || ""}</div>
-            </td>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:${tx.amount < 0 ? "#dc2626" : "#d1fae5"}">
-              ${tx.amount < 0 ? formatCurrency(Math.abs(tx.amount), locale) : ""}
-            </td>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:${tx.amount >= 0 ? "#059669" : "#d1fae5"}">
-              ${tx.amount >= 0 ? formatCurrency(tx.amount, locale) : ""}
-            </td>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700;color:#111827">
-              ${formatCurrency(tx.runningBalance, locale)}
-            </td>
-          </tr>`
-            )
-            .join("");
+        // Compute totals
+        const totalDebit = mutasiRows.reduce((sum, tx) => sum + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
+        const totalCredit = mutasiRows.reduce((sum, tx) => sum + (tx.amount >= 0 ? tx.amount : 0), 0);
+        const activeBalance: number = walletData?.activeBalance ?? walletData?.balance ?? 0;
 
-        printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="${isRTL ? "rtl" : "ltr"}" lang="${locale}">
-      <head>
-        <meta charset="UTF-8"/>
-        <title>${t("user_detail.wallet_statement.print_title", "Mutasi Rekening")} — ${userName}</title>
-        <style>
-          body{font-family:Arial,sans-serif;color:#111827;margin:0;padding:32px;background:#fff}
-          h1{font-size:20px;margin-bottom:4px;color:#065f46}
-          .meta{font-size:12px;color:#6b7280;margin-bottom:24px}
-          table{width:100%;border-collapse:collapse;font-size:12px}
-          thead tr{background:#f0fdf4}
-          th{padding:10px 12px;text-align:left;font-size:11px;color:#374151;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1fae5}
-          th.num,td.num{text-align:right}
-          tr:nth-child(even){background:#f9fafb}
-          tfoot tr{background:#ecfdf5}
-          tfoot td{font-weight:700;border-top:2px solid #6ee7b7;padding:10px 12px;font-size:12px}
-          @media print{body{padding:16px}}
-        </style>
-      </head>
-      <body>
-        <h1>🕌 Qurani — ${t("user_detail.wallet_statement.print_title", "Mutasi Rekening")}</h1>
-        <div class="meta">
-          ${t("user_detail.wallet_statement.print_user", "Pengguna")}: <strong>${userName}</strong> &nbsp;|&nbsp;
-          ${t("user_detail.wallet_statement.print_period", "Periode")}: <strong>${fromLabel} → ${toLabel}</strong> &nbsp;|&nbsp;
-          ${t("user_detail.wallet_statement.print_generated", "Dicetak pada")}: <strong>${new Date().toLocaleString(locale)}</strong>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>${t("user_detail.wallet_statement.col_date", "Tanggal")}</th>
-              <th>${t("user_detail.wallet_statement.col_desc", "Keterangan")}</th>
-              <th class="num">${t("user_detail.wallet_statement.col_debit", "Debit")}</th>
-              <th class="num">${t("user_detail.wallet_statement.col_credit", "Kredit")}</th>
-              <th class="num">${t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-          <tfoot>
-            <tr>
-              <td colspan="4">${t("billing.wallet_detail.active_balance", "Saldo Aktif")}</td>
-              <td class="num">${formatCurrency(walletData?.activeBalance ?? 0, locale)}</td>
-            </tr>
-          </tfoot>
-        </table>
-        <script>window.onload=function(){window.print();window.close()}<\/script>
-      </body>
-      </html>`);
-        printWindow.document.close();
+
+        const statusLabel = walletData?.status?.toLowerCase() === "suspended" ? "Suspended" : "Aktif";
+        const walletId = walletData?.id || `W-${userId}`;
+        const emailStr = userEmail ? `(${userEmail})` : "";
+        const rowsHtml = mutasiRows.length === 0
+            ? "<tr><td colspan='5' style='text-align:center;padding:20px;'>Tidak ada data mutasi pada periode ini</td></tr>"
+            : mutasiRows.map(tx => [
+                "<tr>",
+                `<td>${formatDateShort(tx.createdAt, locale)}</td>`,
+                "<td>",
+                `<strong>${getTxTypeName(tx.type, t)}</strong><br/>`,
+                `<span style='font-size:11px;color:#555'>${tx.referenceId || "#" + tx.id}</span><br/>`,
+                `<span style='font-size:12px'>${tx.description || ""}</span>`,
+                "</td>",
+                `<td class='r'>${tx.amount < 0 ? formatCurrency(Math.abs(tx.amount), locale) : "-"}</td>`,
+                `<td class='r'>${tx.amount >= 0 ? formatCurrency(tx.amount, locale) : "-"}</td>`,
+                `<td class='r'><strong>${formatCurrency(tx.runningBalance, locale)}</strong></td>`,
+                "</tr>",
+            ].join("")).join("");
+
+
+        const writeDoc = (logoBase64: string) => {
+            const logoTag = logoBase64
+                ? `<img src="${logoBase64}" alt="Qurani" style="height:48px;object-fit:contain;display:block"/>`
+                : `<div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;border:1px solid #000;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px">\u{1F54C}</div><span style="color:#000;font-size:24px;font-weight:900;letter-spacing:-0.5px">Qurani</span></div>`;
+
+            const totalDebitStr = formatCurrency(totalDebit, locale);
+            const totalCreditStr = formatCurrency(totalCredit, locale);
+            const activeBalStr = formatCurrency(activeBalance, locale);
+
+            printWindow.document.write(`<!DOCTYPE html>
+<html lang="${locale}" dir="${isRTL ? "rtl" : "ltr"}">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mutasi Rekening \u2014 ${userName}</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,'Helvetica Neue',sans-serif;background:#fff;color:#000;padding:40px;line-height:1.5}
+.toolbar{position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;align-items:center;gap:8px;background:#064e3b;border-radius:30px;padding:6px 14px 6px 12px;box-shadow:0 4px 16px rgba(6,78,59,.3);font-size:12px;}
+.btn-print{background:#fff;color:#064e3b;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-print:hover{background:#d1fae5}
+.toolbar-lbl{color:rgba(167,243,208,.85);font-size:11px;}
+.pw{max-width:800px;margin:0 auto;}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:16px;margin-bottom:0;}
+.hdr-left{display:flex;flex-direction:column;gap:4px;}
+.hdr-right{text-align:right;}
+.hdr-org{font-size:13px;font-weight:bold;color:#222;margin-top:8px;}
+.hdr-addr{font-size:11px;color:#555;}
+.hdr-title{font-size:22px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;}
+.hdr-sub{font-size:12px;color:#444;margin-top:2px;}
+.info-table{width:100%;border-collapse:collapse;font-size:13px;margin:0;border-bottom:1px solid #ccc;margin-bottom:18px;}
+.info-table tr{border-bottom:1px solid #eee;}
+.info-table td{padding:6px 8px;vertical-align:top;}
+.info-lbl{color:#555;font-size:12px;width:120px;white-space:nowrap;}
+.info-sep{color:#555;width:10px;text-align:center;}
+.info-val{color:#111;font-size:13px;padding-right:24px;}
+table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:13px;}
+thead th{background:#f3f4f6;padding:9px 10px;text-align:left;font-weight:bold;border:1px solid #d1d5db;font-size:12px;}
+thead th.r{text-align:right;}
+tbody td{padding:9px 10px;border:1px solid #d1d5db;vertical-align:top;}
+tbody td.r{text-align:right;}
+.summary{display:flex;justify-content:flex-end;margin-bottom:32px;}
+.summary-table{width:320px;border-collapse:collapse;font-size:13px;}
+.summary-table td{padding:8px 10px;border:1px solid #d1d5db;}
+.summary-table td.lbl{font-weight:bold;background:#f3f4f6;width:180px;}
+.summary-table td.val{text-align:right;font-weight:bold;}
+.ftr{text-align:center;font-size:11.5px;color:#555;border-top:1px solid #d1d5db;padding-top:16px;line-height:1.6;}
+@media print{
+  body{padding:0;}
+  .toolbar{display:none!important;}
+  .pw{max-width:100%;}
+  @page{margin:15mm;}
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span class="toolbar-lbl">Siap dicetak / simpan PDF</span>
+  <button class="btn-print" onclick="window.print()">\u{1F5A8}\uFE0F Cetak / Simpan PDF</button>
+</div>
+<div class="pw">
+
+  <!-- HEADER: Bank-style -->
+  <div class="hdr">
+    <div class="hdr-left">
+      ${logoTag}
+      <div class="hdr-org">PT Qurani Digital Indonesia</div>
+      <div class="hdr-addr">qurani.org &nbsp;|&nbsp; Layanan Keuangan Digital</div>
+    </div>
+    <div class="hdr-right">
+      <div class="hdr-title">LAPORAN MUTASI SALDO</div>
+      <div class="hdr-sub">Mutasi Saldo Wallet Digital</div>
+    </div>
+  </div>
+
+  <!-- NASABAH INFO: Bank-style rows -->
+  <table class="info-table">
+    <tr>
+      <td class="info-lbl">Nama Nasabah</td>
+      <td class="info-sep">:</td>
+      <td class="info-val"><strong>${userName}</strong></td>
+      <td class="info-lbl">Nomor Rekening</td>
+      <td class="info-sep">:</td>
+      <td class="info-val"><strong>${walletId}</strong></td>
+    </tr>
+    <tr>
+      <td class="info-lbl">Email</td>
+      <td class="info-sep">:</td>
+      <td class="info-val">${emailStr || "-"}</td>
+      <td class="info-lbl">Jenis Rekening</td>
+      <td class="info-sep">:</td>
+      <td class="info-val">Qurani Digital Wallet</td>
+    </tr>
+    <tr>
+      <td class="info-lbl">Periode Laporan</td>
+      <td class="info-sep">:</td>
+      <td class="info-val">${fromLabel} s/d ${toLabel}</td>
+      <td class="info-lbl">Status Rekening</td>
+      <td class="info-sep">:</td>
+      <td class="info-val">${statusLabel}</td>
+    </tr>
+    <tr>
+      <td class="info-lbl">Tanggal Cetak</td>
+      <td class="info-sep">:</td>
+      <td class="info-val" colspan="3">${generatedAt}</td>
+    </tr>
+  </table>
+
+  <!-- MUTASI TABLE -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:130px">Tanggal</th>
+        <th>Keterangan</th>
+        <th class="r" style="width:120px">Debit (Rp)</th>
+        <th class="r" style="width:120px">Kredit (Rp)</th>
+        <th class="r" style="width:120px">Saldo (Rp)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <!-- SUMMARY -->
+  <div class="summary">
+    <table class="summary-table">
+      <tr>
+        <td class="lbl">Total Mutasi Debit</td>
+        <td class="val">${totalDebitStr}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Total Mutasi Kredit</td>
+        <td class="val">${totalCreditStr}</td>
+      </tr>
+      <tr style="background:#f3f4f6">
+        <td class="lbl">Saldo Akhir</td>
+        <td class="val" style="font-size:15px">${activeBalStr}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- DISCLAIMER / FOOTER -->
+  <div class="ftr">
+    <div>Dokumen ini dicetak secara elektronik melalui sistem Qurani dan <strong>sah tanpa tanda tangan dan cap basah</strong>.</div>
+    <div style="margin-top:4px;color:#888">Jika Anda memerlukan klarifikasi, hubungi layanan kami di qurani.org &nbsp;&mdash;&nbsp; &copy; ${new Date().getFullYear()} PT Qurani Digital Indonesia</div>
+  </div>
+</div>
+</body>
+</html>`);
+            printWindow.document.close();
+        };
+
+        // Convert logo to base64 so it renders correctly in the blank popup window
+        fetch("/icons/Qurani%20-%20Logo%20Green.png")
+            .then((res) => res.blob())
+            .then((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => writeDoc(reader.result as string);
+                reader.onerror = () => writeDoc("");
+                reader.readAsDataURL(blob);
+            })
+            .catch(() => writeDoc(""));
     };
 
     const hasActiveFilters = filterDateFrom || filterDateTo || filterType !== "all";
+
 
     const clearFilters = () => {
         setFilterDateFrom("");
@@ -883,8 +1014,9 @@ export function UserWalletDetail({
                                 </p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left whitespace-nowrap">
+                            <div>
+                                <div className="hidden sm:block overflow-x-auto">
+                                    <table className="w-full text-sm text-left whitespace-nowrap">
                                     <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 tracking-wider font-bold">
                                         <tr>
                                             <th className="px-5 py-3.5">{t("billing.wallet_detail.table.id", "ID")}</th>
@@ -957,44 +1089,83 @@ export function UserWalletDetail({
                                     </tbody>
                                 </table>
                             </div>
+                            {/* Mobile cards for List mode */}
+                            <div className="sm:hidden space-y-3 mt-4">
+                                {filteredTransactions.map((tx: any) => (
+                                    <div
+                                        key={`mob-list-${tx.id}`}
+                                        onClick={() => router.push(`/${lang}/billing/${tx.id}/transaction`)}
+                                        className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 space-y-3 cursor-pointer"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-gray-900 dark:text-white text-sm">{tx.referenceId ? tx.referenceId : `#${tx.id}`}</span>
+                                                <span className="text-[10px] text-gray-400 uppercase mt-0.5">{tx.referenceId ? t("billing.wallet_detail.internal_id", "Internal: #{{id}}", { id: tx.id }) : t("billing.wallet_detail.internal_tx", "Transaksi Internal")}</span>
+                                            </div>
+                                            <div className="bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700/50">
+                                                {getStatusBadge(tx.status, t)}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                {getTxTypeBadge(tx.type, t)}
+                                                {tx.paymentMethod && (
+                                                    <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                                        {tx.paymentMethod}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-xs text-gray-500">
+                                                {tx.description || t("billing.wallet_detail.description_fallback", "Transaksi")}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                                {formatDate(tx.createdAt, "relative", tz, locale, t)}
+                                            </span>
+                                            <span className={`font-black text-sm ${tx.amount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                                {tx.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(tx.amount), locale)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                         )}
                     </>
                 )}
 
-                {/* ── MUTASI BANK MODE (TIMELINE DESIGN) ──────────────────────────────────────────────── */}
+                {/* ── MUTASI BANK MODE (TABLE BANK DESIGN) ──────────────────────────────────────────────── */}
                 {viewMode === "mutasi" && (
-                    <div ref={printRef} className="space-y-6">
-                        {/* Summary Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t("billing.wallet_detail.active_balance", "Saldo Aktif")}</p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(walletData?.activeBalance ?? 0, locale)}</p>
-                                </div>
-                                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
-                                    <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                                </div>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Pemasukan</p>
-                                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                    <div ref={printRef} className="space-y-4">
+                        {/* Summary Cards — hanya Pemasukan & Pengeluaran (Saldo Aktif sudah ada di atas) */}
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 truncate">
+                                        {t("user_detail.wallet_statement.income", "Pemasukan")}
+                                    </p>
+                                    <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 truncate">
                                         {formatCurrency(mutasiRows.filter((tx: any) => tx.amount > 0).reduce((acc: number, tx: any) => acc + tx.amount, 0), locale)}
                                     </p>
                                 </div>
-                                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
-                                    <ArrowDownLeft className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
+                                    <ArrowDownLeft className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Pengeluaran</p>
-                                    <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 truncate">
+                                        {t("user_detail.wallet_statement.expense", "Pengeluaran")}
+                                    </p>
+                                    <p className="text-lg sm:text-xl font-bold text-red-600 dark:text-red-400 truncate">
                                         {formatCurrency(Math.abs(mutasiRows.filter((tx: any) => tx.amount < 0).reduce((acc: number, tx: any) => acc + tx.amount, 0)), locale)}
                                     </p>
                                 </div>
-                                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-                                    <ArrowUpRight className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                                    <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-400" />
                                 </div>
                             </div>
                         </div>
@@ -1007,74 +1178,143 @@ export function UserWalletDetail({
                                 </p>
                             </div>
                         ) : (
-                            <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 dark:before:via-gray-700 before:to-transparent">
-                                {mutasiRows.map((tx: any, idx: number) => {
-                                    const isDebit = tx.amount < 0;
-                                    const isFirst = idx === 0;
-                                    
-                                    // Icons based on type
-                                    let Icon = History;
-                                    let iconBg = "bg-gray-100 dark:bg-gray-800";
-                                    let iconColor = "text-gray-500 dark:text-gray-400";
+                            <>
+                                {/* Preview notice */}
+                                {preview && mutasiRows.length > MUTASI_PREVIEW && (
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                                        {t("user_detail.wallet_statement.showing_preview", "Menampilkan 10 mutasi terbaru")}
+                                    </p>
+                                )}
 
-                                    if (tx.type === 1) { // TopUp
-                                        Icon = ArrowDownLeft;
-                                        iconBg = "bg-emerald-100 dark:bg-emerald-900/30";
-                                        iconColor = "text-emerald-600 dark:text-emerald-400";
-                                    } else if (tx.type === 2) { // Withdraw
-                                        Icon = ArrowUpRight;
-                                        iconBg = "bg-orange-100 dark:bg-orange-900/30";
-                                        iconColor = "text-orange-600 dark:text-orange-400";
-                                    } else if (tx.type === 4) { // Payment
-                                        Icon = isDebit ? ShoppingCart : CheckCircle;
-                                        iconBg = isDebit ? "bg-red-100 dark:bg-red-900/30" : "bg-emerald-100 dark:bg-emerald-900/30";
-                                        iconColor = isDebit ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
-                                    }
-
-                                    return (
-                                        <div key={`mob-${tx.id}-${idx}`} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active mb-8">
-                                            {/* Icon */}
-                                            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white dark:border-gray-900 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 ${iconBg} ${iconColor}`}>
-                                                <Icon className="w-4 h-4" />
-                                            </div>
-                                            
-                                            {/* Content Card */}
-                                            <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/60 hover:shadow-md transition-shadow">
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">{formatDateShort(tx.createdAt, locale)}</span>
+                                {/* ── Bank Statement Table ── */}
+                                {/* Desktop: full table */}
+                                <div className="hidden sm:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-[11px] text-gray-500 uppercase bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 tracking-wider font-bold">
+                                            <tr>
+                                                <th className="px-4 py-3.5">{t("user_detail.wallet_statement.col_date", "Tanggal")}</th>
+                                                <th className="px-4 py-3.5">{t("user_detail.wallet_statement.col_desc", "Keterangan")}</th>
+                                                <th className="px-4 py-3.5 text-right">{t("user_detail.wallet_statement.col_debit", "Debit")}</th>
+                                                <th className="px-4 py-3.5 text-right">{t("user_detail.wallet_statement.col_credit", "Kredit")}</th>
+                                                <th className="px-4 py-3.5 text-right">{t("user_detail.wallet_statement.col_balance", "Saldo Akhir")}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
+                                            {(preview ? mutasiRows.slice(0, MUTASI_PREVIEW) : mutasiRows).map((tx: any, idx: number) => {
+                                                const isDebit = tx.amount < 0;
+                                                const isFirst = idx === 0;
+                                                return (
+                                                    <tr
+                                                        key={`tbl-${tx.id}-${idx}`}
+                                                        className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors group"
+                                                    >
+                                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                                                                    {formatDateShort(tx.createdAt, locale)}
+                                                                </span>
                                                                 {isFirst && (
-                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">TERBARU</span>
+                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 uppercase">
+                                                                        {t("billing.wallet_detail.rel.just_now", "Terbaru")}
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                            <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{getTxTypeName(tx.type, t)}</h4>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className={`text-base font-black ${isDebit ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                                {isDebit ? '-' : '+'}{formatCurrency(Math.abs(tx.amount), locale)}
+                                                        </td>
+                                                        <td className="px-4 py-3.5">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    {getTxTypeBadge(tx.type, t)}
+                                                                </div>
+                                                                {tx.description && (
+                                                                    <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                                                                        {tx.description}
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-[10px] font-mono text-gray-400">
+                                                                    {tx.referenceId || `#${tx.id}`}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right">
+                                                            {isDebit ? (
+                                                                <span className="font-bold text-red-600 dark:text-red-400">
+                                                                    {formatCurrency(Math.abs(tx.amount), locale)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 dark:text-gray-700">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right">
+                                                            {!isDebit ? (
+                                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                                    {formatCurrency(tx.amount, locale)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 dark:text-gray-700">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right">
+                                                            <span className="font-bold text-gray-800 dark:text-gray-200">
+                                                                {formatCurrency(tx.runningBalance, locale)}
                                                             </span>
-                                                        </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile: card per row */}
+                                <div className="sm:hidden space-y-3">
+                                    {(preview ? mutasiRows.slice(0, MUTASI_PREVIEW) : mutasiRows).map((tx: any, idx: number) => {
+                                        const isDebit = tx.amount < 0;
+                                        const isFirst = idx === 0;
+                                        return (
+                                            <div
+                                                key={`mob-${tx.id}-${idx}`}
+                                                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 space-y-3"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        {getTxTypeBadge(tx.type, t)}
+                                                        {isFirst && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 uppercase">Terbaru</span>
+                                                        )}
                                                     </div>
-                                                    
-                                                    {tx.description && (
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">{tx.description}</p>
-                                                    )}
-                                                    
-                                                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex justify-between items-center">
-                                                        <span className="text-[10px] font-mono text-gray-400">Ref: {tx.referenceId || `#${tx.id}`}</span>
-                                                        <div className="text-right flex items-center gap-2">
-                                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Saldo</span>
-                                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatCurrency(tx.runningBalance, locale)}</span>
-                                                        </div>
+                                                    <span className={`text-base font-black ${isDebit ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                        {isDebit ? '-' : '+'}{formatCurrency(Math.abs(tx.amount), locale)}
+                                                    </span>
+                                                </div>
+                                                {tx.description && (
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{tx.description}</p>
+                                                )}
+                                                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-[10px] font-mono text-gray-400">{tx.referenceId || `#${tx.id}`}</span>
+                                                        <span className="text-[10px] text-gray-400">{formatDateShort(tx.createdAt, locale)}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Saldo</p>
+                                                        <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatCurrency(tx.runningBalance, locale)}</p>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* View All button (preview mode) */}
+                                {preview && mutasiRows.length > 0 && (
+                                    <button
+                                        onClick={() => router.push(`/${lang}/users/manage/${userId}/mutations`)}
+                                        className="w-full py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                        {t("user_detail.wallet_statement.view_all_count", "Lihat Semua ({{count}} Mutasi)").replace("{{count}}", String(mutasiRows.length))}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 )}

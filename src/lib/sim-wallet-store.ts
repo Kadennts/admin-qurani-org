@@ -8,7 +8,7 @@ const TRANSACTIONS_KEY = "qurani_sim_transactions_v3"
 const WALLET_STATS_KEY = "qurani_sim_wallet_stats"
 const WALLETS_KEY = "qurani_sim_wallets_v2"
 const STORE_VERSION_KEY = "qurani_sim_wallet_version"
-const STORE_VERSION = "v13-pkg-names"
+const STORE_VERSION = "v14-pagination-test"
 
 // ─── RIWAYAT TRANSAKSI DINAMIS ───────────────────────────
 function generateDynamicTransactions() {

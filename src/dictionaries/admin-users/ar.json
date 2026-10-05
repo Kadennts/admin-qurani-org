@@ -77,7 +77,7 @@
     "tabs": {
       "overview": "نظرة عامة",
       "kyc": "KYC العضو",
-      "wallet": "محفظة المستخدم",
+      "wallet": "المحفظة",
       "orders": "الطلبات",
       "setoran": "الإيداعات",
       "log": "سجل النشاط"
@@ -170,6 +170,10 @@
       "approve_tooltip": "الموافقة على هذا الإيداع",
       "reject_tooltip": "رفض هذا الإيداع",
       "pagination": "عرض {{from}}-{{to}} من {{total}} إيداع",
+      "view_all": "عرض جميع الإيداعات",
+      "view_all_count": "عرض الكل ({{count}} إيداع)",
+      "full_page_title": "جميع الإيداعات",
+      "showing_preview": "عرض أحدث 10 إيداعات",
       "columns": {
         "time": "الوقت",
         "penyetor": "المودِع",
@@ -211,7 +215,11 @@
       },
       "session_label": "جلسات",
       "detail": "تفاصيل",
-      "no_details": "لا توجد تفاصيل بعد."
+      "no_details": "لا توجد تفاصيل بعد.",
+      "view_all": "عرض جميع الطلبات",
+      "view_all_count": "عرض الكل ({{count}} طلب)",
+      "full_page_title": "جميع الطلبات",
+      "showing_preview": "عرض أحدث 10 طلبات"
     },
     "log": {
       "title": "سجل النشاط",
@@ -246,7 +254,13 @@
       "print_title": "كشف الحساب البنكي",
       "print_user": "المستخدم",
       "print_period": "الفترة",
-      "print_generated": "تم الإنشاء في"
+      "print_generated": "تم الإنشاء في",
+      "view_all": "عرض جميع المعاملات",
+      "view_all_count": "عرض الكل ({{count}} معاملة)",
+      "full_page_title": "جميع المعاملات",
+      "showing_preview": "عرض أحدث 10 معاملات",
+      "income": "الدخل",
+      "expense": "المصروفات"
     }
   }
 }

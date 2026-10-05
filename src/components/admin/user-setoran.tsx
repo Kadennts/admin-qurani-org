@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, ChevronLeft, ChevronRight, CheckCircle, Minus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { BookOpen, ChevronLeft, ChevronRight, CheckCircle, Minus, ExternalLink } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -17,7 +18,7 @@ import { getRecapAllAdmin } from "@/utils/api/recaps/fetch"
 import { IRecap } from "@/types/recap"
 import { getSimSetoransByUser } from "@/data/sim-setoran"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { formatTimeAgo, formatTooltipDate } from "@/lib/date-utils"
+import { formatTimeAgo, formatTooltipDate, formatDateShort } from "@/lib/date-utils"
 
 const PAGE_SIZE = 10
 
@@ -31,18 +32,6 @@ function getClientToken(): string | null {
     } catch {
         return null
     }
-}
-
-function formatDateWithHour(date: string, locale: string) {
-    const dt = new Date(date)
-    if (Number.isNaN(dt.getTime())) return date
-    return dt.toLocaleDateString(locale, {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-    })
 }
 
 function formatMemorizationDisplay(memorization: string, recitationType: string) {
@@ -90,9 +79,17 @@ function getResultFromConclusion(conclusion: string | undefined, mistakesCount: 
     }
 }
 
-export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boolean }) {
+interface UserSetoranProps {
+    userId: string
+    isMock?: boolean
+    /** Preview mode: hanya tampilkan 10 data terbaru tanpa paginasi penuh */
+    preview?: boolean
+}
+
+export function UserSetoran({ userId, isMock, preview = true }: UserSetoranProps) {
     const router = useRouter()
     const { t, locale } = useI18n()
+    const lang = typeof window !== "undefined" ? window.location.pathname.split("/")[1] : "en"
     const [recaps, setRecaps] = useState<IRecap[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [currentPage, setCurrentPage] = useState(1)
@@ -141,7 +138,13 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
         if (currentPage > totalPages) setCurrentPage(totalPages)
     }, [currentPage, totalPages])
 
-    const displayedData = recaps.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    // Preview mode: only first 10, no pagination
+    // Full mode: paginate normally
+    const displayedData = preview
+        ? recaps.slice(0, PAGE_SIZE)
+        : recaps.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+    const hasMore = preview && recaps.length > 0
 
     if (isLoading) {
         return (
@@ -166,15 +169,34 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     {t("user_detail.setoran.history_title", "Riwayat Setoran")}
-                    <span className="text-sm font-medium text-gray-400">({recaps.length})</span>
                 </h4>
+                {hasMore && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/${lang}/users/manage/${userId}/setorans`)}
+                        className="gap-2 text-xs h-8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-400"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        {t("user_detail.setoran.view_all_count", "Lihat Semua ({{count}} Setoran)").replace("{{count}}", String(recaps.length))}
+                    </Button>
+                )}
             </div>
 
-            <div className="hidden md:block rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Preview notice */}
+            {preview && recaps.length > PAGE_SIZE && (
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                    {t("user_detail.setoran.showing_preview", "Menampilkan 10 setoran terbaru")}
+                </p>
+            )}
+
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-emerald-600 hover:bg-emerald-600">
@@ -245,6 +267,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                 </Table>
             </div>
 
+            {/* Mobile Cards */}
             <div className="md:hidden space-y-3">
                 {displayedData.map((row) => {
                     const result = getResultFromConclusion(row.conclusion, row.mistakes?.length || 0)
@@ -255,7 +278,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                             className="bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatTooltipDate(row.created_at)}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateShort(row.created_at, locale)}</span>
                                 {row.paraf
                                     ? <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                     : <Minus className="h-5 w-5 text-gray-300 dark:text-gray-600" />}
@@ -279,8 +302,20 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                 })}
             </div>
 
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2">
+            {/* View All Button (preview mode with hasMore) */}
+            {hasMore && (
+                <button
+                    onClick={() => router.push(`/${lang}/users/manage/${userId}/setorans`)}
+                    className="w-full py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                    <ExternalLink className="w-4 h-4" />
+                    {t("user_detail.setoran.view_all_count", "Lihat Semua ({{count}} Setoran)").replace("{{count}}", String(recaps.length))}
+                </button>
+            )}
+
+            {/* Pagination (full mode only) */}
+            {!preview && totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         {t("user_detail.setoran.pagination", "Menampilkan {{from}}-{{to}} dari {{total}} setoran", {
                             from: (currentPage - 1) * PAGE_SIZE + 1,
@@ -296,7 +331,7 @@ export function UserSetoran({ userId, isMock }: { userId: string; isMock?: boole
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{currentPage} / {totalPages}</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200 min-w-[60px] text-center">{currentPage} / {totalPages}</span>
                         <button
                             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}

@@ -405,7 +405,7 @@ export function TeacherOrdersTab({ trainerId, userId, locale }: Props) {
                                                 className="flex items-center justify-center w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                             >
                                                 <MoreHorizontal className="w-3.5 h-3.5" />
-                                            </button>   tu 30r9uq3utr9f3    9ur
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-start mb-3">

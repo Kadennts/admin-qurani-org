@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingCart, ArrowRight, Calendar } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ShoppingCart, ArrowRight, Calendar, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -15,7 +16,9 @@ import {
 import { useI18n } from "@/components/providers/i18n-provider"
 import dummyData from "@/data/billing-dummy.json"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { formatTimeAgo, formatTooltipDate } from "@/lib/date-utils"
+import { formatTimeAgo, formatTooltipDate, formatDateShort } from "@/lib/date-utils"
+
+const PAGE_SIZE = 10
 
 function formatCurrency(amount: number, locale: string) {
     return new Intl.NumberFormat(locale, {
@@ -24,18 +27,6 @@ function formatCurrency(amount: number, locale: string) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(amount).replace("IDR", "Rp")
-}
-
-function formatDate(dateString: string, locale: string) {
-    try {
-        const date = new Date(dateString)
-        if (isNaN(date.getTime())) return dateString
-        return date.toLocaleDateString(locale, {
-            day: "2-digit", month: "short", year: "numeric"
-        })
-    } catch {
-        return dateString
-    }
 }
 
 type OrderStatus = "baru" | "lunas" | "aktif" | "gagal" | "selesai" | "menunggu_guru"
@@ -57,7 +48,13 @@ function getStage(status: string): OrderStatus {
     return "baru"
 }
 
-export function UserOrders({ userId }: { userId: string }) {
+interface UserOrdersProps {
+    userId: string
+    /** Preview mode: hanya tampilkan 10 data, tanpa paginasi penuh */
+    preview?: boolean
+}
+
+export function UserOrders({ userId, preview = true }: UserOrdersProps) {
     const router = useRouter()
     const { t, locale } = useI18n()
     const lang = typeof window !== "undefined" ? window.location.pathname.split("/")[1] : "en"
@@ -67,6 +64,20 @@ export function UserOrders({ userId }: { userId: string }) {
             .filter((b) => String(b.userId) === String(userId))
             .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())
     }, [userId])
+
+    const [currentPage, setCurrentPage] = useState(1)
+    
+    const totalPages = Math.ceil(orders.length / PAGE_SIZE)
+
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages)
+    }, [currentPage, totalPages])
+
+    const displayOrders = preview 
+        ? orders.slice(0, PAGE_SIZE) 
+        : orders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    
+    const hasMore = preview && orders.length > 0
 
     if (orders.length === 0) {
         return (
@@ -81,15 +92,34 @@ export function UserOrders({ userId }: { userId: string }) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <ShoppingCart className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <ShoppingCart className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     {t("user_detail.orders.title", "Riwayat Pesanan")}
-                    <span className="text-sm font-medium text-gray-400">({orders.length})</span>
                 </h4>
+                {hasMore && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/${lang}/users/manage/${userId}/orders`)}
+                        className="gap-2 text-xs h-8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-400"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        {t("user_detail.orders.view_all_count", "Lihat Semua ({{count}} Pesanan)").replace("{{count}}", String(orders.length))}
+                    </Button>
+                )}
             </div>
 
-            <div className="hidden md:block rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Preview notice */}
+            {preview && orders.length > PAGE_SIZE && (
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                    {t("user_detail.orders.showing_preview", "Menampilkan 10 pesanan terbaru")}
+                </p>
+            )}
+
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-emerald-600 hover:bg-emerald-600">
@@ -103,7 +133,7 @@ export function UserOrders({ userId }: { userId: string }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {orders.map((order) => {
+                        {displayOrders.map((order) => {
                             const st = STATUS_CONFIG[getStage(order.status)]
                             return (
                                 <TableRow
@@ -155,8 +185,9 @@ export function UserOrders({ userId }: { userId: string }) {
                 </Table>
             </div>
 
+            {/* Mobile Cards */}
             <div className="md:hidden space-y-3">
-                {orders.map((order) => {
+                {displayOrders.map((order) => {
                     const st = STATUS_CONFIG[getStage(order.status)]
                     return (
                         <div
@@ -172,7 +203,7 @@ export function UserOrders({ userId }: { userId: string }) {
                                 <p className="font-medium">{order.packageName}</p>
                                 <p className="text-gray-500">{t("user_detail.orders.columns.trainer", "Guru")}: {order.trainerName}</p>
                                 <p className="text-gray-500">{order.completedSessions}/{order.totalSessions} {t("user_detail.orders.session_label", "sesi")}</p>
-                                <p className="text-gray-500">{formatTooltipDate(order.bookingDate)}</p>
+                                <p className="text-gray-500">{formatDateShort(order.bookingDate, locale)}</p>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
                                 <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalPayment, locale)}</span>
@@ -184,6 +215,50 @@ export function UserOrders({ userId }: { userId: string }) {
                     )
                 })}
             </div>
+
+            {/* View All Button (bottom, mobile-friendly) */}
+            {hasMore && (
+                <button
+                    onClick={() => router.push(`/${lang}/users/manage/${userId}/orders`)}
+                    className="w-full py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                    <ExternalLink className="w-4 h-4" />
+                    {t("user_detail.orders.view_all_count", "Lihat Semua ({{count}} Pesanan)").replace("{{count}}", String(orders.length))}
+                </button>
+            )}
+
+            {/* Pagination (full mode only) */}
+            {!preview && totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {t("user_detail.orders.pagination", "Menampilkan {{from}}-{{to}} dari {{total}} pesanan", {
+                            from: (currentPage - 1) * PAGE_SIZE + 1,
+                            to: Math.min(currentPage * PAGE_SIZE, orders.length),
+                            total: orders.length,
+                        })}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="text-xs h-8"
+                        >
+                            <ChevronLeft className="w-4 h-4 mr-1" /> {t("common.previous", "Sebelumnya")}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="text-xs h-8"
+                        >
+                            {t("common.next", "Selanjutnya")} <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

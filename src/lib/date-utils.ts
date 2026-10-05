@@ -113,3 +113,15 @@ export function formatTimeAgo(dateInput: Date | string | null | undefined, local
         return ""
     }
 }
+
+export function formatDateShort(dateInput: Date | string | null | undefined, localeStr = 'id-ID'): string {
+    if (!dateInput) return "-";
+    let d: Date;
+    if (dateInput instanceof Date) {
+        d = dateInput;
+    } else {
+        d = new Date(String(dateInput));
+    }
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString(localeStr, { day: "2-digit", month: "short", year: "numeric" });
+}

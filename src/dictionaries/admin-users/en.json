@@ -99,7 +99,7 @@
     "tabs": {
       "overview": "Overview",
       "kyc": "KYC Member",
-      "wallet": "User Wallet",
+      "wallet": "Wallet",
       "orders": "Orders",
       "setoran": "Setoran",
       "log": "Activity Log"
@@ -192,6 +192,10 @@
       "approve_tooltip": "Approve this setoran",
       "reject_tooltip": "Reject this setoran",
       "pagination": "Showing {{from}}-{{to}} of {{total}} setoran",
+      "view_all": "View All Setoran",
+      "view_all_count": "View All ({{count}} Setoran)",
+      "full_page_title": "All Setoran",
+      "showing_preview": "Showing the 10 most recent setoran",
       "columns": {
         "time": "Time",
         "penyetor": "Depositor",
@@ -233,7 +237,11 @@
       },
       "session_label": "sessions",
       "detail": "Detail",
-      "no_details": "No details yet."
+      "no_details": "No details yet.",
+      "view_all": "View All Orders",
+      "view_all_count": "View All ({{count}} Orders)",
+      "full_page_title": "All Orders",
+      "showing_preview": "Showing the 10 most recent orders"
     },
     "log": {
       "title": "Activity Log",
@@ -268,7 +276,13 @@
       "print_title": "Bank Statement",
       "print_user": "User",
       "print_period": "Period",
-      "print_generated": "Generated on"
+      "print_generated": "Generated on",
+      "view_all": "View All Mutations",
+      "view_all_count": "View All ({{count}} Mutations)",
+      "full_page_title": "All Balance Mutations",
+      "showing_preview": "Showing the 10 most recent mutations",
+      "income": "Income",
+      "expense": "Expense"
     }
   }
 }
