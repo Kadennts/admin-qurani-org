@@ -432,10 +432,17 @@ export function UserWalletDetail({
         const userEmail = userData?.email || "";
         const fromLabel = filterDateFrom
             ? new Date(filterDateFrom).toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" })
-            : "\u2014";
+            : "";
         const toLabel = filterDateTo
             ? new Date(filterDateTo).toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" })
-            : "\u2014";
+            : "";
+        const periodeLabel = fromLabel && toLabel
+            ? `${fromLabel} s/d ${toLabel}`
+            : fromLabel
+            ? `Mulai ${fromLabel}`
+            : toLabel
+            ? `s/d ${toLabel}`
+            : "Seluruh Riwayat Transaksi";
         const generatedAt = new Date().toLocaleString(locale, {
             day: "2-digit", month: "long", year: "numeric",
             hour: "2-digit", minute: "2-digit", second: "2-digit"
@@ -544,7 +551,6 @@ tbody td.r{text-align:right;}
     </div>
     <div class="hdr-right">
       <div class="hdr-title">LAPORAN MUTASI SALDO</div>
-      <div class="hdr-sub">Mutasi Saldo Wallet Digital</div>
     </div>
   </div>
 
@@ -569,7 +575,7 @@ tbody td.r{text-align:right;}
     <tr>
       <td class="info-lbl">Periode Laporan</td>
       <td class="info-sep">:</td>
-      <td class="info-val">${fromLabel} s/d ${toLabel}</td>
+      <td class="info-val">${periodeLabel}</td>
       <td class="info-lbl">Status Rekening</td>
       <td class="info-sep">:</td>
       <td class="info-val">${statusLabel}</td>

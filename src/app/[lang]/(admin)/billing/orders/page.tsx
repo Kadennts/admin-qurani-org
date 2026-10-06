@@ -750,40 +750,40 @@ function PesananContent() {
                 {/* ── Action Toolbar ── */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
                     {/* Search & Filter Container */}
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-2 sm:p-3 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
-                        <div className="relative group flex-1 flex">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                                {apiLoading && search && (
-                                    <Loader2 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                                )}
-                                <input
-                                    type="text"
-                                    placeholder="Cari member, guru..."
-                                    value={searchInput}
-                                    onChange={e => handleSearchChange(e.target.value)}
-                                    onKeyDown={handleKeyPress}
-                                    className="w-full pl-9 sm:pl-11 pr-4 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all border-r-0"
-                                />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
+                            <div className="relative group flex-1 md:max-w-sm flex shadow-sm rounded-xl overflow-hidden bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                                    {apiLoading && search && (
+                                        <Loader2 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                    )}
+                                    <input
+                                        type="text"
+                                        placeholder="Cari member, guru..."
+                                        value={searchInput}
+                                        onChange={e => handleSearchChange(e.target.value)}
+                                        onKeyDown={handleKeyPress}
+                                        className="w-full pl-9 sm:pl-11 pr-4 py-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all h-10"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSearchSubmit}
+                                    className="px-4 sm:px-5 bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2 text-xs font-bold transition-all cursor-pointer h-10"
+                                >
+                                    Cari
+                                </button>
                             </div>
-                            <button
-                                onClick={handleSearchSubmit}
-                                className="px-4 sm:px-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer"
-                            >
-                                Cari
-                            </button>
                         </div>
                         
-                        <div className="hidden sm:block h-8 w-px bg-gray-100 dark:bg-gray-800 mx-1" />
-                        
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 sm:ml-auto">
                             <button
                                 onClick={() => setBulkOpen(o => !o)}
                                 disabled={selectedIds.length === 0 || updatingStatus}
-                                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 sm:py-2 text-xs font-bold transition-all shadow-sm ${
+                                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border px-3 h-10 text-xs font-bold transition-all shadow-sm ${
                                     selectedIds.length > 0 
                                     ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
-                                    : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
+                                    : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
                                 }`}
                             >
                                 Bulk
@@ -793,7 +793,7 @@ function PesananContent() {
 
                             <button
                                 onClick={() => setFilterOpen(true)}
-                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2.5 rounded-xl border text-sm font-semibold transition-colors whitespace-nowrap ${hasActiveFilter
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 h-10 rounded-xl border text-sm font-semibold transition-colors shadow-sm whitespace-nowrap ${hasActiveFilter
                                     ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
                                     : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                                 }`}

@@ -23,34 +23,6 @@ export {
     handleGoogleCallback,
 } from './oauth';
 
-// Re-export Tickets services
-export {
-    fetchTickets,
-    fetchTicketById,
-    createTicket,
-    addTicketReply,
-    updateTicketStatus,
-    updateTicketPriority,
-    assignTicket,
-    uploadTicketAttachment,
-    fetchTicketStatuses,
-    fetchTicketPriorities,
-    fetchPredefinedReplies,
-    submitTicketFeedback,
-} from './tickets';
-
-// Re-export types from tickets
-export type {
-    TicketListDto,
-    TicketDetailDto,
-    TicketReplyDto,
-    TicketAttachmentDto,
-    CreateTicketRequest,
-    CreateReplyRequest,
-    TicketStatusDto,
-    TicketPriorityDto,
-} from './tickets';
-
 // Re-export Setoran/Recitation services
 export {
     createSetoran,

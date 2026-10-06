@@ -229,7 +229,7 @@ function MutationsFullContent() {
             {/* Back + Header */}
             <div className="flex items-center gap-3 flex-wrap">
                 <button
-                    onClick={() => router.push(`/${lang}/users/manage/${userId}?tab=wallet`)}
+                    onClick={() => router.back()}
                     className="group flex items-center justify-center w-9 h-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 transition-all shadow-sm shrink-0"
                 >
                     <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />

@@ -336,7 +336,8 @@ export default function FinanceDashboardPage() {
                             </div>
                         )}
 
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table */}
+                        <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
                                     <tr>
@@ -421,6 +422,74 @@ export default function FinanceDashboardPage() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Mobile Cards */}
+                        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
+                            {loading ? (
+                                <div className="p-4 space-y-3">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                                    ))}
+                                </div>
+                            ) : pagedTransactions.length === 0 ? (
+                                <div className="py-12 text-center text-gray-500">
+                                    <History className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                                    <p className="text-sm font-medium">Belum ada riwayat transaksi</p>
+                                </div>
+                            ) : (
+                                pagedTransactions.map((tx: any, idx: number) => (
+                                    <div
+                                        key={tx.id || idx}
+                                        onClick={() => router.push(`/${lang}/billing/${tx.id}/transaction`)}
+                                        className="p-4 space-y-3 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors"
+                                    >
+                                        {/* Row 1: ID + Status */}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800 shrink-0">
+                                                #{tx.id}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                {getTxTypeBadge(tx.type, tx.typeName)}
+                                                {getStatusBadge(tx.status)}
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: User info */}
+                                        <div className="flex items-start gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); if (tx.userId) { router.push(`/${lang}/users/manage/${tx.userId}?tab=wallet`) } }}
+                                                    className="font-semibold text-gray-900 dark:text-white text-sm hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left truncate block w-full"
+                                                >
+                                                    {tx.user?.name || `User ID: ${tx.userId}`}
+                                                </button>
+                                                {tx.user?.username && (
+                                                    <span className="text-[11px] text-gray-400">@{tx.user.username}</span>
+                                                )}
+                                                {tx.description && (
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{tx.description}</p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Row 3: Amount + Method + Time */}
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                                    {getPaymentMethodName(tx.paymentMethod)}
+                                                </span>
+                                                <span className="text-[11px] text-gray-400">
+                                                    {formatDate(tx.createdAt, 'relative', tz, locale)}
+                                                </span>
+                                            </div>
+                                            <span className={`font-black text-base ${tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                {tx.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(tx.amount || 0))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
 
                         <SmartPagination

@@ -1070,7 +1070,7 @@ export default function Users() {
                                             </TableCell>
                                             <TableCell className="py-2 px-3">
                                                 <Badge variant="outline" className={`px-2 py-0.5 text-xs font-medium border rounded-md shadow-sm ${(user.isBlocked || false) ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'}`}>
-                                                    {(user.isBlocked || false) ? t('status.blocked', 'Tidak') : t('status.active', 'Ya')}
+                                                    {(user.isBlocked || false) ? t('status.blocked', 'Diblokir') : t('status.active', 'Aktif')}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="py-2 px-3">

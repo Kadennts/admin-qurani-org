@@ -91,15 +91,17 @@ function UserDetailContent() {
     const { profile, loading: loadingProfile, isMock } = useUserProfile(userId)
     const user = profile as any
 
-    const defaultTab = searchParams?.get("tab") || "overview"
-    const [activeTab, setActiveTab] = useState(defaultTab)
+    const [activeTab, setActiveTab] = useState(() => searchParams?.get("tab") || "overview")
 
     useEffect(() => {
         const tab = searchParams?.get("tab")
         if (tab && tab !== activeTab) {
             setActiveTab(tab)
+        } else if (!tab && activeTab !== "overview") {
+            // If URL has no tab param, reset to overview
+            setActiveTab("overview")
         }
-    }, [searchParams, activeTab])
+    }, [searchParams])
 
     const handleTabChange = (val: string) => {
         setActiveTab(val)
@@ -289,9 +291,7 @@ function UserDetailContent() {
                                 <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white leading-tight truncate">
                                     {user.name || user.username}
                                 </h1>
-                                <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] px-2 py-0 shrink-0">
-                                    #{userId}
-                                </Badge>
+
                                 {user.isVerify && (
                                     <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] px-2 h-5 inline-flex items-center justify-center leading-none border border-emerald-200 dark:border-emerald-800 shrink-0">
                                         Verified
