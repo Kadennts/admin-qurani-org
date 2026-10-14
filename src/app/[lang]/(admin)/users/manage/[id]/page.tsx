@@ -164,9 +164,15 @@ function UserDetailContent() {
         const balances = getSimWalletBalances(userId)
         setSimBalance(balances)
 
-        // Jumlah pesanan dari billing-dummy.json
+        // Jumlah pesanan dari billing-dummy.json (deduplicated)
+        const seenOrderIds = new Set<string>()
         const orders = (dummyBillingData.bookings as any[]).filter(
-            (b: any) => String(b.userId) === String(userId)
+            (b: any) => {
+                if (String(b.userId) !== String(userId)) return false
+                if (seenOrderIds.has(String(b.id))) return false
+                seenOrderIds.add(String(b.id))
+                return true
+            }
         )
         setSimOrderCount(orders.length)
 

@@ -362,6 +362,127 @@
         "limit_success": "تم تحديث حد المحفظة بنجاح",
         "limit_error": "فشل تحديث حد المحفظة"
       }
+    },
+    "orders": {
+      "detail": {
+        "title": "تفاصيل الطلب",
+        "back": "العودة إلى الطلبات",
+        "back_payments": "العودة إلى المدفوعات",
+        "back_payout": "العودة إلى المدفوعات للمعلمين",
+        "back_refund": "العودة إلى المسترجعات",
+        "invoice_no": "رقم الفاتورة",
+        "copy": "نسخ",
+        "copied": "تم النسخ!",
+        "view_invoice": "عرض الفاتورة",
+        "created_at": "تم الإنشاء في",
+        "tab_info": "معلومات الطلب",
+        "tab_log": "السجل والنشاط",
+        "progress": {
+          "title": "تقدم التعلم",
+          "sessions_done": "{{done}}/{{total}} مكتملة",
+          "percent": "{{pct}}% من رحلة التعلم مكتملة",
+          "stat_completed": "مكتملة",
+          "stat_absent": "غائب",
+          "stat_ongoing": "جارية",
+          "stat_scheduled": "مجدولة"
+        },
+        "schedule": {
+          "title": "جدول الدروس",
+          "count": "{{count}} جلسة",
+          "empty": "لا يوجد جدول بعد",
+          "empty_hint": "أكمل الدفع لإعداد الجدول.",
+          "session": "الجلسة {{n}}",
+          "detail": "التفاصيل",
+          "mark_done": "تحديد كمكتمل",
+          "feedback_label": "تقييم الجلسة",
+          "rating": "التقييم"
+        },
+        "notes": {
+          "title": "ملاحظات",
+          "graduation": "ملاحظة التخرج",
+          "cancellation": "تفاصيل الإلغاء",
+          "reason": "السبب / الفئة",
+          "note": "ملاحظة",
+          "resolution": "الحل"
+        },
+        "log": {
+          "title": "السجل والنشاط",
+          "empty": "لا يوجد نشاط مسجل بعد.",
+          "by": "بواسطة"
+        },
+        "student": {
+          "title": "الطالب"
+        },
+        "teacher": {
+          "title": "المعلم",
+          "students": "{{count}} طالب"
+        },
+        "payment": {
+          "title": "ملخص الدفع",
+          "method": "طريقة الدفع",
+          "package": "الباقة",
+          "price_package": "سعر الباقة",
+          "tax": "الضريبة",
+          "service_fee": "رسوم الخدمة",
+          "free": "مجاني",
+          "total": "الإجمالي",
+          "payment_status": "حالة الدفع",
+          "gateway": "بوابة الدفع",
+          "transaction_ref": "مرجع المعاملة",
+          "paid_at": "تاريخ الدفع",
+          "payout_status": "حالة الصرف",
+          "go_to_payout": "الذهاب إلى الصرف",
+          "check_refund": "التحقق من طلب الاسترداد"
+        },
+        "order_info": {
+          "title": "معلومات الطلب",
+          "order_date": "تاريخ الطلب",
+          "total_sessions": "إجمالي الجلسات",
+          "completed_sessions": "الجلسات المكتملة",
+          "mode": "الوضع"
+        },
+        "status": {
+          "order": {
+            "active": "نشط",
+            "completed": "مكتمل",
+            "cancelled": "ملغى",
+            "menunggu_guru": "بانتظار المعلم",
+            "pending": "بانتظار الدفع"
+          },
+          "session": {
+            "completed": "مكتملة",
+            "ongoing": "جارية",
+            "scheduled": "مجدولة",
+            "cancelled": "ملغاة",
+            "absent": "غائب"
+          },
+          "payment": {
+            "paid": "مدفوع",
+            "pending": "غير مدفوع",
+            "failed": "فشل",
+            "refunded": "مسترجع",
+            "paid_out": "تم الصرف"
+          }
+        },
+        "mode": {
+          "online": "عبر الإنترنت",
+          "offline": "حضوري"
+        },
+        "payout_status": {
+          "paid_out": "تم تحويل الأموال للمعلم",
+          "refunded": "تم استرجاع الأموال",
+          "paid": "مدفوع (بانتظار الصرف)",
+          "pending": "بانتظار الدفع"
+        },
+        "not_found": {
+          "title": "الطلب غير موجود",
+          "desc": "رقم الطلب #{{id}} غير موجود في قاعدة البيانات.",
+          "back": "العودة إلى قائمة الطلبات"
+        },
+        "error": {
+          "load_failed": "فشل تحميل بيانات الطلب."
+        }
+      }
     }
   }
 }

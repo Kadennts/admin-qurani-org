@@ -660,8 +660,11 @@ export default function SupportTicketsPage() {
       )}
 
       {/* --- PAGE TITLE --- */}
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Support Tickets</h1>
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-500 hover:text-emerald-600 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm" onClick={() => loadTickets()} disabled={isLoading}>
+          <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+        </Button>
       </div>
 
       {/* --- HEADER --- */}
@@ -720,155 +723,143 @@ export default function SupportTicketsPage() {
             {t('new_ticket')}
           </Button>
         </div>
-      </div>
-
-      {/* --- TOOLBAR SECTION --- */}
-      <div className="flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between bg-white dark:bg-gray-900 p-2 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-        {/* Left Side: Bulk, Export */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 xl:pb-0 scrollbar-hide">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 whitespace-nowrap text-xs">
-                {t('bulk_actions')} <ChevronDown className="w-3 h-3 ml-2 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={handleBulkAction}>{t('edit_selected')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu
-            open={showExportDropdown}
-            onOpenChange={setShowExportDropdown}
-          >
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 whitespace-nowrap text-xs" disabled={isExporting}>
-                {isExporting ? <RefreshCw className="w-3 h-3 animate-spin mr-2" /> : <FileSpreadsheet className="w-3.5 h-3.5 mr-2 text-gray-500" />}
-                {t("export_label", "Export")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => handleExport("excel")}>
-                <FileSpreadsheet className="w-3.5 h-3.5 mr-2 text-emerald-600" /> {t("export.excel", "Excel")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("csv")}>
-                <FileText className="w-3.5 h-3.5 mr-2 text-blue-600" /> {t("export.csv", "CSV")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("print")}>
-                <Printer className="w-3.5 h-3.5 mr-2 text-gray-600" /> {t("export.print", "Print")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Right Side: Search, Filter, Date */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full xl:w-auto ml-auto">
-          {/* Search Bar Joined Format */}
-          <div className="flex items-center w-full sm:w-auto order-3 sm:order-1">
-            <div className="flex w-full sm:w-64 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
-              <input
-                type="text"
-                placeholder={t('search_placeholder') || "Cari ticket..."}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setSearchQuery(searchInput)
-                    setCurrentPage(1)
-                  }
-                }}
-                className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
-              />
-              <button 
-                  onClick={() => {
-                    setSearchQuery(searchInput)
-                    setCurrentPage(1)
-                  }}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
-              >
-                  <Search className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto sm:overflow-visible order-1 sm:order-2">
-            {/* Main Filter Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "h-9 w-full sm:w-auto whitespace-nowrap text-xs",
-                (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) 
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20" 
-                  : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
-              )}
-              onClick={() => {
-                setTempStatusFilters([...statusFilters])
-                setTempPriorityFilters([...priorityFilters])
-                setTempDepartmentFilters([...departmentFilters])
-                setShowFilterPanel(true)
+      </div>      {/* --- TOOLBAR SECTION --- */}
+      <div className="flex flex-wrap gap-2 items-center bg-white dark:bg-gray-900 p-2 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+        {/* Search Bar */}
+        <div className="flex items-center flex-1 min-w-[140px] sm:flex-none sm:w-64 order-1">
+          <div className="flex w-full rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
+            <input
+              type="text"
+              placeholder={t('search_placeholder') || "Cari ticket..."}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setSearchQuery(searchInput)
+                  setCurrentPage(1)
+                }
               }}
+              className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
+            />
+            <button 
+                onClick={() => {
+                  setSearchQuery(searchInput)
+                  setCurrentPage(1)
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
             >
-              <Filter className="w-3.5 h-3.5 mr-2" />
-              {t('filters')}
-            </Button>
-
-            {/* Date Filter Enhanced */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-9 w-full sm:w-auto justify-start sm:justify-center whitespace-nowrap text-xs", (dateRange.start || dateRange.end) && "border-emerald-500 text-emerald-700 bg-emerald-50")}>
-                  <CalendarIcon className="w-3.5 h-3.5 mr-2 text-emerald-600" />
-                  {dateRange.start ? (
-                    <span>{dateRange.start}{dateRange.end ? ` - ${dateRange.end}` : ''}</span>
-                  ) : t('date_range')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-4" align="end">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleDatePreset(0)} className="text-xs">{t('this_month')}</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDatePreset(3)} className="text-xs">{t('last_3_months')}</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDatePreset(6)} className="text-xs">{t('last_6_months')}</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDatePreset('year')} className="text-xs">{t('last_year')}</Button>
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[10px] font-medium uppercase text-gray-500">{t('start')}</label>
-                      <input type="date" className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-sm"
-                        value={dateRange.start || ""}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[10px] font-medium uppercase text-gray-500">{t('end')}</label>
-                      <input type="date" className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-sm"
-                        value={dateRange.end || ""}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 text-xs"
-                      onClick={() => { setDateRange({ start: null, end: null }); setCurrentPage(1); }}
-                    >
-                      {t('clear')}
-                    </Button>
-                    <Button size="sm" className="flex-1 bg-emerald-600 text-white text-xs"
-                      onClick={() => setCurrentPage(1)}
-                    >
-                      {t('apply')}
-                    </Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-500 hover:text-emerald-600" onClick={() => loadTickets()} disabled={isLoading}>
-              <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
-            </Button>
+                <Search className="w-4 h-4" />
+            </button>
           </div>
         </div>
+
+        {/* Filter Button - icon only on mobile */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-9 px-2.5 sm:px-3 order-2",
+            (statusFilters.length > 0 || priorityFilters.length > 0 || departmentFilters.length > 0) 
+              ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20" 
+              : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
+          )}
+          onClick={() => {
+            setTempStatusFilters([...statusFilters])
+            setTempPriorityFilters([...priorityFilters])
+            setTempDepartmentFilters([...departmentFilters])
+            setShowFilterPanel(true)
+          }}
+        >
+          <Filter className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline ml-1.5 text-xs whitespace-nowrap">{t('filters')}</span>
+        </Button>
+
+        {/* Date Range - calendar icon + text on mobile */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("h-9 px-2.5 sm:px-3 order-3", (dateRange.start || dateRange.end) && "border-emerald-500 text-emerald-700 bg-emerald-50")}>
+              <CalendarIcon className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="ml-1.5 text-xs whitespace-nowrap">
+                {dateRange.start ? `${dateRange.start}${dateRange.end ? ` - ${dateRange.end}` : ''}` : t('date_range')}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-4" align="end">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleDatePreset(0)} className="text-xs">{t('this_month')}</Button>
+                <Button size="sm" variant="outline" onClick={() => handleDatePreset(3)} className="text-xs">{t('last_3_months')}</Button>
+                <Button size="sm" variant="outline" onClick={() => handleDatePreset(6)} className="text-xs">{t('last_6_months')}</Button>
+                <Button size="sm" variant="outline" onClick={() => handleDatePreset('year')} className="text-xs">{t('last_year')}</Button>
+              </div>
+              <div className="flex gap-2 items-center">
+                <div className="space-y-1 flex-1">
+                  <label className="text-[10px] font-medium uppercase text-gray-500">{t('start')}</label>
+                  <input type="date" className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-sm"
+                    value={dateRange.start || ""}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <label className="text-[10px] font-medium uppercase text-gray-500">{t('end')}</label>
+                  <input type="date" className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-sm"
+                    value={dateRange.end || ""}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 text-xs"
+                  onClick={() => { setDateRange({ start: null, end: null }); setCurrentPage(1); }}
+                >
+                  {t('clear')}
+                </Button>
+                <Button size="sm" className="flex-1 bg-emerald-600 text-white text-xs"
+                  onClick={() => setCurrentPage(1)}
+                >
+                  {t('apply')}
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Bulk Actions - text visible on mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 px-2.5 sm:px-3 order-4 text-xs">
+              <span className="">{t('bulk_actions')}</span>
+              <ChevronDown className="w-3 h-3 ml-2 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={handleBulkAction}>{t('edit_selected')}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Export - text visible on mobile */}
+        <DropdownMenu
+          open={showExportDropdown}
+          onOpenChange={setShowExportDropdown}
+        >
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 px-2.5 sm:px-3 order-5 text-xs" disabled={isExporting}>
+              {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5 text-gray-500" />}
+              <span className="ml-1.5">{t("export_label", "Export")}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => handleExport("excel")}>
+              <FileSpreadsheet className="w-3.5 h-3.5 mr-2 text-emerald-600" /> {t("export.excel", "Excel")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv")}>
+              <FileText className="w-3.5 h-3.5 mr-2 text-blue-600" /> {t("export.csv", "CSV")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("print")}>
+              <Printer className="w-3.5 h-3.5 mr-2 text-gray-600" /> {t("export.print", "Print")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* --- CONTENT SECTION --- */}

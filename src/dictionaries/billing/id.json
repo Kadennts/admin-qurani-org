@@ -362,6 +362,127 @@
         "limit_success": "Limit wallet berhasil diperbarui",
         "limit_error": "Gagal memperbarui limit wallet"
       }
+    },
+    "orders": {
+      "detail": {
+        "title": "Detail Pesanan",
+        "back": "Kembali ke Pesanan",
+        "back_payments": "Kembali ke Pembayaran",
+        "back_payout": "Kembali ke Payout",
+        "back_refund": "Kembali ke Refund",
+        "invoice_no": "No. Invoice",
+        "copy": "Salin",
+        "copied": "Tersalin!",
+        "view_invoice": "Lihat Invoice",
+        "created_at": "Dibuat pada",
+        "tab_info": "Informasi Pesanan",
+        "tab_log": "Log & Aktivitas",
+        "progress": {
+          "title": "Progress Belajar",
+          "sessions_done": "{{done}}/{{total}} Selesai",
+          "percent": "{{pct}}% perjalanan belajar selesai",
+          "stat_completed": "Selesai",
+          "stat_absent": "Tidak Hadir",
+          "stat_ongoing": "Berlangsung",
+          "stat_scheduled": "Terjadwal"
+        },
+        "schedule": {
+          "title": "Jadwal Belajar",
+          "count": "{{count}} Pertemuan",
+          "empty": "Belum ada jadwal",
+          "empty_hint": "Selesaikan pembayaran untuk mengatur jadwal.",
+          "session": "Pertemuan {{n}}",
+          "detail": "Detail",
+          "mark_done": "Tandai Selesai",
+          "feedback_label": "Feedback Sesi",
+          "rating": "Rating"
+        },
+        "notes": {
+          "title": "Catatan",
+          "graduation": "Catatan Kelulusan",
+          "cancellation": "Detail Pembatalan",
+          "reason": "Alasan / Kategori",
+          "note": "Catatan",
+          "resolution": "Resolusi"
+        },
+        "log": {
+          "title": "Riwayat & Aktivitas",
+          "empty": "Belum ada aktivitas tercatat.",
+          "by": "Oleh"
+        },
+        "student": {
+          "title": "Murid"
+        },
+        "teacher": {
+          "title": "Pengajar",
+          "students": "{{count}} Murid"
+        },
+        "payment": {
+          "title": "Ringkasan Pembayaran",
+          "method": "Metode Bayar",
+          "package": "Paket",
+          "price_package": "Harga Paket",
+          "tax": "Pajak",
+          "service_fee": "Biaya Layanan",
+          "free": "Gratis",
+          "total": "Total",
+          "payment_status": "Status Pembayaran",
+          "gateway": "Gateway",
+          "transaction_ref": "Ref. Transaksi",
+          "paid_at": "Tanggal Bayar",
+          "payout_status": "Status Payout",
+          "go_to_payout": "Ke Halaman Payout",
+          "check_refund": "Cek Permintaan Refund"
+        },
+        "order_info": {
+          "title": "Info Pesanan",
+          "order_date": "Tanggal Pesan",
+          "total_sessions": "Total Sesi",
+          "completed_sessions": "Sesi Selesai",
+          "mode": "Metode"
+        },
+        "status": {
+          "order": {
+            "active": "Aktif",
+            "completed": "Selesai",
+            "cancelled": "Dibatalkan",
+            "menunggu_guru": "Menunggu Guru",
+            "pending": "Menunggu Bayar"
+          },
+          "session": {
+            "completed": "Selesai",
+            "ongoing": "Berlangsung",
+            "scheduled": "Terjadwal",
+            "cancelled": "Batal",
+            "absent": "Tidak Hadir"
+          },
+          "payment": {
+            "paid": "Lunas",
+            "pending": "Belum Bayar",
+            "failed": "Gagal",
+            "refunded": "Refund",
+            "paid_out": "Dana Diteruskan"
+          }
+        },
+        "mode": {
+          "online": "Online",
+          "offline": "Offline"
+        },
+        "payout_status": {
+          "paid_out": "Dana Diteruskan ke Guru",
+          "refunded": "Dana Dikembalikan (Refund)",
+          "paid": "Lunas (Menunggu Payout)",
+          "pending": "Menunggu Pembayaran"
+        },
+        "not_found": {
+          "title": "Pesanan Tidak Ditemukan",
+          "desc": "ID pesanan #{{id}} tidak ada dalam database.",
+          "back": "Kembali ke Daftar Pesanan"
+        },
+        "error": {
+          "load_failed": "Gagal memuat data pesanan."
+        }
+      }
     }
   }
 }

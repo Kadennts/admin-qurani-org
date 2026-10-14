@@ -6,7 +6,7 @@ import {
     Search, ShoppingBag, CheckCircle2, X,
     MoreHorizontal, ChevronLeft,
     ChevronRight, Trash2,
-    ChevronDown, Check, Timer, BarChart2, History, Calendar,
+    ChevronDown, ChevronUp, ChevronsUpDown, Check, Timer, BarChart2, History, Calendar,
     Loader2, AlertCircle, Wifi, MapPin, CreditCard,
     Filter, Banknote, XCircle
 } from "lucide-react"
@@ -421,6 +421,28 @@ function PesananContent() {
     const [updatingStatus, setUpdatingStatus] = useState(false)
     const [page, setPage] = useState(1)
     const [pageSize, setPageSize] = useState(10)
+
+    // ── Sorting state
+    type SortKey = "id" | "member" | "guru" | "paket" | "harga" | "status" | "tglPesan"
+    const [sortKey, setSortKey] = useState<SortKey>("tglPesan")
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+
+    function handleSort(key: SortKey) {
+        if (sortKey === key) {
+            setSortDir(d => d === "asc" ? "desc" : "asc")
+        } else {
+            setSortKey(key)
+            setSortDir("asc")
+        }
+        setPage(1)
+    }
+
+    function SortIcon({ col }: { col: SortKey }) {
+        if (sortKey !== col) return <ChevronsUpDown className="w-3 h-3 ml-1 opacity-40 inline" />
+        return sortDir === "asc"
+            ? <ChevronUp className="w-3 h-3 ml-1 text-emerald-400 inline" />
+            : <ChevronDown className="w-3 h-3 ml-1 text-emerald-400 inline" />
+    }
     
     // User wallet modal state
     const [selectedWalletUserId, setSelectedWalletUserId] = useState<string | number | null>(null);
@@ -600,7 +622,10 @@ function PesananContent() {
 
     const allOrders = useMemo<PipelineOrder[]>(() => {
         const simRows = simOrders.map(simOrderToPipeline)
-        const staticRows = dummyData.bookings.map(bookingToPipeline)
+        // Dummy/static data dipakai selama apiOrders masih kosong (API belum ada data atau error)
+        // Begitu apiOrders terisi dari server, dummy otomatis tidak dipakai
+        const useStaticFallback = !apiLoading && apiOrders.length === 0
+        const staticRows = useStaticFallback ? dummyData.bookings.map(bookingToPipeline) : []
         const combined = [...apiOrders, ...simRows, ...staticRows]
         const seen = new Set<string>()
         return combined
@@ -611,7 +636,7 @@ function PesananContent() {
                 return true
             })
             .map(o => statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o)
-    }, [apiOrders, simOrders, statusOverrides])
+    }, [apiOrders, simOrders, statusOverrides, apiLoading, apiError])
 
     // ── Client-side filtering: date range + status tab (search already applied server-side)
     const filtered = useMemo(() => {
@@ -659,6 +684,29 @@ function PesananContent() {
         })
     }, [allOrders, activeFilter, statusTab, search])
 
+    // ── Sorted results
+    const sortedFiltered = useMemo(() => {
+        const copy = [...filtered]
+        copy.sort((a, b) => {
+            let aVal: any
+            let bVal: any
+            switch (sortKey) {
+                case "id":      aVal = Number(a.id);          bVal = Number(b.id);          break
+                case "member":  aVal = a.member.toLowerCase(); bVal = b.member.toLowerCase(); break
+                case "guru":    aVal = a.guru.toLowerCase();   bVal = b.guru.toLowerCase();   break
+                case "paket":   aVal = a.paket.toLowerCase();  bVal = b.paket.toLowerCase();  break
+                case "harga":   aVal = a.harga;                bVal = b.harga;                break
+                case "status":  aVal = a.status;               bVal = b.status;               break
+                case "tglPesan": aVal = a.rawDate.getTime();  bVal = b.rawDate.getTime();    break
+                default:        aVal = a.rawDate.getTime();   bVal = b.rawDate.getTime();
+            }
+            if (aVal < bVal) return sortDir === "asc" ? -1 : 1
+            if (aVal > bVal) return sortDir === "asc" ? 1 : -1
+            return 0
+        })
+        return copy
+    }, [filtered, sortKey, sortDir])
+
     const dateFiltered = useMemo(() => {
         return allOrders.filter(o => {
             if (!o.isApi && (activeFilter.dateFrom || activeFilter.dateTo)) {
@@ -672,8 +720,8 @@ function PesananContent() {
         })
     }, [allOrders, activeFilter])
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-    const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+    const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / pageSize))
+    const paged = sortedFiltered.slice((page - 1) * pageSize, page * pageSize)
     const pagedIds = paged.map(o => o.id)
     const allPagedSelected = pagedIds.length > 0 && pagedIds.every(id => selectedIds.some(selected => String(selected) === String(id)))
 
@@ -750,58 +798,58 @@ function PesananContent() {
                 {/* ── Action Toolbar ── */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
                     {/* Search & Filter Container */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
-                        <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
-                            <div className="relative group flex-1 md:max-w-sm flex shadow-sm rounded-xl overflow-hidden bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                                    {apiLoading && search && (
-                                        <Loader2 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                                    )}
-                                    <input
-                                        type="text"
-                                        placeholder="Cari member, guru..."
-                                        value={searchInput}
-                                        onChange={e => handleSearchChange(e.target.value)}
-                                        onKeyDown={handleKeyPress}
-                                        className="w-full pl-9 sm:pl-11 pr-4 py-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all h-10"
-                                    />
-                                </div>
-                                <button
-                                    onClick={handleSearchSubmit}
-                                    className="px-4 sm:px-5 bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2 text-xs font-bold transition-all cursor-pointer h-10"
-                                >
-                                    Cari
-                                </button>
+                    <div className="flex flex-wrap items-center gap-2 w-full">
+                        {/* Search */}
+                        <div className="relative group flex-1 min-w-[200px] md:max-w-sm flex shadow-sm rounded-xl overflow-hidden bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 transition-all focus-within:ring-2 focus-within:ring-emerald-400 focus-within:border-emerald-400">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                                {apiLoading && search && (
+                                    <Loader2 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                )}
+                                <input
+                                    type="text"
+                                    placeholder="Cari member, guru..."
+                                    value={searchInput}
+                                    onChange={e => handleSearchChange(e.target.value)}
+                                    onKeyDown={handleKeyPress}
+                                    className="w-full pl-9 sm:pl-11 pr-4 py-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder:text-gray-400 transition-all h-10"
+                                />
                             </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 sm:ml-auto">
                             <button
-                                onClick={() => setBulkOpen(o => !o)}
-                                disabled={selectedIds.length === 0 || updatingStatus}
-                                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border px-3 h-10 text-xs font-bold transition-all shadow-sm ${
-                                    selectedIds.length > 0 
-                                    ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
-                                    : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
-                                }`}
+                                onClick={handleSearchSubmit}
+                                className="px-3 sm:px-5 bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer h-10"
                             >
-                                Bulk
-                                {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-white text-[10px] ml-1">{selectedIds.length}</span>}
-                                <ChevronDown className="w-3.5 h-3.5" />
+                                <Search className="w-4 h-4 sm:hidden" />
+                                <span className="hidden sm:inline">Cari</span>
                             </button>
+                        </div>
 
-                            <button
-                                onClick={() => setFilterOpen(true)}
-                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 h-10 rounded-xl border text-sm font-semibold transition-colors shadow-sm whitespace-nowrap ${hasActiveFilter
-                                    ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
-                                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                }`}
-                            >
-                                <Filter className="w-4 h-4" />
-                                Filter
-                            </button>
-                        </div>
+                        {/* Bulk Button */}
+                        <button
+                            onClick={() => setBulkOpen(o => !o)}
+                            disabled={selectedIds.length === 0 || updatingStatus}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 sm:px-3 h-10 text-xs font-bold transition-all shadow-sm ${
+                                selectedIds.length > 0 
+                                ? "bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer" 
+                                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60"
+                            }`}
+                        >
+                            <span className="hidden sm:inline">Bulk</span>
+                            {selectedIds.length > 0 && <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-white text-[10px]">{selectedIds.length}</span>}
+                            <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Filter Button */}
+                        <button
+                            onClick={() => setFilterOpen(true)}
+                            className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-4 h-10 rounded-xl border text-sm font-semibold transition-colors shadow-sm whitespace-nowrap ${hasActiveFilter
+                                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span className="hidden sm:inline">Filter</span>
+                        </button>
                     </div>
 
                     <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
@@ -882,16 +930,13 @@ function PesananContent() {
                         </DialogContent>
                     </Dialog>
 
-                    {/* Simulation Tools Container */}
-                    <div className="flex items-center gap-2.5 ml-auto">
-                        {simOrders.length > 0 && (
-                            <button onClick={handleResetSim}
-                                className="flex items-center justify-center w-[46px] h-[46px] rounded-xl border border-red-100 bg-white dark:bg-gray-900 text-red-500 hover:bg-red-50 transition-all cursor-pointer shadow-sm group">
-                                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                            </button>
-                        )}
-                        
-                    </div>
+                    {/* Simulation Tools */}
+                    {simOrders.length > 0 && (
+                        <button onClick={handleResetSim}
+                            className="flex items-center justify-center w-10 h-10 rounded-xl border border-red-100 bg-white dark:bg-gray-900 text-red-500 hover:bg-red-50 transition-all cursor-pointer shadow-sm group">
+                            <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        </button>
+                    )}
                 </div>
 
                 {/* ── API Loading / Error Toast ── */}
@@ -946,14 +991,49 @@ function PesananContent() {
                                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                         />
                                     </th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Kode Pesanan</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Murid</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Guru</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Paket</th>
+                                    <th
+                                        onClick={() => handleSort("id")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Kode Pesanan <SortIcon col="id" />
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort("member")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Murid <SortIcon col="member" />
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort("guru")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Guru <SortIcon col="guru" />
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort("paket")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Paket <SortIcon col="paket" />
+                                    </th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Mode</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Harga</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Status</th>
-                                    <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Tanggal</th>
+                                    <th
+                                        onClick={() => handleSort("harga")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Harga <SortIcon col="harga" />
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort("status")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Status <SortIcon col="status" />
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort("tglPesan")}
+                                        className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap cursor-pointer select-none hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        Tanggal <SortIcon col="tglPesan" />
+                                    </th>
                                     <th className="text-left text-xs font-bold text-gray-800 dark:text-gray-200 px-4 py-3 whitespace-nowrap">Aksi</th>
                                 </tr>
                             </thead>

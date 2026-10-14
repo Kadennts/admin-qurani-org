@@ -60,8 +60,15 @@ export function UserOrders({ userId, preview = true }: UserOrdersProps) {
     const lang = typeof window !== "undefined" ? window.location.pathname.split("/")[1] : "en"
 
     const orders = useMemo(() => {
+        const seen = new Set<string | number>()
         return dummyData.bookings
-            .filter((b) => String(b.userId) === String(userId))
+            .filter((b) => {
+                if (String(b.userId) !== String(userId)) return false
+                // dedup — simpan hanya ID pertama yang muncul
+                if (seen.has(b.id)) return false
+                seen.add(b.id)
+                return true
+            })
             .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())
     }, [userId])
 
@@ -228,35 +235,77 @@ export function UserOrders({ userId, preview = true }: UserOrdersProps) {
             )}
 
             {/* Pagination (full mode only) */}
-            {!preview && totalPages > 1 && (
+            {!preview && orders.length > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t("user_detail.orders.pagination", "Menampilkan {{from}}-{{to}} dari {{total}} pesanan", {
-                            from: (currentPage - 1) * PAGE_SIZE + 1,
-                            to: Math.min(currentPage * PAGE_SIZE, orders.length),
-                            total: orders.length,
-                        })}
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="text-xs h-8"
-                        >
-                            <ChevronLeft className="w-4 h-4 mr-1" /> {t("common.previous", "Sebelumnya")}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                            className="text-xs h-8"
-                        >
-                            {t("common.next", "Selanjutnya")} <ChevronRight className="w-4 h-4 ml-1" />
-                        </Button>
+                    {/* Left: Info text + rows per page */}
+                    <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                        <span>
+                            Menampilkan{" "}
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                                {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, orders.length)}
+                            </span>{" "}
+                            dari{" "}
+                            <span className="font-semibold text-gray-900 dark:text-white">{orders.length}</span>{" "}
+                            pesanan
+                        </span>
                     </div>
+
+                    {/* Right: Page buttons + prev/next */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-1">
+                            {/* Prev */}
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+
+                            {/* Page numbers */}
+                            {(() => {
+                                const pages: (number | "...")[] = []
+                                const delta = 1
+                                const left = currentPage - delta
+                                const right = currentPage + delta
+
+                                for (let i = 1; i <= totalPages; i++) {
+                                    if (i === 1 || i === totalPages || (i >= left && i <= right)) {
+                                        pages.push(i)
+                                    } else if (pages[pages.length - 1] !== "...") {
+                                        pages.push("...")
+                                    }
+                                }
+
+                                return pages.map((p, idx) =>
+                                    p === "..." ? (
+                                        <span key={`ellipsis-${idx}`} className="flex items-center justify-center w-8 h-8 text-xs text-gray-400">…</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => setCurrentPage(p as number)}
+                                            className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
+                                                currentPage === p
+                                                    ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                                                    : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                )
+                            })()}
+
+                            {/* Next */}
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

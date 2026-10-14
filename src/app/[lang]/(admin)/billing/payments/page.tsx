@@ -381,8 +381,8 @@ function PaymentsContent() {
                 return timeB - timeA; // Descending (terbaru di atas)
             });
 
-            setPayments(dummy)
             setTotalItems(dummy.length)
+            setPayments(dummy.slice((page - 1) * pageSize, page * pageSize))
             setStats(prev => ({
                 ...prev,
                 revenue: prev.revenue || dummy.filter(p => p.status === 'paid').reduce((a, b) => a + b.amount, 0),

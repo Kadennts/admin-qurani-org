@@ -756,52 +756,51 @@ function KycOrganisasiContent() {
                 </div>
 
                 {/* ── Search + Filter Bar ── */}
-                <div className="flex flex-col sm:flex-row items-center justify-start gap-2 w-full xl:w-auto mb-3">
-                    {/* Left Side: Search + Filter */}
-                    <div className="flex flex-col sm:flex-row items-center justify-start gap-2 w-full sm:w-auto">
-                        {/* Search Bar Joined Format */}
-                        <div className="flex items-center w-full sm:w-auto order-2 sm:order-1">
-                            <div className="flex w-full sm:w-64 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
-                                <input
-                                    type="text"
-                                    placeholder="Cari nama organisasi"
-                                    value={searchInput}
-                                    onChange={e => setSearchInput(e.target.value)}
-                                    onKeyDown={e => {
-                                        if (e.key === "Enter") {
-                                            setSearch(searchInput)
-                                            setPage(1)
-                                        }
-                                    }}
-                                    className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
-                                />
-                                <button
-                                    onClick={() => { setSearch(searchInput); setPage(1) }}
-                                    className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
-                                >
-                                    <Search className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
+                <div className="flex flex-wrap items-center gap-2 w-full mb-3">
+                    {/* Search Bar */}
+                    <div className="flex items-center flex-1 min-w-[140px]">
+                        <div className="flex w-full rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
+                            <input
+                                type="text"
+                                placeholder="Cari nama organisasi"
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === "Enter") {
+                                        setSearch(searchInput)
+                                        setPage(1)
+                                    }
+                                }}
+                                className="w-full pl-3 pr-2 h-9 text-sm bg-transparent focus:outline-none placeholder:text-gray-400"
+                            />
+                            <button
+                                onClick={() => { setSearch(searchInput); setPage(1) }}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white h-9 w-10 flex items-center justify-center shrink-0"
+                            >
+                                <Search className="w-3.5 h-3.5" />
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setShowFilter(true)}
-                            className={`relative flex items-center justify-center w-full sm:w-auto gap-1.5 h-9 px-3 text-xs font-medium rounded-lg transition-colors border order-1 sm:order-2 ${activeFiltersCount > 0
-                                ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20"
-                                : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
-                                }`}
-                        >
-                            <Filter className="w-4 h-4" /> Filter
-                        </button>
                     </div>
+                    {/* Filter Button - icon only on mobile */}
+                    <button
+                        onClick={() => setShowFilter(true)}
+                        className={`relative flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-medium rounded-lg transition-colors border ${activeFiltersCount > 0
+                            ? "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20"
+                            : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 bg-white dark:bg-gray-900"
+                            }`}
+                    >
+                        <Filter className="w-4 h-4" /> 
+                        <span className="hidden sm:inline">Filter</span>
+                    </button>
                 </div>
 
                 {/* ── Tabs ── */}
-                <div className="flex gap-0 mb-0">
+                <div className="flex gap-0 mb-0 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
                     {tabs.map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => { setActiveTab(tab.key); setPage(1) }}
-                            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer ${activeTab === tab.key
+                            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${activeTab === tab.key
                                 ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
                                 : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                                 }`}

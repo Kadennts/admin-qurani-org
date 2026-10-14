@@ -362,6 +362,127 @@
         "limit_success": "Wallet limit updated successfully",
         "limit_error": "Failed to update wallet limit"
       }
+    },
+    "orders": {
+      "detail": {
+        "title": "Order Detail",
+        "back": "Back to Orders",
+        "back_payments": "Back to Payments",
+        "back_payout": "Back to Payout",
+        "back_refund": "Back to Refund",
+        "invoice_no": "Invoice No.",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "view_invoice": "View Invoice",
+        "created_at": "Created at",
+        "tab_info": "Order Information",
+        "tab_log": "Log & Activity",
+        "progress": {
+          "title": "Learning Progress",
+          "sessions_done": "{{done}}/{{total}} Done",
+          "percent": "{{pct}}% of learning journey complete",
+          "stat_completed": "Completed",
+          "stat_absent": "Absent",
+          "stat_ongoing": "Ongoing",
+          "stat_scheduled": "Scheduled"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "count": "{{count}} Sessions",
+          "empty": "No schedule yet",
+          "empty_hint": "Complete payment to set up a schedule.",
+          "session": "Session {{n}}",
+          "detail": "Detail",
+          "mark_done": "Mark as Done",
+          "feedback_label": "Session Feedback",
+          "rating": "Rating"
+        },
+        "notes": {
+          "title": "Notes",
+          "graduation": "Graduation Note",
+          "cancellation": "Cancellation Details",
+          "reason": "Reason / Category",
+          "note": "Note",
+          "resolution": "Resolution"
+        },
+        "log": {
+          "title": "History & Activity",
+          "empty": "No activity recorded yet.",
+          "by": "By"
+        },
+        "student": {
+          "title": "Student"
+        },
+        "teacher": {
+          "title": "Teacher",
+          "students": "{{count}} Students"
+        },
+        "payment": {
+          "title": "Payment Summary",
+          "method": "Payment Method",
+          "package": "Package",
+          "price_package": "Package Price",
+          "tax": "Tax",
+          "service_fee": "Service Fee",
+          "free": "Free",
+          "total": "Total",
+          "payment_status": "Payment Status",
+          "gateway": "Gateway",
+          "transaction_ref": "Transaction Ref.",
+          "paid_at": "Payment Date",
+          "payout_status": "Payout Status",
+          "go_to_payout": "Go to Payout",
+          "check_refund": "Check Refund Request"
+        },
+        "order_info": {
+          "title": "Order Info",
+          "order_date": "Order Date",
+          "total_sessions": "Total Sessions",
+          "completed_sessions": "Completed Sessions",
+          "mode": "Mode"
+        },
+        "status": {
+          "order": {
+            "active": "Active",
+            "completed": "Completed",
+            "cancelled": "Cancelled",
+            "menunggu_guru": "Awaiting Teacher",
+            "pending": "Pending Payment"
+          },
+          "session": {
+            "completed": "Completed",
+            "ongoing": "Ongoing",
+            "scheduled": "Scheduled",
+            "cancelled": "Cancelled",
+            "absent": "Absent"
+          },
+          "payment": {
+            "paid": "Paid",
+            "pending": "Unpaid",
+            "failed": "Failed",
+            "refunded": "Refunded",
+            "paid_out": "Paid Out"
+          }
+        },
+        "mode": {
+          "online": "Online",
+          "offline": "Offline"
+        },
+        "payout_status": {
+          "paid_out": "Funds Forwarded to Teacher",
+          "refunded": "Funds Returned (Refund)",
+          "paid": "Paid (Awaiting Payout)",
+          "pending": "Pending Payment"
+        },
+        "not_found": {
+          "title": "Order Not Found",
+          "desc": "Order ID #{{id}} does not exist in the database.",
+          "back": "Back to Order List"
+        },
+        "error": {
+          "load_failed": "Failed to load order data."
+        }
+      }
     }
   }
 }
